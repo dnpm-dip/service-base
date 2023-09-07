@@ -3,7 +3,6 @@ package de.dnpm.dip.service.query
 
 import java.net.URI
 import scala.util.Either
-import scala.concurrent.{Future,ExecutionContext}
 import cats.data.{Ior,IorNel,NonEmptyList}
 import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
@@ -15,7 +14,7 @@ import de.dnpm.dip.model.{
 
 
 trait QueryOps[
-  F[_],
+  F[+_],
   Env,
   UseCase <: UseCaseConfig,
   Error
@@ -24,28 +23,32 @@ trait QueryOps[
   self =>
 
   type PatientRecord = UseCase#PatientRecord
-  type Parameters    = UseCase#Parameters
+  type Criteria      = UseCase#Criteria
   type Filters       = UseCase#Filters
   type Results       = UseCase#Results
 
-  def useCase: String
+
+//  def useCase: String
+
+
+  def sites: List[Coding[Site]]
 
 
   def process(
-    cmd: Query.Command[Parameters,Filters]
+    cmd: Query.Command[Criteria,Filters]
   )(
     implicit
     env: Env,
     querier: Querier
-  ): F[Error IorNel Query[Parameters,Filters]]
+  ): F[Error IorNel Query[Criteria,Filters]]
 
   final def !(
-    cmd: Query.Command[Parameters,Filters]
+    cmd: Query.Command[Criteria,Filters]
   )(
     implicit
     env: Env,
     querier: Querier
-  ): F[Error IorNel Query[Parameters,Filters]] = self.process(cmd)
+  ): F[Error IorNel Query[Criteria,Filters]] = self.process(cmd)
 
 
   def get(
@@ -54,7 +57,7 @@ trait QueryOps[
     implicit
     env: Env,
     querier: Querier
-  ): F[Option[Query[Parameters,Filters]]]
+  ): F[Option[Query[Criteria,Filters]]]
 
 
   def summary(
@@ -75,13 +78,23 @@ trait QueryOps[
   ): F[Option[Results]]
 
 
+  def patientRecord(
+    id: Query.Id,
+    patId: Id[Patient]
+  )(
+    implicit
+    env: Env,
+    querier: Querier
+  ): F[Option[PatientRecord]]
+
 
   def !(
-    req: PeerToPeerQuery[Parameters,PatientRecord]
+    req: PeerToPeerQuery[Criteria,PatientRecord]
   )(
     implicit
     env: Env
-  ): F[Either[Error,Seq[Snapshot[PatientRecord]]]]
+  ): F[Either[Error,Seq[(Snapshot[PatientRecord],Criteria)]]]
+ // ): F[Either[Error,Seq[Snapshot[PatientRecord]]]]
 
 /*
   def !(
@@ -93,10 +106,10 @@ trait QueryOps[
 */
 
 
-  def getPatientRecord(
+  def fetchPatientRecord(
     site: Coding[Site],
     patient: Id[Patient],
-    snapshot: Option[Id[Snapshot[PatientRecord]]] = None
+    snapshot: Option[Long] = None
   )(
     implicit
     env: Env,
@@ -107,11 +120,16 @@ trait QueryOps[
 }
 
 
-trait QueryProcessor[
+trait QueryService[
+  F[+_],
+  Env,
   UseCase <: UseCaseConfig,
   Error
 ]
-extends QueryOps[
-  Future,ExecutionContext,UseCase,Error
+extends Data.Ops[
+  F,Env,UseCase,Error
+]
+with QueryOps[
+  F,Env,UseCase,Error
 ]
 

@@ -19,7 +19,6 @@ import de.dnpm.dip.model.{
 trait Connector[
   F[_],
   Env,
-//  Response
 ]{
   self =>
 

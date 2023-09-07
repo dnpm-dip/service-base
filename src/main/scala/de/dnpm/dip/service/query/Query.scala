@@ -5,6 +5,16 @@ import java.time.{
   Instant,
   LocalDateTime
 }
+import cats.Applicative
+import de.dnpm.dip.coding.{
+  Coding,
+//  CodedEnum,
+//  DefaultCodeSystem
+  CodeSystem,
+  CodeSystemProvider,
+  CodeSystemProviderSPI,
+  SingleCodeSystemProvider
+}
 import play.api.libs.json.{
   Json,
   Format
@@ -19,15 +29,17 @@ object Querier
 
 
 final case class Query[
-  Parameters,
+  Criteria,
   Filters <: Query.Filters
 ](
   id: Query.Id,
   submittedAt: LocalDateTime,
   querier: Querier,
-  mode: Query.Mode.Value,
-  parameters: Parameters,
+  mode: Coding[Query.Mode],
+//  mode: Query.Mode.Value,
+  criteria: Criteria,
   filters: Filters,
+  expiresAfter: Int,
   lastUpdate: Instant
 )
 
@@ -37,9 +49,57 @@ object Query
 
   case class Id(value: String) extends AnyVal
 
-  object Mode extends Enumeration
+/*  
+  object Mode
+  extends CodedEnum("dnpm-dip/query/mode")
+  with DefaultCodeSystem
   {
-    val Local, Federated = Value
+    val Local     = Value("local")
+    val Federated = Value("federated")
+
+    override val display = {
+      case Local     => "Lokal"
+      case Federated => "Föderiert"
+    }
+
+    object Provider extends SingleCodeSystemProvider(codeSystem)
+
+    final class ProviderSPI extends CodeSystemProviderSPI
+    {
+      override def getInstance[F[_]]: CodeSystemProvider[Any,F,Applicative[F]] =
+        new Provider.Facade[F]
+    }
+
+  }
+*/
+
+  sealed trait Mode
+  object Mode
+  {
+    val Local     = "local"
+    val Federated = "federated"
+
+    implicit val system =
+      Coding.System[Mode]("dnpm-dip/query/mode")
+
+    implicit val codeSystem =
+      CodeSystem[Mode](
+        uri     = Coding.System[Mode].uri,
+        name    = "query-mode",
+        title   = Some("Query Mode"),
+        version = None,
+        Local     -> "Lokal",
+        Federated -> "Föderiert"
+      )
+
+    object Provider extends SingleCodeSystemProvider(codeSystem)
+
+    final class ProviderSPI extends CodeSystemProviderSPI
+    {
+      override def getInstance[F[_]]: CodeSystemProvider[Any,F,Applicative[F]] =
+        new Provider.Facade[F]
+    }
+
   }
 
 
@@ -49,22 +109,24 @@ object Query
   }
 
 
-  sealed abstract class Command[+Parameters,+Fltrs <: Filters]
+  sealed abstract class Command[+Criteria,+Fltrs <: Filters]
 
-  final case class Submit[Parameters]
+  final case class Submit[Criteria]
   ( 
-    mode: Query.Mode.Value,
-    parameters: Parameters
+//    mode: Query.Mode.Value,
+    mode: Coding[Query.Mode],
+    criteria: Criteria
   )
-  extends Command[Parameters,Nothing]
+  extends Command[Criteria,Nothing]
 
-  final case class Update[Parameters]
+  final case class Update[Criteria]
   ( 
     id: Id,
-    mode: Option[Query.Mode.Value],
-    parameters: Option[Parameters]
+//    mode: Option[Query.Mode.Value],
+    mode: Option[Coding[Query.Mode]],
+    criteria: Option[Criteria]
   )
-  extends Command[Parameters,Nothing]
+  extends Command[Criteria,Nothing]
 
   final case class ApplyFilters[Fltrs <: Filters]
   (
@@ -75,11 +137,11 @@ object Query
 
 
   implicit val formatQueryId           = Json.valueFormat[Id]
-  implicit val formatMode              = Json.formatEnum(Mode)
+//  implicit val formatMode              = Json.formatEnum(Mode)
 
-  implicit def formatQuery[Params: Format, Fltrs <: Filters: Format] = Json.format[Query[Params,Fltrs]]
-  implicit def formatSubmit[Params: Format]                          = Json.format[Submit[Params]]
-  implicit def formatUpdate[Params: Format]                          = Json.format[Update[Params]]
+  implicit def formatQuery[Criteria: Format, Fltrs <: Filters: Format] = Json.format[Query[Criteria,Fltrs]]
+  implicit def formatSubmit[Criteria: Format]                          = Json.format[Submit[Criteria]]
+  implicit def formatUpdate[Criteria: Format]                          = Json.format[Update[Criteria]]
   implicit def formatApplyFilters[Fltrs <: Filters: Format]          = Json.format[ApplyFilters[Fltrs]]
 
 }

@@ -7,10 +7,11 @@ trait UseCaseConfig
 
   type PatientRecord
 
-  type Parameters
+  type Criteria
 
   type Filters <: Query.Filters
 
-  type Results <: ResultSet
+//  type Results <: ResultSet
+  type Results <: ResultSet[PatientRecord,Criteria]
 
 }

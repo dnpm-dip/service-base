@@ -26,15 +26,16 @@ trait PeerToPeerRequest
 }
 
 
-final case class PeerToPeerQuery[Parameters,PatientRecord]
+final case class PeerToPeerQuery[Criteria,PatientRecord]
 (
   origin: Coding[Site],
   querier: Querier,
-  parameters: Parameters,
+  criteria: Criteria,
 )
 extends PeerToPeerRequest
 {
-  type ResultType = Seq[Snapshot[PatientRecord]]
+  type ResultType = Seq[(Snapshot[PatientRecord],Criteria)]
+//  type ResultType = Seq[Snapshot[PatientRecord]]
 }
 
 
@@ -43,7 +44,7 @@ final case class PatientRecordRequest[PatientRecord]
   origin: Coding[Site],
   querier: Querier,
   patient: Id[Patient],
-  snapshot: Option[Id[Snapshot[PatientRecord]]]
+  snapshot: Option[Long]
 )
 extends PeerToPeerRequest
 {

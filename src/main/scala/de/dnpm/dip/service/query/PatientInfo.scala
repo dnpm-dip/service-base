@@ -1,7 +1,6 @@
 package de.dnpm.dip.service.query
 
 
-import play.api.libs.json.Json
 import de.dnpm.dip.model.{
   Id,
   Site,
@@ -10,7 +9,10 @@ import de.dnpm.dip.model.{
   VitalStatus
 }
 import de.dnpm.dip.coding.Coding
-import de.dnpm.dip.coding.icd.ICD10GM
+import play.api.libs.json.{
+  Json,
+  Format
+}
 
 
 final case class PatientInfo
@@ -19,7 +21,6 @@ final case class PatientInfo
   managingSite: Coding[Site],
   gender: Coding[Gender.Value],
   age: Int,
-  diagnoses: List[Coding[ICD10GM]],
   vitalStatus: Coding[VitalStatus.Value]
 )
 
@@ -27,3 +28,35 @@ object PatientInfo
 {
   implicit val format = Json.format[PatientInfo]
 }
+
+
+final case class PatientMatch[Criteria]
+(
+  id: Id[Patient],
+  managingSite: Option[Coding[Site]],
+  gender: Coding[Gender.Value],
+  age: Long,
+  vitalStatus: Coding[VitalStatus.Value],
+  matchingCriteria: Criteria
+)
+object PatientMatch
+{
+
+  def of[Criteria](
+    patient: Patient,
+    matchingCriteria: Criteria
+  ): PatientMatch[Criteria] =
+    PatientMatch(
+      patient.id,
+      patient.managingSite,
+      patient.gender,
+      patient.age,
+      patient.vitalStatus,
+      matchingCriteria
+    )
+
+
+  implicit def format[Criteria: Format] =
+    Json.format[PatientMatch[Criteria]]
+}
+

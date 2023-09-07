@@ -13,7 +13,7 @@ import de.dnpm.dip.model.{
 trait LocalDB[
   F[_],
   Env,
-  Parameters,
+  Criteria,
   PatientRecord
 ]{
 
@@ -32,15 +32,18 @@ trait LocalDB[
 
 
   def ?(
-    parameters: Parameters
+    criteria: Criteria
   )(
     implicit env: Env
-  ): F[Either[String,Seq[Snapshot[PatientRecord]]]]
+  ): F[Either[String,Seq[(Snapshot[PatientRecord],Criteria)]]]
+//  ): F[Either[String,Seq[Snapshot[PatientRecord]]]]
 
 
   def ?(
     patient: Id[Patient],
-    snapshot: Option[Id[Snapshot[PatientRecord]]] = None
+    snapshot: Option[Long] = None
+  )(
+    implicit env: Env
   ): F[Option[Snapshot[PatientRecord]]]
 
 }
