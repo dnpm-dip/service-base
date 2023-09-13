@@ -3,10 +3,13 @@ package de.dnpm.dip.service.validation
 
 import java.time.Instant
 import cats.data.NonEmptyList
-import play.api.libs.json._
 import de.dnpm.dip.model.{
   Id,
   Patient
+}
+import play.api.libs.json.{
+  Json,
+  Format
 }
 
 
@@ -49,7 +52,8 @@ object ValidationReport
       val Error   = Value("error")
       val Fatal   = Value("fatal")
     
-      implicit val format = Json.formatEnum(this)
+      implicit val format: Format[Severity.Value] =
+        Json.formatEnum(this)
     }
     
     case class Location
@@ -89,15 +93,18 @@ object ValidationReport
       BuilderImpl(Severity.Fatal,msg)
 
 
-    implicit val formatLocation = Json.format[Location]
+    implicit val formatLocation: Format[Location] =
+      Json.format[Location]
     
-    implicit val format = Json.format[Issue]
+    implicit val format: Format[Issue] =
+      Json.format[Issue]
 
   }
 
 
   import de.dnpm.dip.util.json._
 
-  implicit val format = Json.format[ValidationReport]
+  implicit val format: Format[ValidationReport] = 
+    Json.format[ValidationReport]
 
 }

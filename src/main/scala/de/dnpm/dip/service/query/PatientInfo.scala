@@ -15,6 +15,7 @@ import play.api.libs.json.{
 }
 
 
+/*
 final case class PatientInfo
 (
   id: Id[Patient],
@@ -28,6 +29,7 @@ object PatientInfo
 {
   implicit val format = Json.format[PatientInfo]
 }
+*/
 
 
 final case class PatientMatch[Criteria]
@@ -56,7 +58,7 @@ object PatientMatch
     )
 
 
-  implicit def format[Criteria: Format] =
+  implicit def format[Criteria: Format]: Format[PatientMatch[Criteria]] =
     Json.format[PatientMatch[Criteria]]
 }
 

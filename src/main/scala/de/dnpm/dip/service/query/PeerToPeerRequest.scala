@@ -35,7 +35,15 @@ final case class PeerToPeerQuery[Criteria,PatientRecord]
 extends PeerToPeerRequest
 {
   type ResultType = Seq[(Snapshot[PatientRecord],Criteria)]
-//  type ResultType = Seq[Snapshot[PatientRecord]]
+}
+
+object PeerToPeerQuery
+{
+  implicit def reads[Criteria: Reads,PatientRecord: Reads]: Reads[PeerToPeerQuery[Criteria,PatientRecord]] =
+    Json.reads[PeerToPeerQuery[Criteria,PatientRecord]]
+
+  implicit def writes[Criteria: Writes,PatientRecord: Writes]: Writes[PeerToPeerQuery[Criteria,PatientRecord]] =
+    Json.writes[PeerToPeerQuery[Criteria,PatientRecord]]
 }
 
 
@@ -49,6 +57,15 @@ final case class PatientRecordRequest[PatientRecord]
 extends PeerToPeerRequest
 {
   type ResultType = Snapshot[PatientRecord]
+}
+
+object PatientRecordRequest
+{
+  implicit def reads[PatientRecord: Reads]: Reads[PatientRecordRequest[PatientRecord]] =
+    Json.reads[PatientRecordRequest[PatientRecord]]
+
+  implicit def writes[PatientRecord: Writes]: Writes[PatientRecordRequest[PatientRecord]] =
+    Json.writes[PatientRecordRequest[PatientRecord]]
 }
 
 

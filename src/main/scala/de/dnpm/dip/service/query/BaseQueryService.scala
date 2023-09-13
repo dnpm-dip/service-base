@@ -16,13 +16,31 @@ import de.dnpm.dip.model.{
   Snapshot,
   Site
 }
+import play.api.libs.json.{
+  Format,
+  Reads,
+  Writes
+}
 
-
-
+/*
 trait BaseQueryService[
   F[+_],
   UseCase <: UseCaseConfig,
 ]
+extends QueryService[
+  F,Monad[F],UseCase,String
+]
+with Logging
+*/
+
+abstract class BaseQueryService[
+  F[+_],
+  UseCase <: UseCaseConfig,
+](
+  implicit 
+  fpr: Format[UseCase#PatientRecord],
+  fcrit: Format[UseCase#Criteria]
+)
 extends QueryService[
   F,Monad[F],UseCase,String
 ]
@@ -37,7 +55,6 @@ with Logging
   
   protected val localDB: LocalDB[F,Monad[F],Criteria,PatientRecord]
   protected val connector: Connector[F,Monad[F]]
-//  protected val connector: Connector[F,Monad[F],Criteria,PatientRecord]
   protected val cache: QueryCache[Criteria,Filters,Results,PatientRecord] 
 
 
@@ -46,9 +63,7 @@ with Logging
   ): Filters
 
 
-//  protected val ResultSetFrom: Results#BuilderFrom[(Snapshot[PatientRecord],Criteria)]
   protected val ResultSetFrom: (Query.Id,Seq[(Snapshot[PatientRecord],Criteria)]) => Results
-//  protected val ResultSetFrom: Results#BuilderFrom[PatientRecord]
 
 
   protected def toPredicate(
@@ -213,7 +228,9 @@ with Logging
   )(
     implicit
     env: Monad[F],
-    querier: Querier
+    querier: Querier,
+//    fpr: Format[PatientRecord],
+//    fcrit: Format[Criteria]
   ): F[IorNel[String,Seq[(Snapshot[PatientRecord],Criteria)]]] = {
 
     import cats.syntax.apply._

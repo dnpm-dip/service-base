@@ -10,7 +10,10 @@ import de.dnpm.dip.model.{
   Patient,
   VitalStatus
 }
-import play.api.libs.json.Json
+import play.api.libs.json.{
+  Json,
+  Format
+}
 
 
 final case class PatientFilter
@@ -39,8 +42,7 @@ object PatientFilter
       
   }
 
-  implicit val formatGender      = Json.formatEnum(Gender)
-  implicit val formatVitalStatus = Json.formatEnum(VitalStatus)
-  implicit val format            = Json.format[PatientFilter]
+  implicit val format: Format[PatientFilter] =
+    Json.format[PatientFilter]
 
 }

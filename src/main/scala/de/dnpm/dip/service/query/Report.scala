@@ -8,6 +8,7 @@ import play.api.libs.json.{
   Json,
   JsObject,
   JsValue,
+  Format,
   Writes,
   Reads
 }
@@ -31,7 +32,8 @@ object Report
     val Local  = Value("local")
     val Global = Value("global")
 
-    implicit val format = Json.formatEnum(this)
+    implicit val format: Format[Scope.Value] =
+      Json.formatEnum(this)
   }
 
 }
@@ -62,14 +64,14 @@ extends Report[T]
 
 object LocalReport
 {
-  implicit def writes[T: Writes] =
+  implicit def writes[T: Writes]: Writes[LocalReport[T]] =
     Json.writes[LocalReport[T]]
       .transform(
         (js: JsValue) => 
           js.as[JsObject] + ("scope" -> Json.toJson(Report.Scope.Local))
       )
 
-  implicit def reads[T: Reads] =
+  implicit def reads[T: Reads]: Reads[LocalReport[T]] =
     Json.reads[LocalReport[T]]
 }
 
@@ -89,13 +91,13 @@ object GlobalReport
     )
 
 
-  implicit def writes[T: Writes] =
+  implicit def writes[T: Writes]: Writes[GlobalReport[T]] =
     Json.writes[GlobalReport[T]]
       .transform(
         (js: JsValue) => 
           js.as[JsObject] + ("scope" -> Json.toJson(Report.Scope.Global))
       )
 
-  implicit def reads[T: Reads] =
+  implicit def reads[T: Reads]: Reads[GlobalReport[T]] =
     Json.reads[GlobalReport[T]]
 }

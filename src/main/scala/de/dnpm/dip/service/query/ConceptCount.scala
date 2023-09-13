@@ -28,7 +28,7 @@ object ConceptCount
     )
 
   // Order ConceptCounts by decreasing number of occurrence
-  implicit def conceptCountOrdering[T] =
+  implicit def conceptCountOrdering[T]: Ordering[ConceptCount[T]] =
     Ordering[Int]
       .on[ConceptCount[T]](_.count)
       .reverse

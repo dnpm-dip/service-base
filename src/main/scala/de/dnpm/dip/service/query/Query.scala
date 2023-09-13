@@ -8,8 +8,6 @@ import java.time.{
 import cats.Applicative
 import de.dnpm.dip.coding.{
   Coding,
-//  CodedEnum,
-//  DefaultCodeSystem
   CodeSystem,
   CodeSystemProvider,
   CodeSystemProviderSPI,
@@ -24,7 +22,8 @@ import play.api.libs.json.{
 final case class Querier(value: String) extends AnyVal
 object Querier
 {
-  implicit val format = Json.valueFormat[Querier]
+  implicit val format: Format[Querier] =
+    Json.valueFormat[Querier]
 }
 
 
@@ -79,12 +78,12 @@ object Query
     val Local     = "local"
     val Federated = "federated"
 
-    implicit val system =
+    implicit val system: Coding.System[Mode] =
       Coding.System[Mode]("dnpm-dip/query/mode")
 
-    implicit val codeSystem =
+    implicit val codeSystem: CodeSystem[Mode] =
       CodeSystem[Mode](
-        uri     = Coding.System[Mode].uri,
+//        uri     = Coding.System[Mode].uri,
         name    = "query-mode",
         title   = Some("Query Mode"),
         version = None,
@@ -122,7 +121,6 @@ object Query
   final case class Update[Criteria]
   ( 
     id: Id,
-//    mode: Option[Query.Mode.Value],
     mode: Option[Coding[Query.Mode]],
     criteria: Option[Criteria]
   )
@@ -136,12 +134,22 @@ object Query
   extends Command[Nothing,Fltrs]
 
 
-  implicit val formatQueryId           = Json.valueFormat[Id]
-//  implicit val formatMode              = Json.formatEnum(Mode)
+  implicit val formatQueryId: Format[Id] =
+    Json.valueFormat[Id]
 
-  implicit def formatQuery[Criteria: Format, Fltrs <: Filters: Format] = Json.format[Query[Criteria,Fltrs]]
-  implicit def formatSubmit[Criteria: Format]                          = Json.format[Submit[Criteria]]
-  implicit def formatUpdate[Criteria: Format]                          = Json.format[Update[Criteria]]
-  implicit def formatApplyFilters[Fltrs <: Filters: Format]          = Json.format[ApplyFilters[Fltrs]]
+  implicit def formatQuery[
+    Criteria: Format,
+    Fltrs <: Filters: Format
+  ]: Format[Query[Criteria,Fltrs]] =
+    Json.format[Query[Criteria,Fltrs]]
+
+  implicit def formatSubmit[Criteria: Format]: Format[Submit[Criteria]] =
+    Json.format[Submit[Criteria]]
+
+  implicit def formatUpdate[Criteria: Format]: Format[Update[Criteria]] =
+    Json.format[Update[Criteria]]
+
+  implicit def formatApplyFilters[Fltrs <: Filters: Format]: Format[ApplyFilters[Fltrs]] =
+    Json.format[ApplyFilters[Fltrs]]
 
 }

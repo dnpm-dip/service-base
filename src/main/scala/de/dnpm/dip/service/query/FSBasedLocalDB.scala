@@ -38,7 +38,8 @@ class FSBackedLocalDB[
 ](
   val dataDir: File,
   val prefix: String,
-  val toPredicate: Criteria => (PatientRecord => Boolean)
+  val criteriaMatcher: Criteria => (PatientRecord => Criteria),
+  val isEmpty: Criteria => Boolean
 )
 extends LocalDB[
   F,
@@ -52,6 +53,7 @@ with Logging
   import scala.language.reflectiveCalls
   import scala.util.Using
   import scala.util.chaining._
+  import cats.syntax.functor._
   import cats.syntax.applicative._
   import cats.syntax.either._
 
@@ -167,7 +169,31 @@ with Logging
     criteria: Criteria
   )(
     implicit env: Applicative[F]
-  ): F[Either[String,Seq[(Snapshot[PatientRecord],Criteria)]]] = ???
+  ): F[Either[String,Seq[(Snapshot[PatientRecord],Criteria)]]] =
+
+    (
+      isEmpty(criteria) match {
+        case false =>
+          val matcher = criteriaMatcher(criteria)
+          
+          cache.values
+            .map(
+              snp => snp -> matcher(snp.data)
+            )
+            .filterNot {
+              case (_,matches) => isEmpty(matches) 
+            }
+            .toSeq
+            
+        case true =>
+          cache.values
+            .map(_ -> criteria)
+            .toSeq
+  
+      }
+    )
+    .pure
+    .map(_.asRight[String])
 
 
   override def ?(
@@ -179,7 +205,7 @@ with Logging
 
     //TODO: Logging
 
-    env.pure(
+    (
       snapshot match {
       
         case Some(snpId) =>
@@ -197,6 +223,7 @@ with Logging
       
       }
     )
+    .pure
 
   }
 

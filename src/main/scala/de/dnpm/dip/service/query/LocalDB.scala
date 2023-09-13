@@ -36,7 +36,6 @@ trait LocalDB[
   )(
     implicit env: Env
   ): F[Either[String,Seq[(Snapshot[PatientRecord],Criteria)]]]
-//  ): F[Either[String,Seq[Snapshot[PatientRecord]]]]
 
 
   def ?(
