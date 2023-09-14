@@ -28,8 +28,6 @@ trait QueryOps[
   type Results       = UseCase#Results
 
 
-//  def useCase: String
-
 
   def sites: List[Coding[Site]]
 
@@ -94,16 +92,6 @@ trait QueryOps[
     implicit
     env: Env
   ): F[Either[Error,Seq[(Snapshot[PatientRecord],Criteria)]]]
- // ): F[Either[Error,Seq[Snapshot[PatientRecord]]]]
-
-/*
-  def !(
-    req: PeerToPeerRequest
-  )(
-    implicit
-    env: Env
-  ): F[Either[Error,PeerToPeerResponse[req.ResultType]]]
-*/
 
 
   def fetchPatientRecord(

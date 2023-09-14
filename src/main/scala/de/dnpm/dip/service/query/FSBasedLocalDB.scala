@@ -33,6 +33,7 @@ import play.api.libs.json.{
 
 class FSBackedLocalDB[
   F[_],
+  C[M[_]] <: Applicative[M],
   Criteria,
   PatientRecord <: { val patient: Patient } : Format
 ](
@@ -43,7 +44,8 @@ class FSBackedLocalDB[
 )
 extends LocalDB[
   F,
-  Applicative[F],
+  C[F],
+//  Applicative[F],
   Criteria,
   PatientRecord
 ]
@@ -107,7 +109,8 @@ with Logging
   override def save(
     dataSet: PatientRecord
   )(
-    implicit env: Applicative[F]
+    implicit env: C[F]
+//    implicit env: Applicative[F]
   ): F[Either[String,Data.Saved[PatientRecord]]] = {
   
     //TODO: Logging
@@ -134,7 +137,8 @@ with Logging
   override def delete(
     patId: Id[Patient],
   )(
-    implicit env: Applicative[F]
+//    implicit env: Applicative[F]
+    implicit env: C[F]
   ): F[Either[String,Data.Deleted]] = {
 
     import java.nio.file.Files
@@ -168,7 +172,8 @@ with Logging
   override def ?(
     criteria: Criteria
   )(
-    implicit env: Applicative[F]
+//    implicit env: Applicative[F]
+    implicit env: C[F]
   ): F[Either[String,Seq[(Snapshot[PatientRecord],Criteria)]]] =
 
     (
@@ -200,7 +205,8 @@ with Logging
     patient: Id[Patient],
     snapshot: Option[Long] = None
   )(
-    implicit env: Applicative[F]
+//    implicit env: Applicative[F]
+    implicit env: C[F]
   ): F[Option[Snapshot[PatientRecord]]] = {
 
     //TODO: Logging

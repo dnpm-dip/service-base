@@ -27,9 +27,28 @@ final case class PatientFilter
 object PatientFilter
 {
 
+  def on(patients: Seq[Patient]): PatientFilter = {
+
+    val ages = patients.map(_.age)
+   
+    PatientFilter(
+      patients
+        .map(_.gender)
+        .toSet,
+      ClosedInterval(
+        ages.minOption.getOrElse(0L) -> ages.maxOption.getOrElse(0L)
+      ),
+      patients
+        .map(_.vitalStatus)
+        .toSet
+    )
+
+  }
+
+
   import scala.language.implicitConversions
 
-  implicit def patientFilerToPredicate(
+  implicit def toPredicate(
     filter: PatientFilter
   ): Patient => Boolean = {
     patient =>
@@ -41,6 +60,8 @@ object PatientFilter
     filter.vitalStatus.exists(_.code == patient.vitalStatus.code)
       
   }
+
+
 
   implicit val format: Format[PatientFilter] =
     Json.format[PatientFilter]

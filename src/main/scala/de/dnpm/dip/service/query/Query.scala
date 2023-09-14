@@ -83,7 +83,6 @@ object Query
 
     implicit val codeSystem: CodeSystem[Mode] =
       CodeSystem[Mode](
-//        uri     = Coding.System[Mode].uri,
         name    = "query-mode",
         title   = Some("Query Mode"),
         version = None,
