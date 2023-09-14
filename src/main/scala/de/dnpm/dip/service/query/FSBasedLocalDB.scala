@@ -39,8 +39,7 @@ class FSBackedLocalDB[
 ](
   val dataDir: File,
   val prefix: String,
-  val criteriaMatcher: Criteria => (PatientRecord => Criteria),
-  val isEmpty: Criteria => Boolean
+  val criteriaMatcher: Criteria => (PatientRecord => Option[Criteria]),
 )
 extends LocalDB[
   F,
@@ -110,7 +109,6 @@ with Logging
     dataSet: PatientRecord
   )(
     implicit env: C[F]
-//    implicit env: Applicative[F]
   ): F[Either[String,Data.Saved[PatientRecord]]] = {
   
     //TODO: Logging
@@ -137,7 +135,6 @@ with Logging
   override def delete(
     patId: Id[Patient],
   )(
-//    implicit env: Applicative[F]
     implicit env: C[F]
   ): F[Either[String,Data.Deleted]] = {
 
@@ -172,7 +169,27 @@ with Logging
   override def ?(
     criteria: Criteria
   )(
-//    implicit env: Applicative[F]
+    implicit env: C[F]
+  ): F[Either[String,Seq[(Snapshot[PatientRecord],Criteria)]]] = {
+
+    val matcher = criteriaMatcher(criteria)
+          
+    cache.values
+      .map(snp => snp -> matcher(snp.data))
+      .collect {
+        case (snp,Some(matches)) => snp -> matches
+      }
+      .toSeq
+            
+    .pure
+    .map(_.asRight[String])
+
+  }
+
+/*
+  override def ?(
+    criteria: Criteria
+  )(
     implicit env: C[F]
   ): F[Either[String,Seq[(Snapshot[PatientRecord],Criteria)]]] =
 
@@ -199,13 +216,12 @@ with Logging
     )
     .pure
     .map(_.asRight[String])
-
+*/
 
   override def ?(
     patient: Id[Patient],
     snapshot: Option[Long] = None
   )(
-//    implicit env: Applicative[F]
     implicit env: C[F]
   ): F[Option[Snapshot[PatientRecord]]] = {
 
