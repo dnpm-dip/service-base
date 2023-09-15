@@ -121,7 +121,7 @@ with Logging
       )
     }
     .map(
-      _ => cache.update(dataSet.patient.id,snp)
+      _ => cache update (dataSet.patient.id,snp)
     )
     .fold(
       _.getMessage.asLeft[Data.Saved[PatientRecord]],
@@ -150,11 +150,13 @@ with Logging
     .map(
       file =>
         Try(Files.delete(file.toPath))
+          .map(_ => cache -= patId)
           .recoverWith {
             case t =>
               log.error(s"Couldn't delete file ${file.getAbsolutePath}",t)
               Failure(t)
           }
+
     )
     .sequence
     .fold(
@@ -186,37 +188,6 @@ with Logging
 
   }
 
-/*
-  override def ?(
-    criteria: Criteria
-  )(
-    implicit env: C[F]
-  ): F[Either[String,Seq[(Snapshot[PatientRecord],Criteria)]]] =
-
-    (
-      isEmpty(criteria) match {
-        case false =>
-          val matcher = criteriaMatcher(criteria)
-          
-          cache.values
-            .map(
-              snp => snp -> matcher(snp.data)
-            )
-            .filterNot {
-              case (_,matches) => isEmpty(matches) 
-            }
-            .toSeq
-            
-        case true =>
-          cache.values
-            .map(_ -> criteria)
-            .toSeq
-  
-      }
-    )
-    .pure
-    .map(_.asRight[String])
-*/
 
   override def ?(
     patient: Id[Patient],
