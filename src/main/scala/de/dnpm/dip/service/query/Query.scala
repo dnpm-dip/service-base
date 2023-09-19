@@ -9,6 +9,8 @@ import cats.Applicative
 import de.dnpm.dip.coding.{
   Coding,
   CodeSystem,
+  CodedEnum,
+  DefaultCodeSystem,
   CodeSystemProvider,
   CodeSystemProviderSPI,
   SingleCodeSystemProvider
@@ -34,8 +36,8 @@ final case class Query[
   id: Query.Id,
   submittedAt: LocalDateTime,
   querier: Querier,
-  mode: Coding[Query.Mode],
-//  mode: Query.Mode.Value,
+//  mode: Coding[Query.Mode],
+  mode: Query.Mode.Value,
   criteria: Criteria,
   filters: Filters,
   expiresAfter: Int,
@@ -48,7 +50,7 @@ object Query
 
   case class Id(value: String) extends AnyVal
 
-/*  
+  
   object Mode
   extends CodedEnum("dnpm-dip/query/mode")
   with DefaultCodeSystem
@@ -61,17 +63,19 @@ object Query
       case Federated => "Föderiert"
     }
 
-    object Provider extends SingleCodeSystemProvider(codeSystem)
-
     final class ProviderSPI extends CodeSystemProviderSPI
     {
       override def getInstance[F[_]]: CodeSystemProvider[Any,F,Applicative[F]] =
         new Provider.Facade[F]
     }
 
-  }
-*/
+    implicit val format: Format[Value] =
+      Json.formatEnum(this)
 
+  }
+
+
+/*
   sealed trait Mode
   object Mode
   {
@@ -99,7 +103,7 @@ object Query
     }
 
   }
-
+*/
 
   trait Filters
   {
@@ -111,8 +115,8 @@ object Query
 
   final case class Submit[Criteria]
   ( 
-//    mode: Query.Mode.Value,
-    mode: Coding[Query.Mode],
+    mode: Query.Mode.Value,
+//    mode: Coding[Query.Mode],
     criteria: Criteria
   )
   extends Command[Criteria,Nothing]
@@ -120,7 +124,8 @@ object Query
   final case class Update[Criteria]
   ( 
     id: Id,
-    mode: Option[Coding[Query.Mode]],
+    mode: Option[Query.Mode.Value],
+//    mode: Option[Coding[Query.Mode]],
     criteria: Option[Criteria]
   )
   extends Command[Criteria,Nothing]

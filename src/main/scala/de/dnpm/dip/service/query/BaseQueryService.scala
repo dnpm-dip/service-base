@@ -22,16 +22,6 @@ import play.api.libs.json.{
   Writes
 }
 
-/*
-trait BaseQueryService[
-  F[+_],
-  UseCase <: UseCaseConfig,
-]
-extends QueryService[
-  F,Monad[F],UseCase,String
-]
-with Logging
-*/
 
 abstract class BaseQueryService[
   F[+_],
@@ -53,7 +43,7 @@ with Logging
   import cats.syntax.functor._
   import cats.syntax.flatMap._
   
-  protected val localDB: LocalDB[F,Monad[F],Criteria,PatientRecord]
+  protected val db: LocalDB[F,Monad[F],Criteria,PatientRecord]
   protected val connector: Connector[F,Monad[F]]
   protected val cache: QueryCache[Criteria,Filters,Results,PatientRecord] 
 
@@ -90,10 +80,10 @@ with Logging
     cmd match {
 
       case Data.Save(dataSet) =>
-        (preprocess andThen localDB.save)(dataSet)
+        (preprocess andThen db.save)(dataSet)
 
       case Data.Delete(patient) =>
-        localDB.delete(patient)
+        db.delete(patient)
 
     }
 
@@ -223,14 +213,13 @@ with Logging
 
   private def executeQuery(
     id: Query.Id,
-    mode: Coding[Query.Mode],
+    mode: Query.Mode.Value,
+//    mode: Coding[Query.Mode],
     criteria: Criteria
   )(
     implicit
     env: Monad[F],
     querier: Querier,
-//    fpr: Format[PatientRecord],
-//    fcrit: Format[Criteria]
   ): F[IorNel[String,Seq[(Snapshot[PatientRecord],Criteria)]]] = {
 
     import cats.syntax.apply._
@@ -238,9 +227,28 @@ with Logging
 
     //TODO: Logging
 
-
+/*
     val externalResults =
       if (mode.code.value == Query.Mode.Federated)
+        for {
+          results <-
+            connector ! PeerToPeerQuery[Criteria,PatientRecord](connector.localSite,querier,criteria)
+        } yield
+          results.foldLeft(
+             Seq.empty[(Snapshot[PatientRecord],Criteria)].rightIor[String].toIorNel
+          ){
+            case (acc,(site,result)) =>
+              acc combine result.leftMap(err => s"Error from site ${site.display}: $err").toIor.toIorNel      
+          }        
+      else
+        Seq.empty[(Snapshot[PatientRecord],Criteria)]
+          .rightIor[String]
+          .toIorNel
+          .pure[F]
+*/
+
+    val externalResults =
+      if (mode == Query.Mode.Federated)
         for {
           results <-
             connector ! PeerToPeerQuery[Criteria,PatientRecord](connector.localSite,querier,criteria)
@@ -259,7 +267,7 @@ with Logging
      
 
     val localResults =
-      (localDB ? criteria).map(_.toIor.toIorNel)
+      (db ? criteria).map(_.toIor.toIorNel)
 
     (localResults,externalResults).mapN(_ combine _)
 
@@ -349,7 +357,7 @@ with Logging
     //TODO: Logging
 
     if (site == connector.localSite){
-      (localDB ? (patient,snapshot))
+      (db ? (patient,snapshot))
         .map(
           _.toRight(s"Invalid Patient ID ${patient.value}${snapshot.map(snp => s" and/or Snapshot ID $snp").getOrElse("")}")
         )
@@ -391,7 +399,7 @@ with Logging
         
             log.info(s"Querier: $q\n Criteria: ${criteria}")
         
-            (localDB ? criteria).map(PeerToPeerResponse(_))
+            (db ? criteria).map(PeerToPeerResponse(_))
         
           case None =>
             "Missing Querier ID!"
@@ -422,7 +430,7 @@ with Logging
           Criteria: ${req.criteria}"""
     )
 
-    localDB ? req.criteria
+    db ? req.criteria
 
 /*
     log.info(s"Processing peer-to-peer query from site ${req.origin.code.value}")
@@ -433,7 +441,7 @@ with Logging
 
         log.info(s"Querier: $q  Criteria: ${req.criteria}")
 
-        localDB ? req.criteria
+        db ? req.criteria
 
       case None =>
         "Missing Querier ID!"

@@ -15,23 +15,6 @@ import play.api.libs.json.{
 }
 
 
-/*
-final case class PatientInfo
-(
-  id: Id[Patient],
-  managingSite: Coding[Site],
-  gender: Coding[Gender.Value],
-  age: Int,
-  vitalStatus: Coding[VitalStatus.Value]
-)
-
-object PatientInfo
-{
-  implicit val format = Json.format[PatientInfo]
-}
-*/
-
-
 final case class PatientMatch[Criteria]
 (
   id: Id[Patient],
@@ -41,6 +24,9 @@ final case class PatientMatch[Criteria]
   vitalStatus: Coding[VitalStatus.Value],
   matchingCriteria: Criteria
 )
+
+
+
 object PatientMatch
 {
 

@@ -7,11 +7,13 @@ import de.dnpm.dip.model.{
   Patient
 }
 
+//trait ResultSet[PatientRecord,Crit]
 trait ResultSet[PatientRecord,Criteria]
 {
   self =>
 
   type Summary <: ResultSet.Summary
+//  type Criteria = Crit
 
 
   val id: Query.Id

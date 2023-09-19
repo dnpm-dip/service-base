@@ -3,7 +3,11 @@ package de.dnpm.dip.service.query
 
 import java.net.URI
 import scala.util.Either
-import cats.data.{Ior,IorNel,NonEmptyList}
+import cats.data.{
+  Ior,
+  IorNel,
+  NonEmptyList
+}
 import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
   Id,
@@ -27,6 +31,8 @@ trait QueryOps[
   type Filters       = UseCase#Filters
   type Results       = UseCase#Results
 
+
+  import cats.syntax.functor._
 
 
   def sites: List[Coding[Site]]
@@ -74,6 +80,22 @@ trait QueryOps[
     env: Env,
     querier: Querier
   ): F[Option[Results]]
+
+
+  //TODO: Look for type-safe way to handle compile problems with Criteria vs. Results#Criteria
+  def patientMatches(
+    id: Query.Id
+  )(
+    implicit
+    env: Env,
+    querier: Querier,
+    func: cats.Functor[F],
+  ): F[Option[Seq[PatientMatch[Criteria]]]] =
+    self.resultSet(id)
+      .map(
+        _.map(_.patientMatches.asInstanceOf[Seq[PatientMatch[Criteria]]])
+//        _.map(_.patientMatches)
+      )
 
 
   def patientRecord(
