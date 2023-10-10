@@ -36,8 +36,7 @@ final case class Query[
   id: Query.Id,
   submittedAt: LocalDateTime,
   querier: Querier,
-//  mode: Coding[Query.Mode],
-  mode: Query.Mode.Value,
+  mode: Coding[Query.Mode.Value],
   criteria: Criteria,
   filters: Filters,
   expiresAfter: Int,
@@ -115,8 +114,7 @@ object Query
 
   final case class Submit[Criteria]
   ( 
-    mode: Query.Mode.Value,
-//    mode: Coding[Query.Mode],
+    mode: Coding[Query.Mode.Value],
     criteria: Criteria
   )
   extends Command[Criteria,Nothing]
@@ -124,8 +122,7 @@ object Query
   final case class Update[Criteria]
   ( 
     id: Id,
-    mode: Option[Query.Mode.Value],
-//    mode: Option[Coding[Query.Mode]],
+    mode: Option[Coding[Query.Mode.Value]],
     criteria: Option[Criteria]
   )
   extends Command[Criteria,Nothing]

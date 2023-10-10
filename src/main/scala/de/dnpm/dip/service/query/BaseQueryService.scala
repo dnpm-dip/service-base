@@ -7,7 +7,10 @@ import java.time.{
 }
 import cats.Monad
 import cats.data.{IorNel,IorT}
-import de.dnpm.dip.util.Logging
+import de.dnpm.dip.util.{
+  Logging,
+  Completer
+}
 import de.dnpm.dip.coding.Code
 import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
@@ -46,6 +49,11 @@ with Logging
   protected val db: LocalDB[F,Monad[F],Criteria,PatientRecord]
   protected val connector: Connector[F,Monad[F]]
   protected val cache: QueryCache[Criteria,Filters,Results,PatientRecord] 
+
+
+  protected implicit val criteriaCompleter: Completer[Criteria]
+
+//  protected implicit val patientRecordCompleter: Completer[PatientRecord]
 
 
   protected def DefaultFilters(
@@ -98,9 +106,12 @@ with Logging
     querier: Querier
   ): F[String IorNel Query[Criteria,Filters]] = {
 
+    import de.dnpm.dip.util.Completer.syntax._
+
     cmd match {
 
       case Query.Submit(mode,criteria) => {
+
 
         log.info(s"Processing new query by $querier") 
 
@@ -118,8 +129,8 @@ with Logging
                 id,
                 LocalDateTime.now,
                 querier,
-                mode,
-                criteria,
+                mode.complete,
+                criteria.complete,
                 DefaultFilters(results.map(_._1)),
                 cache.timeoutSeconds,
                 Instant.now
@@ -147,7 +158,7 @@ with Logging
 
           case Some(query) => {
 
-            val mode       = optMode.getOrElse(query.mode)
+            val mode     = optMode.getOrElse(query.mode)
             val criteria = optCriteria.getOrElse(query.criteria)
 
             //TODO: parameter validation
@@ -159,8 +170,8 @@ with Logging
               
                 updatedQuery =
                   query.copy(
-                    mode = mode,
-                    criteria = criteria,
+                    mode = mode.complete,
+                    criteria = criteria.complete,
                     filters = DefaultFilters(results.map(_._1)),
                     lastUpdate = Instant.now
                   )
@@ -213,8 +224,7 @@ with Logging
 
   private def executeQuery(
     id: Query.Id,
-    mode: Query.Mode.Value,
-//    mode: Coding[Query.Mode],
+    mode: Coding[Query.Mode.Value],
     criteria: Criteria
   )(
     implicit
@@ -227,7 +237,7 @@ with Logging
 
     //TODO: Logging
 
-/*
+
     val externalResults =
       if (mode.code.value == Query.Mode.Federated)
         for {
@@ -245,26 +255,7 @@ with Logging
           .rightIor[String]
           .toIorNel
           .pure[F]
-*/
 
-    val externalResults =
-      if (mode == Query.Mode.Federated)
-        for {
-          results <-
-            connector ! PeerToPeerQuery[Criteria,PatientRecord](connector.localSite,querier,criteria)
-        } yield
-          results.foldLeft(
-             Seq.empty[(Snapshot[PatientRecord],Criteria)].rightIor[String].toIorNel
-          ){
-            case (acc,(site,result)) =>
-              acc combine result.leftMap(err => s"Error from site ${site.display}: $err").toIor.toIorNel      
-          }        
-      else
-        Seq.empty[(Snapshot[PatientRecord],Criteria)]
-          .rightIor[String]
-          .toIorNel
-          .pure[F]
-     
 
     val localResults =
       (db ? criteria).map(_.toIor.toIorNel)
@@ -376,51 +367,12 @@ with Logging
   }
 
 
-
-/*
-  override def !(
-    req: PeerToPeerRequest
-  )(
-    implicit
-    env: Monad[F]
-  ): F[Either[String,PeerToPeerResponse[req.ResultType]]] = {
-
-    import scala.util.chaining._
-
-    log.info(s"Processing peer-to-peer query from site ${req.origin.code.value}")
-
-    req match {
-
-      case PeerToPeerQuery[Criteria,PatientRecord](_,querier,criteria) =>
-
-        querier match {
-        
-          case Some(Querier(q)) =>
-        
-            log.info(s"Querier: $q\n Criteria: ${criteria}")
-        
-            (db ? criteria).map(PeerToPeerResponse(_))
-        
-          case None =>
-            "Missing Querier ID!"
-              .tap(log.error)
-              .asLeft[Seq[Snapshot[PatientRecord]]]
-              .pure[F]
-        }
-    }
-
-  }
-*/
-
-
   override def !(
     req: PeerToPeerQuery[Criteria,PatientRecord]
   )(
     implicit
     env: Monad[F]
   ): F[Either[String,Seq[(Snapshot[PatientRecord],Criteria)]]] = {
-//  ): F[Either[String,Seq[Snapshot[PatientRecord]]]] = {
-
 
     import scala.util.chaining._
 
@@ -431,25 +383,6 @@ with Logging
     )
 
     db ? req.criteria
-
-/*
-    log.info(s"Processing peer-to-peer query from site ${req.origin.code.value}")
-
-    req.querier match {
-
-      case Some(Querier(q)) =>
-
-        log.info(s"Querier: $q  Criteria: ${req.criteria}")
-
-        db ? req.criteria
-
-      case None =>
-        "Missing Querier ID!"
-          .tap(log.error)
-          .asLeft[Seq[Snapshot[PatientRecord]]]
-          .pure[F]
-    }
- */
 
   }
 
