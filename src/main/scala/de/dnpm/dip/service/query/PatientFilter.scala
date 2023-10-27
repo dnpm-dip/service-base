@@ -29,7 +29,10 @@ object PatientFilter
 
   def on(patients: Seq[Patient]): PatientFilter = {
 
-    val ages = patients.map(_.age)
+    val ages =
+      patients
+        .map(_.age)
+        .map(_.value.toLong)
    
     PatientFilter(
       patients
@@ -56,7 +59,7 @@ object PatientFilter
     import VitalStatus._
 
     filter.genders.exists(_.code == patient.gender.code) &&
-    filter.ageRange.contains(patient.age) &&
+    filter.ageRange.contains(patient.age.value.toLong) &&
     filter.vitalStatus.exists(_.code == patient.vitalStatus.code)
       
   }

@@ -4,6 +4,7 @@ package de.dnpm.dip.service.query
 import de.dnpm.dip.model.{
   Id,
   Site,
+  Age,
   Patient,
   Gender,
   VitalStatus
@@ -20,7 +21,8 @@ final case class PatientMatch[Criteria]
   id: Id[Patient],
   managingSite: Option[Coding[Site]],
   gender: Coding[Gender.Value],
-  age: Long,
+  age: Age,
+//  age: Long,
   vitalStatus: Coding[VitalStatus.Value],
   matchingCriteria: Criteria
 )

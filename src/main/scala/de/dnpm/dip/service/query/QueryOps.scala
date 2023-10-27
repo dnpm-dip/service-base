@@ -64,6 +64,14 @@ trait QueryOps[
   ): F[Option[Query[Criteria,Filters]]]
 
 
+  // For Admin purposes
+  def queries(
+    implicit
+    env: Env,
+    querier: Querier
+  ): F[Seq[Query[Criteria,Filters]]]
+
+
   def summary(
     id: Query.Id
   )(
@@ -94,7 +102,6 @@ trait QueryOps[
     self.resultSet(id)
       .map(
         _.map(_.patientMatches.asInstanceOf[Seq[PatientMatch[Criteria]]])
-//        _.map(_.patientMatches)
       )
 
 
@@ -108,15 +115,7 @@ trait QueryOps[
   ): F[Option[PatientRecord]]
 
 
-  def !(
-    req: PeerToPeerQuery[Criteria,PatientRecord]
-  )(
-    implicit
-    env: Env
-  ): F[Either[Error,Seq[(Snapshot[PatientRecord],Criteria)]]]
-
-
-  def fetchPatientRecord(
+  def retrievePatientRecord(
     site: Coding[Site],
     patient: Id[Patient],
     snapshot: Option[Long] = None
@@ -125,6 +124,24 @@ trait QueryOps[
     env: Env,
     querier: Querier
   ): F[Either[Error,Snapshot[PatientRecord]]]
+
+
+
+  // Peer-to-peer Ops
+  def !(
+    req: PeerToPeerQuery[Criteria,PatientRecord]
+  )(
+    implicit
+    env: Env
+  ): F[Either[Error,Seq[(Snapshot[PatientRecord],Criteria)]]]
+
+
+  def !(
+    req: PatientRecordRequest[PatientRecord]
+  )(
+    implicit
+    env: Env
+  ): F[Option[req.ResultType]]
 
 
 }

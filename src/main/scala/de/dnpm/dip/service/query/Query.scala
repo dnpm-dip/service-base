@@ -134,6 +134,12 @@ object Query
   )
   extends Command[Nothing,Fltrs]
 
+  final case class Delete( 
+    id: Id,
+  )
+  extends Command[Nothing,Nothing]
+
+
 
   implicit val formatQueryId: Format[Id] =
     Json.valueFormat[Id]
@@ -149,6 +155,9 @@ object Query
 
   implicit def formatUpdate[Criteria: Format]: Format[Update[Criteria]] =
     Json.format[Update[Criteria]]
+
+  implicit val formatDelete: Format[Delete] =
+    Json.format[Delete]
 
   implicit def formatApplyFilters[Fltrs <: Filters: Format]: Format[ApplyFilters[Fltrs]] =
     Json.format[ApplyFilters[Fltrs]]

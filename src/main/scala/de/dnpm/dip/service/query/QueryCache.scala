@@ -28,6 +28,7 @@ trait QueryCache[
     queryWithResults: (Query[Criteria,Filters],Results)
   ) = add(queryWithResults)
 
+  def queries: Seq[Query[Criteria,Filters]]
 
   def get(id: Query.Id): Option[(Query[Criteria,Filters],Results)]
 
@@ -130,6 +131,12 @@ with Logging
   ): Unit =
     cache += (queryWithResults._1.id -> queryWithResults)
   
+
+  override def queries: Seq[Query[Criteria,Filters]] =
+    cache.values
+      .map(_._1)
+      .toSeq
+
 
   override def get(id: Query.Id): Option[(Query[Criteria,Filters],Results)] = 
     cache.updateWith(id){

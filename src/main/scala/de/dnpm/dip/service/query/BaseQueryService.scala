@@ -217,6 +217,29 @@ with Logging
 
       }
 
+      case Query.Delete(id) => {
+
+        // Logging
+
+        cache.getQuery(id) match {
+
+          case None =>
+            s"Invalid Query ID ${id.value}"
+              .leftIor[Query[Criteria,Filters]]
+              .toIorNel
+              .pure[F]
+
+          case Some(query) => {
+            cache -= id
+            query.rightIor[String]
+              .toIorNel
+              .pure
+          }
+
+        }
+
+      }
+
     }
 
   }
@@ -263,6 +286,19 @@ with Logging
     (localResults,externalResults).mapN(_ combine _)
 
   }
+
+
+  override def queries(
+    implicit
+    env: Monad[F],
+    querier: Querier
+  ): F[Seq[Query[Criteria,Filters]]] = {
+
+    //TODO: Logging
+
+    cache.queries.pure
+  }
+
 
 
   override def get(
@@ -335,7 +371,7 @@ with Logging
 
 
 
-  override def fetchPatientRecord(
+  override def retrievePatientRecord(
     site: Coding[Site],
     patient: Id[Patient],
     snapshot: Option[Long]
@@ -374,8 +410,6 @@ with Logging
     env: Monad[F]
   ): F[Either[String,Seq[(Snapshot[PatientRecord],Criteria)]]] = {
 
-    import scala.util.chaining._
-
     log.info(
       s"""Processing peer-to-peer query from site ${req.origin.code.value}
           Querier: ${req.querier.value}
@@ -383,6 +417,25 @@ with Logging
     )
 
     db ? req.criteria
+
+  }
+
+
+  override def !(
+    req: PatientRecordRequest[PatientRecord]
+  )(
+    implicit
+    env: Monad[F]
+  ): F[Option[req.ResultType]] = {
+
+    log.info(
+      s"""Processing PatientRecord from site ${req.origin.code.value}
+          Querier: ${req.querier.value}
+          Patient-ID ${req.patient.value}
+          Snapshot-ID ${req.snapshot.getOrElse("-")}"""
+    )
+
+    db ? (req.patient,req.snapshot)
 
   }
 
