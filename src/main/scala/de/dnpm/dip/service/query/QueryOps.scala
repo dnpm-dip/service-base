@@ -33,6 +33,7 @@ trait QueryOps[
 
 
   import cats.syntax.functor._
+  import scala.util.chaining._
 
 
   def sites: List[Coding[Site]]
@@ -90,6 +91,7 @@ trait QueryOps[
   ): F[Option[Results]]
 
 
+/*
   //TODO: Look for type-safe way to handle compile problems with Criteria vs. Results#Criteria
   def patientMatches(
     id: Query.Id
@@ -102,6 +104,26 @@ trait QueryOps[
     self.resultSet(id)
       .map(
         _.map(_.patientMatches.asInstanceOf[Seq[PatientMatch[Criteria]]])
+      )
+
+*/
+
+  def patientMatches(
+    id: Query.Id,
+    offset: Option[Int] = None,
+    length: Option[Int] = None
+  )(
+    implicit
+    env: Env,
+    querier: Querier,
+    func: cats.Functor[F],
+  ): F[Option[Seq[PatientMatch[Criteria]]]] =
+    self.resultSet(id)
+      .map(
+        _.map(
+          _.patientMatches(offset,length)
+           .asInstanceOf[Seq[PatientMatch[Criteria]]]  //TODO: Look for type-safe way to handle compile problems with Criteria vs. Results#Criteria
+        )
       )
 
 

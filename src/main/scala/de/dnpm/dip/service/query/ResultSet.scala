@@ -7,13 +7,14 @@ import de.dnpm.dip.model.{
   Patient
 }
 
-//trait ResultSet[PatientRecord,Crit]
 trait ResultSet[PatientRecord,Criteria]
 {
   self =>
 
+  import scala.util.chaining._
+
+
   type Summary <: ResultSet.Summary
-//  type Criteria = Crit
 
 
   val id: Query.Id
@@ -21,6 +22,28 @@ trait ResultSet[PatientRecord,Criteria]
   def summary: Summary
 
   def patientMatches: Seq[PatientMatch[Criteria]]
+
+  def patientMatches(
+    offset: Option[Int] = None,
+    length: Option[Int] = None,
+  ): Seq[PatientMatch[Criteria]] =
+    self.patientMatches
+      .pipe(
+        seq =>
+          offset match {
+            case Some(n) => seq.drop(n)
+            case None    => seq
+          }
+      )
+      .pipe(
+        seq =>
+          length match {
+            case Some(n) => seq.take(n)
+            case None    => seq
+          }
+      )
+
+
 
   def patientRecord(
     patId: Id[Patient]
