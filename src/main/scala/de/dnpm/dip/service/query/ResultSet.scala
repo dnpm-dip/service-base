@@ -23,6 +23,20 @@ trait ResultSet[PatientRecord,Criteria]
 
   def patientMatches: Seq[PatientMatch[Criteria]]
 
+/*
+  def patientMatches(
+    offset: Option[Int] = None,
+    length: Option[Int] = None,
+  ): Seq[PatientMatch[Criteria]] =
+    self.patientMatches
+      .pipe(
+        seq => offset.fold(seq)(seq.drop)
+      )
+      .pipe(
+        seq => length.fold(seq)(seq.take)
+      )
+*/
+
   def patientMatches(
     offset: Option[Int] = None,
     length: Option[Int] = None,

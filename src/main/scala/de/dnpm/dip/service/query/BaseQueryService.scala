@@ -110,17 +110,21 @@ with Logging
 
     cmd match {
 
-      case Query.Submit(mode,criteria) => {
+      case Query.Submit(md,crit) => {
 
 
         log.info(s"Processing new query by $querier") 
 
         val id = cache.newQueryId
 
+        val mode = md.complete
+
+        val criteria = crit.complete
+
         (
           for {
             //TODO: parameter validation
-
+            
             results <-
               IorT { executeQuery(id,mode,criteria) }
 
@@ -129,8 +133,8 @@ with Logging
                 id,
                 LocalDateTime.now,
                 querier,
-                mode.complete,
-                criteria.complete,
+                mode,
+                criteria,
                 DefaultFilters(results.map(_._1)),
                 cache.timeoutSeconds,
                 Instant.now
@@ -158,8 +162,11 @@ with Logging
 
           case Some(query) => {
 
-            val mode     = optMode.getOrElse(query.mode)
-            val criteria = optCriteria.getOrElse(query.criteria)
+            val mode =
+              optMode.map(_.complete).getOrElse(query.mode)
+
+            val criteria =
+              optCriteria.map(_.complete).getOrElse(query.criteria)
 
             //TODO: parameter validation
 
@@ -170,8 +177,8 @@ with Logging
               
                 updatedQuery =
                   query.copy(
-                    mode = mode.complete,
-                    criteria = criteria.complete,
+                    mode = mode,
+                    criteria = criteria,
                     filters = DefaultFilters(results.map(_._1)),
                     lastUpdate = Instant.now
                   )
