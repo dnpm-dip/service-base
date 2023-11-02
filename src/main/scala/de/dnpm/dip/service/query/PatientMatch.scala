@@ -12,7 +12,8 @@ import de.dnpm.dip.model.{
 import de.dnpm.dip.coding.Coding
 import play.api.libs.json.{
   Json,
-  Format
+  Format,
+  OFormat
 }
 
 
@@ -46,7 +47,7 @@ object PatientMatch
     )
 
 
-  implicit def format[Criteria: Format]: Format[PatientMatch[Criteria]] =
+  implicit def format[Criteria: Format]: OFormat[PatientMatch[Criteria]] =
     Json.format[PatientMatch[Criteria]]
 }
 

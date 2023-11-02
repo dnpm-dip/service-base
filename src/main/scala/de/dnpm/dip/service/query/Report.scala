@@ -9,7 +9,9 @@ import play.api.libs.json.{
   JsObject,
   JsValue,
   Format,
+  OFormat,
   Writes,
+  OWrites,
   Reads
 }
 import de.dnpm.dip.coding.Coding
@@ -91,7 +93,7 @@ object GlobalReport
     )
 
 
-  implicit def writes[T: Writes]: Writes[GlobalReport[T]] =
+  implicit def writes[T: Writes]: OWrites[GlobalReport[T]] =
     Json.writes[GlobalReport[T]]
       .transform(
         (js: JsValue) => 

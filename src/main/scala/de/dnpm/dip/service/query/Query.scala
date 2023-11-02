@@ -17,7 +17,8 @@ import de.dnpm.dip.coding.{
 }
 import play.api.libs.json.{
   Json,
-  Format
+  Format,
+  OFormat
 }
 
 
@@ -147,19 +148,19 @@ object Query
   implicit def formatQuery[
     Criteria: Format,
     Fltrs <: Filters: Format
-  ]: Format[Query[Criteria,Fltrs]] =
+  ]: OFormat[Query[Criteria,Fltrs]] =
     Json.format[Query[Criteria,Fltrs]]
 
-  implicit def formatSubmit[Criteria: Format]: Format[Submit[Criteria]] =
+  implicit def formatSubmit[Criteria: Format]: OFormat[Submit[Criteria]] =
     Json.format[Submit[Criteria]]
 
-  implicit def formatUpdate[Criteria: Format]: Format[Update[Criteria]] =
+  implicit def formatUpdate[Criteria: Format]: OFormat[Update[Criteria]] =
     Json.format[Update[Criteria]]
 
-  implicit val formatDelete: Format[Delete] =
+  implicit val formatDelete: OFormat[Delete] =
     Json.format[Delete]
 
-  implicit def formatApplyFilters[Fltrs <: Filters: Format]: Format[ApplyFilters[Fltrs]] =
+  implicit def formatApplyFilters[Fltrs <: Filters: Format]: OFormat[ApplyFilters[Fltrs]] =
     Json.format[ApplyFilters[Fltrs]]
 
 }

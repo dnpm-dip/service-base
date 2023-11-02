@@ -12,7 +12,7 @@ import de.dnpm.dip.model.{
 }
 import play.api.libs.json.{
   Json,
-  Format
+  OFormat
 }
 
 
@@ -66,7 +66,7 @@ object PatientFilter
 
 
 
-  implicit val format: Format[PatientFilter] =
+  implicit val format: OFormat[PatientFilter] =
     Json.format[PatientFilter]
 
 }

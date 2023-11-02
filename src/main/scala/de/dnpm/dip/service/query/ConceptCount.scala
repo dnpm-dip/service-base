@@ -17,7 +17,7 @@ object ConceptCount
   import play.api.libs.functional.syntax._
 
   // Explicit Format definition required because of recursive type ConceptCount
-  implicit def format[T: Format]: Format[ConceptCount[T]] =
+  implicit def format[T: Format]: OFormat[ConceptCount[T]] =
     (
       (JsPath \ "concept").format[T] and
       (JsPath \ "count").format[Int] and
