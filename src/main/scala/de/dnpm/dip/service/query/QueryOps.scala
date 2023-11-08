@@ -17,6 +17,16 @@ import de.dnpm.dip.model.{
 }
 
 
+/*
+final case class QueryFilter
+(
+  id: Option[Query.Id],
+  querier: Option[Querier],
+  mode: Option[Set[Coding[Query.Mode.Value]]]
+)
+*/
+
+
 trait QueryOps[
   F[+_],
   Env,
@@ -91,38 +101,29 @@ trait QueryOps[
   ): F[Option[Results]]
 
 
-/*
-  //TODO: Look for type-safe way to handle compile problems with Criteria vs. Results#Criteria
-  def patientMatches(
-    id: Query.Id
-  )(
-    implicit
-    env: Env,
-    querier: Querier,
-    func: cats.Functor[F],
-  ): F[Option[Seq[PatientMatch[Criteria]]]] =
-    self.resultSet(id)
-      .map(
-        _.map(_.patientMatches.asInstanceOf[Seq[PatientMatch[Criteria]]])
-      )
-
-*/
-
   def patientMatches(
     id: Query.Id,
+    filter: PatientFilter,
     offset: Option[Int] = None,
-    length: Option[Int] = None
+    limit: Option[Int] = None
   )(
     implicit
     env: Env,
     querier: Querier,
     func: cats.Functor[F],
-  ): F[Option[Seq[PatientMatch[Criteria]]]] =
+  ): F[Option[Collection[PatientMatch[Criteria]]]] =
     self.resultSet(id)
       .map(
         _.map(
-          _.patientMatches(offset,length)
-           .asInstanceOf[Seq[PatientMatch[Criteria]]]  //TODO: Look for type-safe way to handle compile problems with Criteria vs. Results#Criteria
+          _.patientMatches
+           .asInstanceOf[Collection[PatientMatch[Criteria]]]  //TODO: Look for type-safe way to handle compile problems with Criteria vs. Results#Criteria
+           .withFilter(filter)
+           .pipe(
+             pms => offset.fold(pms)(pms.withOffset(_))
+           )
+           .pipe(
+             pms => limit.fold(pms)(pms.withLimit(_))
+           )
         )
       )
 

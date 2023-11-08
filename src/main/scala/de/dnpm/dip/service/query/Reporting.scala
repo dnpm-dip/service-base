@@ -84,7 +84,8 @@ trait ReportingOps
              val parent =
                codeSystem
                  .parentOf(coding.code)
-                 .map(Coding.fromConcept(_))
+                 .map(_.toCoding)
+//                 .map(Coding.fromConcept(_))
                  .getOrElse(coding)
        
              parent -> (coding -> cs.size)
@@ -263,3 +264,5 @@ trait ReportingOps
 */
 
 }
+
+object ReportingOps extends ReportingOps

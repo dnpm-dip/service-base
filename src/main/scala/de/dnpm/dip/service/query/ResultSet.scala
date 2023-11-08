@@ -2,10 +2,14 @@ package de.dnpm.dip.service.query
 
 
 
+import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
   Id,
-  Patient
+  Patient,
+  Site
 }
+
+
 
 trait ResultSet[PatientRecord,Criteria]
 {
@@ -21,25 +25,14 @@ trait ResultSet[PatientRecord,Criteria]
 
   def summary: Summary
 
-  def patientMatches: Seq[PatientMatch[Criteria]]
+//  def patientMatches: Seq[PatientMatch[Criteria]]
+
+  def patientMatches: Collection[PatientMatch[Criteria]]
 
 /*
   def patientMatches(
     offset: Option[Int] = None,
-    length: Option[Int] = None,
-  ): Seq[PatientMatch[Criteria]] =
-    self.patientMatches
-      .pipe(
-        seq => offset.fold(seq)(seq.drop)
-      )
-      .pipe(
-        seq => length.fold(seq)(seq.take)
-      )
-*/
-
-  def patientMatches(
-    offset: Option[Int] = None,
-    length: Option[Int] = None,
+    limit: Option[Int] = None,
   ): Seq[PatientMatch[Criteria]] =
     self.patientMatches
       .pipe(
@@ -51,22 +44,23 @@ trait ResultSet[PatientRecord,Criteria]
       )
       .pipe(
         seq =>
-          length match {
+          limit match {
             case Some(n) => seq.take(n)
             case None    => seq
           }
       )
-
+*/
 
 
   def patientRecord(
     patId: Id[Patient]
   ): Option[PatientRecord] 
 
-
+/*
   protected[query] def withFilter(
     f: PatientRecord => Boolean
   ): self.type
+*/
 
   protected[query] def cohort: Seq[PatientRecord]
 
@@ -81,7 +75,9 @@ object ResultSet
   {
     val id: Query.Id
 
-    val numPatients: Int
+    def numPatients: Int
+
+    def siteDistribution: Seq[ConceptCount[Coding[Site]]]
   }
 
 }

@@ -53,8 +53,6 @@ with Logging
 
   protected implicit val criteriaCompleter: Completer[Criteria]
 
-//  protected implicit val patientRecordCompleter: Completer[PatientRecord]
-
 
   protected def DefaultFilters(
     rs: Seq[Snapshot[PatientRecord]]
@@ -64,9 +62,9 @@ with Logging
   protected val ResultSetFrom: (Query.Id,Seq[(Snapshot[PatientRecord],Criteria)]) => Results
 
 
-  protected def toPredicate(
-    flts: Filters
-  ): PatientRecord => Boolean
+//  protected def toPredicate(
+//    flts: Filters
+//  ): PatientRecord => Boolean
 
  
   protected val preprocess: PatientRecord => PatientRecord  // Complete, etc...
@@ -193,6 +191,7 @@ with Logging
         }
       }
 
+/*      
       case Query.ApplyFilters(id,filters) => {
 
         cache.get(id) match {
@@ -223,6 +222,7 @@ with Logging
         }
 
       }
+*/
 
       case Query.Delete(id) => {
 

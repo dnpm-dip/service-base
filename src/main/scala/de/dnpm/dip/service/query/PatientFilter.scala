@@ -5,6 +5,8 @@ import java.time.LocalDate.{now => today}
 import java.time.temporal.ChronoUnit.YEARS 
 import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
+  Age,
+  Interval,
   ClosedInterval,
   Gender,
   Patient,
@@ -18,9 +20,9 @@ import play.api.libs.json.{
 
 final case class PatientFilter
 (
-  genders: Set[Coding[Gender.Value]],
-  ageRange: ClosedInterval[Long],
-  vitalStatus: Set[Coding[VitalStatus.Value]]
+  gender: Option[Set[Coding[Gender.Value]]],
+  ageRange: Option[Interval[Int]],
+  vitalStatus: Option[Set[Coding[VitalStatus.Value]]]
 )
 
 
@@ -32,38 +34,72 @@ object PatientFilter
     val ages =
       patients
         .map(_.age)
-        .map(_.value.toLong)
+        .map(_.value.toInt)
    
     PatientFilter(
-      patients
-        .map(_.gender)
-        .toSet,
-      ClosedInterval(
-        ages.minOption.getOrElse(0L) -> ages.maxOption.getOrElse(0L)
+      Some(
+        patients
+          .map(_.gender)
+          .toSet
       ),
-      patients
+      Some(
+        ClosedInterval(
+          ages.minOption.getOrElse(0) -> ages.maxOption.getOrElse(0)
+        )
+      ),
+      Some(
+        patients
         .map(_.vitalStatus)
         .toSet
+      )
     )
 
   }
 
+  def apply(
+    gender: Option[Set[Coding[Gender.Value]]],
+    ageMin: Option[Int],
+    ageMax: Option[Int],
+    vitalStatus: Option[Set[Coding[VitalStatus.Value]]]
+  ): PatientFilter =
+    PatientFilter(
+      gender,
+      Some(
+        Interval(
+          min = ageMin,
+          max = ageMax
+        )
+      ),
+      vitalStatus
+    )
+
 
   import scala.language.implicitConversions
 
-  implicit def toPredicate(
-    filter: PatientFilter
-  ): Patient => Boolean = {
-    patient =>
-
-    import VitalStatus._
-
-    filter.genders.exists(_.code == patient.gender.code) &&
-    filter.ageRange.contains(patient.age.value.toLong) &&
-    filter.vitalStatus.exists(_.code == patient.vitalStatus.code)
-      
+  type PatientLike = {
+    def gender: Coding[Gender.Value]
+    def age: Age
+    def vitalStatus: Coding[VitalStatus.Value]
   }
 
+
+  implicit def toPredicate[P <: PatientLike](
+    filter: PatientFilter
+  ): P => Boolean = {
+    patient =>
+
+    import scala.language.reflectiveCalls
+    import VitalStatus._
+
+    filter.gender.fold(true)(_ contains patient.gender) &&
+    filter.ageRange.fold(true)(_ contains patient.age.value.toInt) &&
+    filter.vitalStatus.fold(true)(_ contains patient.vitalStatus)
+      
+//    filter.gender.fold(true)(_.exists(_.code == patient.gender.code)) &&
+//    filter.ageRange.fold(true)(_.contains(patient.age.value.toInt)) &&
+//    filter.vitalStatus.fold(true)(_.exists(_.code == patient.vitalStatus.code))
+      
+  }
 
 
   implicit val format: OFormat[PatientFilter] =

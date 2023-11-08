@@ -20,10 +20,10 @@ import play.api.libs.json.{
 final case class PatientMatch[Criteria]
 (
   id: Id[Patient],
-  managingSite: Option[Coding[Site]],
+  managingSite: Coding[Site],
+//  managingSite: Option[Coding[Site]],
   gender: Coding[Gender.Value],
   age: Age,
-//  age: Long,
   vitalStatus: Coding[VitalStatus.Value],
   matchingCriteria: Criteria
 )
@@ -39,7 +39,7 @@ object PatientMatch
   ): PatientMatch[Criteria] =
     PatientMatch(
       patient.id,
-      patient.managingSite,
+      patient.managingSite.get, // Safe here: site is set upon entry of a dataset into the DNPM system 'context' (i.e. upon import)
       patient.gender,
       patient.age,
       patient.vitalStatus,

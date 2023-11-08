@@ -67,3 +67,15 @@ object ConceptCount
 
 
 }
+
+
+final case class Distribution[T]
+(
+  data: Seq[ConceptCount[T]]
+)
+
+object Distribution
+{
+  implicit def format[T: Format]: OFormat[Distribution[T]] =
+    Json.format[Distribution[T]]
+}
