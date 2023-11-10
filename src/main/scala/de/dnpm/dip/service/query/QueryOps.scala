@@ -104,29 +104,19 @@ trait QueryOps[
   def patientMatches(
     id: Query.Id,
     filter: PatientFilter,
-    offset: Option[Int] = None,
-    limit: Option[Int] = None
   )(
     implicit
     env: Env,
     querier: Querier,
     func: cats.Functor[F],
-  ): F[Option[Collection[PatientMatch[Criteria]]]] =
+  ): F[Option[Seq[PatientMatch[Criteria]]]] =
     self.resultSet(id)
       .map(
         _.map(
-          _.patientMatches
-           .asInstanceOf[Collection[PatientMatch[Criteria]]]  //TODO: Look for type-safe way to handle compile problems with Criteria vs. Results#Criteria
-           .withFilter(filter)
-           .pipe(
-             pms => offset.fold(pms)(pms.withOffset(_))
-           )
-           .pipe(
-             pms => limit.fold(pms)(pms.withLimit(_))
-           )
+          _.patientMatches(filter)
+           .asInstanceOf[Seq[PatientMatch[Criteria]]]  //TODO: Look for type-safe way to handle compile problems with Criteria vs. Results#Criteria
         )
       )
-
 
   def patientRecord(
     id: Query.Id,

@@ -63,15 +63,17 @@ object PatientFilter
     vitalStatus: Option[Set[Coding[VitalStatus.Value]]]
   ): PatientFilter =
     PatientFilter(
-      gender,
+      gender.filter(_.nonEmpty),
       Some(
         Interval(
           min = ageMin,
           max = ageMax
         )
       ),
-      vitalStatus
+      vitalStatus.filter(_.nonEmpty)
     )
+
+
 
 
   import scala.language.implicitConversions
@@ -94,11 +96,6 @@ object PatientFilter
     filter.gender.fold(true)(_ contains patient.gender) &&
     filter.ageRange.fold(true)(_ contains patient.age.value.toInt) &&
     filter.vitalStatus.fold(true)(_ contains patient.vitalStatus)
-      
-//    filter.gender.fold(true)(_.exists(_.code == patient.gender.code)) &&
-//    filter.ageRange.fold(true)(_.contains(patient.age.value.toInt)) &&
-//    filter.vitalStatus.fold(true)(_.exists(_.code == patient.vitalStatus.code))
-      
   }
 
 
