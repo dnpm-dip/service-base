@@ -6,7 +6,11 @@ import java.time.{
   LocalDateTime
 }
 import cats.Monad
-import cats.data.{IorNel,IorT}
+import cats.data.{
+  EitherNel,
+  IorNel,
+  IorT
+}
 import de.dnpm.dip.util.{
   Logging,
   Completer
@@ -45,13 +49,21 @@ with Logging
   import cats.syntax.applicative._
   import cats.syntax.functor._
   import cats.syntax.flatMap._
+  import de.dnpm.dip.util.Completer.syntax._
+
   
+  protected val preparedQueryDB: PreparedQueryDB[F,Monad[F],Criteria,String]
   protected val db: LocalDB[F,Monad[F],Criteria,PatientRecord]
   protected val connector: Connector[F,Monad[F]]
   protected val cache: QueryCache[Criteria,Filters,Results,PatientRecord] 
 
 
   protected implicit val criteriaCompleter: Completer[Criteria]
+
+  // Completer[Criteria] to allow expanding the criteria,
+  // e.g. including sub-classes of concepts, etc
+  // separately from the completed criteria returned to the client
+  protected val CriteriaExpander: Completer[Criteria]
 
 
   protected def DefaultFilters(
@@ -61,17 +73,114 @@ with Logging
 
   protected val ResultSetFrom: (Query.Id,Seq[(Snapshot[PatientRecord],Criteria)]) => Results
 
-
-//  protected def toPredicate(
-//    flts: Filters
-//  ): PatientRecord => Boolean
-
  
   protected val preprocess: PatientRecord => PatientRecord  // Complete, etc...
 
 
   override def sites: List[Coding[Site]] =
     connector.localSite :: connector.otherSites
+
+
+  override def !(
+    cmd: PreparedQuery.Command[Criteria]
+  )(
+    implicit 
+    env: Monad[F],
+    querier: Querier
+  ): F[String EitherNel PreparedQuery[Criteria]] = {
+
+    import de.dnpm.dip.util.Operations.syntax._
+    import PreparedQuery.{Create,Update,Delete}
+
+    cmd match {
+
+      case Create(name,criteria) =>
+
+        for { 
+          id <-
+            preparedQueryDB.newId
+
+          pq =
+            PreparedQuery(
+              id,
+              querier,
+              name,
+              criteria.complete,
+              LocalDateTime.now,
+              Instant.now
+            )
+
+          result <-
+            preparedQueryDB.save(pq)
+              .map(_ => pq.asRight[String])
+
+        } yield result.toEitherNel
+
+
+      case Update(id,optName,optCriteria) =>
+
+        for {
+          pq <-
+            preparedQueryDB.get(id)
+
+          result <-
+            pq.map(
+                _.patch(
+                  optName.map(name => _.copy(name = name)),
+                  optCriteria.map(crit => _.copy(criteria = crit))
+                )
+              )
+              .fold(
+                s"Invalid PreparedQuery ID ${id.value}"
+                  .asLeft[PreparedQuery[Criteria]]
+                  .pure
+              )(
+                updated =>
+                  preparedQueryDB.save(updated)
+                    .map(_ => updated.asRight[String])
+              )
+
+        } yield result.toEitherNel 
+
+
+      case Delete(id) =>
+        preparedQueryDB
+          .delete(id)
+          .map(_.toRight(s"Invalid PreparedQuery ID ${id.value}").toEitherNel)
+
+
+    }
+
+  }
+
+
+  override def ?(
+    id: PreparedQuery.Id
+  )(
+    implicit 
+    env: Monad[F],
+    querier: Querier
+  ): F[Option[PreparedQuery[Criteria]]] = {
+
+    // TODO: Logging
+
+    preparedQueryDB.get(id)
+
+  }
+
+
+  override def ?(
+    q: PreparedQuery.Query
+  )(
+    implicit
+    env: Monad[F],
+    querier: Querier
+  ): F[Seq[PreparedQuery[Criteria]]] = {
+
+    // TODO: Logging
+    
+    preparedQueryDB.query(q)
+  }
 
 
   override def process(
@@ -103,8 +212,6 @@ with Logging
     env: Monad[F],
     querier: Querier
   ): F[String IorNel Query[Criteria,Filters]] = {
-
-    import de.dnpm.dip.util.Completer.syntax._
 
     cmd match {
 
@@ -267,12 +374,14 @@ with Logging
 
     //TODO: Logging
 
+    val expandedCriteria =
+      CriteriaExpander(criteria)
 
     val externalResults =
       if (mode.code.value == Query.Mode.Federated)
         for {
           results <-
-            connector ! PeerToPeerQuery[Criteria,PatientRecord](connector.localSite,querier,criteria)
+            connector ! PeerToPeerQuery[Criteria,PatientRecord](connector.localSite,querier,expandedCriteria)
         } yield
           results.foldLeft(
              Seq.empty[(Snapshot[PatientRecord],Criteria)].rightIor[String].toIorNel
@@ -288,7 +397,7 @@ with Logging
 
 
     val localResults =
-      (db ? criteria).map(_.toIor.toIorNel)
+      (db ? expandedCriteria).map(_.toIor.toIorNel)
 
     (localResults,externalResults).mapN(_ combine _)
 

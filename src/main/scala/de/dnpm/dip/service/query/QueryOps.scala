@@ -17,15 +17,6 @@ import de.dnpm.dip.model.{
 }
 
 
-/*
-final case class QueryFilter
-(
-  id: Option[Query.Id],
-  querier: Option[Querier],
-  mode: Option[Set[Coding[Query.Mode.Value]]]
-)
-*/
-
 
 trait QueryOps[
   F[+_],
@@ -171,5 +162,8 @@ extends Data.Ops[
 ]
 with QueryOps[
   F,Env,UseCase,Error
+]
+with PreparedQueryOps[
+  F,Env,UseCase#Criteria,Error
 ]
 
