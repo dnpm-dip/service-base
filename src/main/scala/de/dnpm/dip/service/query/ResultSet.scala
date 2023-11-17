@@ -16,8 +16,7 @@ trait ResultSet[PatientRecord,Criteria]
   self =>
 
   import scala.util.chaining._
-
-
+ 
   type Summary <: ResultSet.Summary
 
 
@@ -25,12 +24,11 @@ trait ResultSet[PatientRecord,Criteria]
 
   def summary: Summary
 
+
   def patientMatches(
-    f: Patient => Boolean
+    f: PatientRecord => Boolean = _ => true
   ): Seq[PatientMatch[Criteria]]
 
-  def patientMatches: Seq[PatientMatch[Criteria]] =
-    patientMatches(_ => true)
 
   def patientRecord(
     patId: Id[Patient]
@@ -51,8 +49,6 @@ object ResultSet
     val id: Query.Id
 
     def numPatients: Int
-
-    def patientFilter: PatientFilter
 
     def siteDistribution: Seq[ConceptCount[Coding[Site]]]
   }

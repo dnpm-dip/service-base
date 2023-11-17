@@ -24,11 +24,11 @@ extends ResultSet[PatientRecord,Criteria]
   val results: Seq[(Snapshot[PatientRecord],Criteria)]
 
   def patientMatches(
-    f: Patient => Boolean
+    f: PatientRecord => Boolean
   ): Seq[PatientMatch[Criteria]] =
     results
       .collect {
-        case (Snapshot(patRec,_),matchingCriteria) if f(patRec.patient) =>
+        case (Snapshot(patRec,_),matchingCriteria) if f(patRec) =>
           PatientMatch.of(
             patRec.patient,
             matchingCriteria

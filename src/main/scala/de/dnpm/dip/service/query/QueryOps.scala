@@ -3,6 +3,7 @@ package de.dnpm.dip.service.query
 
 import java.net.URI
 import scala.util.Either
+import cats.Functor
 import cats.data.{
   Ior,
   IorNel,
@@ -29,7 +30,7 @@ trait QueryOps[
 
   type PatientRecord = UseCase#PatientRecord
   type Criteria      = UseCase#Criteria
-  type Filters       = UseCase#Filters
+  type Filter        = UseCase#Filter
   type Results       = UseCase#Results
 
 
@@ -41,20 +42,20 @@ trait QueryOps[
 
 
   def process(
-    cmd: Query.Command[Criteria,Filters]
+    cmd: Query.Command[Criteria,Filter]
   )(
     implicit
     env: Env,
     querier: Querier
-  ): F[Error IorNel Query[Criteria,Filters]]
+  ): F[Error IorNel Query[Criteria,Filter]]
 
   final def !(
-    cmd: Query.Command[Criteria,Filters]
+    cmd: Query.Command[Criteria,Filter]
   )(
     implicit
     env: Env,
     querier: Querier
-  ): F[Error IorNel Query[Criteria,Filters]] = self.process(cmd)
+  ): F[Error IorNel Query[Criteria,Filter]] = self.process(cmd)
 
 
   def get(
@@ -63,7 +64,7 @@ trait QueryOps[
     implicit
     env: Env,
     querier: Querier
-  ): F[Option[Query[Criteria,Filters]]]
+  ): F[Option[Query[Criteria,Filter]]]
 
 
   // For Admin purposes
@@ -71,7 +72,7 @@ trait QueryOps[
     implicit
     env: Env,
     querier: Querier
-  ): F[Seq[Query[Criteria,Filters]]]
+  ): F[Seq[Query[Criteria,Filter]]]
 
 
   def summary(
@@ -94,20 +95,22 @@ trait QueryOps[
 
   def patientMatches(
     id: Query.Id,
-    filter: PatientFilter,
+    filter: Filter,
   )(
     implicit
     env: Env,
     querier: Querier,
     func: cats.Functor[F],
-  ): F[Option[Seq[PatientMatch[Criteria]]]] =
+  ): F[Option[Seq[PatientMatch[Criteria]]]] = 
     self.resultSet(id)
       .map(
         _.map(
-          _.patientMatches(filter)
+//          _.patientMatches(filter)
+          _.patientMatches(filter.asInstanceOf[Filters[PatientRecord]])
            .asInstanceOf[Seq[PatientMatch[Criteria]]]  //TODO: Look for type-safe way to handle compile problems with Criteria vs. Results#Criteria
         )
       )
+
 
   def patientRecord(
     id: Query.Id,

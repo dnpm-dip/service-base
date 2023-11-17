@@ -17,8 +17,11 @@ import de.dnpm.dip.coding.{
 }
 import play.api.libs.json.{
   Json,
+  Reads,
+  Writes,
+  OWrites,
   Format,
-  OFormat
+//  OFormat
 }
 
 
@@ -32,14 +35,14 @@ object Querier
 
 final case class Query[
   Criteria,
-  Filters <: Query.Filters
+  Filter <: Filters[_]
 ](
   id: Query.Id,
   submittedAt: LocalDateTime,
   querier: Querier,
   mode: Coding[Query.Mode.Value],
   criteria: Criteria,
-  filters: Filters,
+  filters: Filter,
   expiresAfter: Int,
   lastUpdate: Instant
 )
@@ -75,43 +78,7 @@ object Query
   }
 
 
-/*
-  sealed trait Mode
-  object Mode
-  {
-    val Local     = "local"
-    val Federated = "federated"
-
-    implicit val system: Coding.System[Mode] =
-      Coding.System[Mode]("dnpm-dip/query/mode")
-
-    implicit val codeSystem: CodeSystem[Mode] =
-      CodeSystem[Mode](
-        name    = "query-mode",
-        title   = Some("Query Mode"),
-        version = None,
-        Local     -> "Lokal",
-        Federated -> "Föderiert"
-      )
-
-    object Provider extends SingleCodeSystemProvider(codeSystem)
-
-    final class ProviderSPI extends CodeSystemProviderSPI
-    {
-      override def getInstance[F[_]]: CodeSystemProvider[Any,F,Applicative[F]] =
-        new Provider.Facade[F]
-    }
-
-  }
-*/
-
-  trait Filters
-  {
-    val patientFilter: PatientFilter
-  }
-
-
-  sealed abstract class Command[+Criteria,+Fltrs <: Filters]
+  sealed abstract class Command[+Criteria,+Filter <: Filters[_]]
 
   final case class Submit[Criteria]
   ( 
@@ -128,30 +95,39 @@ object Query
   )
   extends Command[Criteria,Nothing]
 
-/*
-  final case class ApplyFilters[Fltrs <: Filters]
-  (
-    id: Id,
-    filters: Fltrs
-  )
-  extends Command[Nothing,Fltrs]
-*/
-
   final case class Delete( 
     id: Id,
   )
   extends Command[Nothing,Nothing]
 
 
+  implicit val formatQueryId: Format[Id] =
+    Json.valueFormat[Id]
 
+  implicit def formatQuery[
+    Criteria: Writes,
+    Filter <: Filters[_]: Writes
+  ]: OWrites[Query[Criteria,Filter]] =
+    Json.writes[Query[Criteria,Filter]]
+
+  implicit def formatSubmit[Criteria: Reads]: Reads[Submit[Criteria]] =
+    Json.reads[Submit[Criteria]]
+
+  implicit def formatUpdate[Criteria: Format]: Reads[Update[Criteria]] =
+    Json.reads[Update[Criteria]]
+
+  implicit val formatDelete: Reads[Delete] =
+    Json.reads[Delete]
+
+/*
   implicit val formatQueryId: Format[Id] =
     Json.valueFormat[Id]
 
   implicit def formatQuery[
     Criteria: Format,
-    Fltrs <: Filters: Format
-  ]: OFormat[Query[Criteria,Fltrs]] =
-    Json.format[Query[Criteria,Fltrs]]
+    Filter <: Filters[_]: Format
+  ]: OFormat[Query[Criteria,Filter]] =
+    Json.format[Query[Criteria,Filter]]
 
   implicit def formatSubmit[Criteria: Format]: OFormat[Submit[Criteria]] =
     Json.format[Submit[Criteria]]
@@ -161,8 +137,5 @@ object Query
 
   implicit val formatDelete: OFormat[Delete] =
     Json.format[Delete]
-
-//  implicit def formatApplyFilters[Fltrs <: Filters: Format]: OFormat[ApplyFilters[Fltrs]] =
-//    Json.format[ApplyFilters[Fltrs]]
-
+*/
 }

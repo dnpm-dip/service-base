@@ -10,11 +10,13 @@ import de.dnpm.dip.model.{
   ClosedInterval,
   Gender,
   Patient,
-  VitalStatus
+  VitalStatus,
+  Site
 }
 import play.api.libs.json.{
   Json,
-  OFormat
+  OWrites
+//  OFormat
 }
 
 
@@ -22,14 +24,28 @@ final case class PatientFilter
 (
   gender: Option[Set[Coding[Gender.Value]]],
   ageRange: Option[Interval[Int]],
-  vitalStatus: Option[Set[Coding[VitalStatus.Value]]]
+  vitalStatus: Option[Set[Coding[VitalStatus.Value]]],
+  site: Option[Set[Coding[Site]]]
 )
+extends (Patient => Boolean)
+{
+  override def apply(patient: Patient): Boolean = {
+
+    import VitalStatus._
+
+    gender.fold(true)(_ contains patient.gender) &&
+    ageRange.fold(true)(_ contains patient.age.value.toInt) &&
+    vitalStatus.fold(true)(_ contains patient.vitalStatus) &&
+    site.fold(true)(sites => patient.managingSite exists (c => sites exists (_.code == c.code)))
+  }
+
+}
 
 
 object PatientFilter
 {
 
-  def on(patients: Seq[Patient]): PatientFilter = {
+  def from(patients: Seq[Patient]): PatientFilter = {
 
     val ages =
       patients
@@ -41,7 +57,8 @@ object PatientFilter
         patients
           .map(_.gender)
           .toSet
-      ),
+      )
+      .filter(_.nonEmpty),
       Some(
         ClosedInterval(
           ages.minOption.getOrElse(0) -> ages.maxOption.getOrElse(0)
@@ -52,15 +69,34 @@ object PatientFilter
         .map(_.vitalStatus)
         .toSet
       )
+      .filter(_.nonEmpty),
+      Some(
+        patients.flatMap(
+          _.managingSite
+        )
+        .toSet
+      )
+      .filter(_.nonEmpty)
     )
 
   }
+
+  def on[PatientRecord <: { def patient: Patient }](
+    records: Seq[PatientRecord]
+  ): PatientFilter = {
+
+    import scala.language.reflectiveCalls
+
+    from(records.map(_.patient))
+  }
+
 
   def apply(
     gender: Option[Set[Coding[Gender.Value]]],
     ageMin: Option[Int],
     ageMax: Option[Int],
-    vitalStatus: Option[Set[Coding[VitalStatus.Value]]]
+    vitalStatus: Option[Set[Coding[VitalStatus.Value]]],
+    site: Option[Set[Coding[Site]]]
   ): PatientFilter =
     PatientFilter(
       gender.filter(_.nonEmpty),
@@ -70,36 +106,12 @@ object PatientFilter
           max = ageMax
         )
       ),
-      vitalStatus.filter(_.nonEmpty)
+      vitalStatus.filter(_.nonEmpty),
+      site.filter(_.nonEmpty)
     )
 
 
-
-
-  import scala.language.implicitConversions
-
-  type PatientLike = {
-    def gender: Coding[Gender.Value]
-    def age: Age
-    def vitalStatus: Coding[VitalStatus.Value]
-  }
-
-
-  implicit def toPredicate[P <: PatientLike](
-    filter: PatientFilter
-  ): P => Boolean = {
-    patient =>
-
-    import scala.language.reflectiveCalls
-    import VitalStatus._
-
-    filter.gender.fold(true)(_ contains patient.gender) &&
-    filter.ageRange.fold(true)(_ contains patient.age.value.toInt) &&
-    filter.vitalStatus.fold(true)(_ contains patient.vitalStatus)
-  }
-
-
-  implicit val format: OFormat[PatientFilter] =
-    Json.format[PatientFilter]
+  implicit val format: OWrites[PatientFilter] =
+    Json.writes[PatientFilter]
 
 }

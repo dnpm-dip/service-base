@@ -55,7 +55,7 @@ with Logging
   protected val preparedQueryDB: PreparedQueryDB[F,Monad[F],Criteria,String]
   protected val db: LocalDB[F,Monad[F],Criteria,PatientRecord]
   protected val connector: Connector[F,Monad[F]]
-  protected val cache: QueryCache[Criteria,Filters,Results,PatientRecord] 
+  protected val cache: QueryCache[Criteria,Filter,Results,PatientRecord] 
 
 
   protected implicit val criteriaCompleter: Completer[Criteria]
@@ -66,13 +66,11 @@ with Logging
   protected val CriteriaExpander: Completer[Criteria]
 
 
-  protected def DefaultFilters(
+  protected def DefaultFilter(
     rs: Seq[Snapshot[PatientRecord]]
-  ): Filters
-
+  ): Filter
 
   protected val ResultSetFrom: (Query.Id,Seq[(Snapshot[PatientRecord],Criteria)]) => Results
-
  
   protected val preprocess: PatientRecord => PatientRecord  // Complete, etc...
 
@@ -120,25 +118,31 @@ with Logging
       case Update(id,optName,optCriteria) =>
 
         for {
-          pq <-
+          optPq <-
             preparedQueryDB.get(id)
 
-          result <-
-            pq.map(
-                _.patch(
-                  optName.map(name => _.copy(name = name)),
-                  optCriteria.map(crit => _.copy(criteria = crit))
-                )
+          optUpdated =
+            optPq.map(
+              _.patch(
+                optName.map(name => _.copy(name = name)),
+                optCriteria.map(crit => _.copy(criteria = crit)),
               )
-              .fold(
+              .update(
+                _.copy(lastUpdate = Instant.now)
+              )
+            )
+
+          result <-
+            optUpdated match {
+              case Some(updated) =>
+                preparedQueryDB.save(updated)
+                  .map(_ => updated.asRight[String])
+
+              case None => 
                 s"Invalid PreparedQuery ID ${id.value}"
                   .asLeft[PreparedQuery[Criteria]]
                   .pure
-              )(
-                updated =>
-                  preparedQueryDB.save(updated)
-                    .map(_ => updated.asRight[String])
-              )
+            }
 
         } yield result.toEitherNel 
 
@@ -146,8 +150,10 @@ with Logging
       case Delete(id) =>
         preparedQueryDB
           .delete(id)
-          .map(_.toRight(s"Invalid PreparedQuery ID ${id.value}").toEitherNel)
-
+          .map(
+            _.toRight(s"Invalid PreparedQuery ID ${id.value}")
+             .toEitherNel
+          )
 
     }
 
@@ -206,12 +212,12 @@ with Logging
 
 
   override def process(
-    cmd: Query.Command[Criteria,Filters]
+    cmd: Query.Command[Criteria,Filter]
   )(
     implicit
     env: Monad[F],
     querier: Querier
-  ): F[String IorNel Query[Criteria,Filters]] = {
+  ): F[String IorNel Query[Criteria,Filter]] = {
 
     cmd match {
 
@@ -234,13 +240,13 @@ with Logging
               IorT { executeQuery(id,mode,criteria) }
 
             query =
-              Query[Criteria,Filters](
+              Query[Criteria,Filter](
                 id,
                 LocalDateTime.now,
                 querier,
                 mode,
                 criteria,
-                DefaultFilters(results.map(_._1)),
+                DefaultFilter(results.map(_._1)),
                 cache.timeoutSeconds,
                 Instant.now
               )
@@ -261,7 +267,7 @@ with Logging
 
           case None =>
             s"Invalid Query ID ${id.value}"
-              .leftIor[Query[Criteria,Filters]]
+              .leftIor[Query[Criteria,Filter]]
               .toIorNel
               .pure[F]
 
@@ -284,7 +290,7 @@ with Logging
                   query.copy(
                     mode = mode,
                     criteria = criteria,
-                    filters = DefaultFilters(results.map(_._1)),
+                    filters = DefaultFilter(results.map(_._1)),
                     lastUpdate = Instant.now
                   )
               
@@ -299,13 +305,13 @@ with Logging
       }
 
 /*      
-      case Query.ApplyFilters(id,filters) => {
+      case Query.ApplyFilter(id,filters) => {
 
         cache.get(id) match {
 
           case None =>
             s"Invalid Query ID ${id.value}"
-              .leftIor[Query[Criteria,Filters]]
+              .leftIor[Query[Criteria,Filter]]
               .toIorNel
               .pure[F]
 
@@ -339,7 +345,7 @@ with Logging
 
           case None =>
             s"Invalid Query ID ${id.value}"
-              .leftIor[Query[Criteria,Filters]]
+              .leftIor[Query[Criteria,Filter]]
               .toIorNel
               .pure[F]
 
@@ -367,10 +373,11 @@ with Logging
     implicit
     env: Monad[F],
     querier: Querier,
-  ): F[IorNel[String,Seq[(Snapshot[PatientRecord],Criteria)]]] = {
+  ): F[String IorNel Seq[(Snapshot[PatientRecord],Criteria)]] = {
 
     import cats.syntax.apply._
     import cats.instances.list._
+    import Query.Mode.{Local,Federated}
 
     //TODO: Logging
 
@@ -378,22 +385,29 @@ with Logging
       CriteriaExpander(criteria)
 
     val externalResults =
-      if (mode.code.value == Query.Mode.Federated)
-        for {
-          results <-
-            connector ! PeerToPeerQuery[Criteria,PatientRecord](connector.localSite,querier,expandedCriteria)
-        } yield
-          results.foldLeft(
-             Seq.empty[(Snapshot[PatientRecord],Criteria)].rightIor[String].toIorNel
-          ){
-            case (acc,(site,result)) =>
-              acc combine result.leftMap(err => s"Error from site ${site.display}: $err").toIor.toIorNel      
-          }        
-      else
-        Seq.empty[(Snapshot[PatientRecord],Criteria)]
-          .rightIor[String]
-          .toIorNel
-          .pure[F]
+      mode match {
+        case Query.Mode(Federated) =>
+          for {
+            results <-
+              connector ! PeerToPeerQuery[Criteria,PatientRecord](
+                connector.localSite,
+                querier,
+                expandedCriteria
+              )
+          } yield
+            results.foldLeft(
+               Seq.empty[(Snapshot[PatientRecord],Criteria)].rightIor[String].toIorNel
+            ){
+              case (acc,(_,result)) =>
+                acc combine result.toIor.toIorNel      
+            }        
+
+        case Query.Mode(Local) | _ =>
+          Seq.empty[(Snapshot[PatientRecord],Criteria)]
+            .rightIor[String]
+            .toIorNel
+            .pure[F]
+      }
 
 
     val localResults =
@@ -408,7 +422,7 @@ with Logging
     implicit
     env: Monad[F],
     querier: Querier
-  ): F[Seq[Query[Criteria,Filters]]] = {
+  ): F[Seq[Query[Criteria,Filter]]] = {
 
     //TODO: Logging
 
@@ -423,7 +437,7 @@ with Logging
     implicit
     env: Monad[F],
     querier: Querier
-  ): F[Option[Query[Criteria,Filters]]] = {
+  ): F[Option[Query[Criteria,Filter]]] = {
 
 // TODO: Logging 
 
@@ -484,7 +498,6 @@ with Logging
       .pure
     
   }
-
 
 
   override def retrievePatientRecord(
