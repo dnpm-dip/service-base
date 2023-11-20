@@ -9,7 +9,7 @@ final case class ConceptCount[T]
 (
   concept: T,
   count: Int,
-  components: Option[Seq[ConceptCount[T]]]
+  components: Option[Seq[ConceptCount[T]]] = None
 )
 
 object ConceptCount

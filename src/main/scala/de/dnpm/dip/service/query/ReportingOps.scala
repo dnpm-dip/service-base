@@ -10,8 +10,38 @@ import de.dnpm.dip.coding.icd.{
   ICD10GM
 }
 import de.dnpm.dip.model.{
+  Age,
   Diagnosis,
-  Site
+  Site,
+  Interval,
+  LeftClosedRightOpenInterval
+}
+
+
+/*
+ * Custom helper type to represent Map entries,
+ * in order to have a more explicit JSON serialization format:
+ *
+ * Default JSON representation of Map[K,V] is a JsArray of sub-JsArrays,
+ * in which the first element is the key and second entry the value
+ *
+ * With this Entry type the key and value are fields on a special JsObject
+*/
+final case class Entry[K,V](
+  key: K,
+  value: V
+)
+
+object Entry 
+{
+  import play.api.libs.json.{
+    Json,
+    Writes,
+    OWrites
+  }
+
+  implicit def writes[K: Writes, V: Writes]: OWrites[Entry[K,V]] =
+    Json.writes[Entry[K,V]]
 }
 
 
@@ -19,9 +49,56 @@ import de.dnpm.dip.model.{
 trait ReportingOps
 {
 
-  def FrequencyDistribution[T](
+  import scala.util.chaining._
+
+
+  type Distribution[T] =
+    Seq[ConceptCount[T]]
+
+  type DistributionsBy[C,T] =
+    Seq[Entry[C,Distribution[T]]]
+
+
+
+
+  def AgeDistribution(
+    ages: Seq[Age],
+    step: Int = 5
+  ): Distribution[Interval[Int]] = {
+
+    // Get minimum age, rounded down to multiple of step size
+    val min =
+      ages.min.value
+        .toInt
+        .pipe(n => n - (n % step))
+
+    // Get maximum age, rounded up to multiple of step size
+    val max =
+      ages.max.value
+        .toInt
+        .pipe(n => n + (n % step))
+
+    LazyList
+      .from(min,step)
+      .takeWhile(_ + step <= max)
+      .map {
+        left =>
+
+          val range =
+            LeftClosedRightOpenInterval(left, left + step)
+
+          ConceptCount(
+            range,
+            ages count (age => range contains age.value.toInt)
+          )
+      }
+
+  }
+
+
+  def DistributionOf[T](
     ts: Seq[T]
-  ): Seq[ConceptCount[T]] =
+  ): Distribution[T] =
     ts.groupBy(identity)
       .map {
         case (t,seq) =>
@@ -35,6 +112,43 @@ trait ReportingOps
       .sorted
 
 
+  def DistributionsOn[A,C,T](
+    records: Seq[A]
+  )(
+    csOn: A => Seq[C],
+    tsOn: A => Seq[T]
+  ): DistributionsBy[C,T] =
+    records.foldLeft(
+      Map.empty[C,Seq[T]]
+    ){
+      (acc,record) =>
+
+      val cs =
+        csOn(record)
+
+      val ts =
+        tsOn(record)
+
+      cs.foldLeft(acc){
+        (accPr,c) =>
+          accPr.updatedWith(c)(
+            _.map(_ :++ ts)
+             .orElse(Some(ts))
+          )
+      }
+
+    }
+    .map {
+      case (c,ts) =>
+        Entry(
+          c,
+          DistributionOf(ts)
+        )
+    }
+    .toSeq
+
+
+
   /*
    * Compute frequency distribution of given codings, optionally in a hierarchical structure,
    * i.e. grouped by their parent coding, with fine-grained component counts.
@@ -46,6 +160,7 @@ trait ReportingOps
    *       - count
    *                 
    */
+/*
   def CodingFrequencyDistribution[T: Coding.System](
     codings: Seq[Coding[T]],
     hierarchical: Boolean
@@ -85,7 +200,6 @@ trait ReportingOps
                codeSystem
                  .parentOf(coding.code)
                  .map(_.toCoding)
-//                 .map(Coding.fromConcept(_))
                  .getOrElse(coding)
        
              parent -> (coding -> cs.size)
@@ -138,7 +252,7 @@ trait ReportingOps
        .toSeq
        .sorted
   }
-
+*/
 
 /*
   def GroupedFrequencyDistribution[T: Coding.System](

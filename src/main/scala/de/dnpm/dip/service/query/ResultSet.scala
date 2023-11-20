@@ -6,6 +6,8 @@ import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
   Id,
   Patient,
+  Gender,
+  Interval,
   Site
 }
 
@@ -50,7 +52,12 @@ object ResultSet
 
     def numPatients: Int
 
+    def genderDistribution: Seq[ConceptCount[Coding[Gender.Value]]]
+
+    def ageDistribution: Seq[ConceptCount[Interval[Int]]]
+
     def siteDistribution: Seq[ConceptCount[Coding[Site]]]
+
   }
 
 }
