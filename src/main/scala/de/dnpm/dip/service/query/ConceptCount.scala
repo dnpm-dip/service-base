@@ -5,7 +5,7 @@ import play.api.libs.json._
 import cats.Semigroup
 
 
-final case class ConceptCount[T]
+final case class ConceptCount[+T]
 (
   concept: T,
   count: Int,

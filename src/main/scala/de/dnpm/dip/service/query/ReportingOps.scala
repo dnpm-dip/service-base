@@ -27,7 +27,7 @@ import de.dnpm.dip.model.{
  *
  * With this Entry type the key and value are fields on a special JsObject
 */
-final case class Entry[K,V](
+final case class Entry[+K,+V](
   key: K,
   value: V
 )
@@ -52,12 +52,11 @@ trait ReportingOps
   import scala.util.chaining._
 
 
-  type Distribution[T] =
+  type Distribution[+T] =
     Seq[ConceptCount[T]]
 
-  type DistributionsBy[C,T] =
+  type DistributionsBy[+C,+T] =
     Seq[Entry[C,Distribution[T]]]
-
 
 
 
@@ -66,32 +65,42 @@ trait ReportingOps
     step: Int = 5
   ): Distribution[Interval[Int]] = {
 
-    // Get minimum age, rounded down to multiple of step size
-    val min =
-      ages.min.value
-        .toInt
-        .pipe(n => n - (n % step))
+    import Interval._  // for syntax "x isIn interval"
+  
+    (
+      for {
 
-    // Get maximum age, rounded up to multiple of step size
-    val max =
-      ages.max.value
-        .toInt
-        .pipe(n => n + (n % step))
+        // Get minimum age, rounded down to multiple of step size
+        min <-
+          ages.minOption
+            .map(_.value.toInt)
+            .map(n => n - (n % step))
+      
+        // Get maximum age, rounded up to multiple of step size
+        max <-
+          ages.maxOption
+            .map(_.value.toInt)
+            .map(n => n + (n % step))
 
-    LazyList
-      .from(min,step)
-      .takeWhile(_ + step <= max)
-      .map {
-        left =>
+        distribution = 
+          LazyList
+            .from(min,step)
+            .takeWhile(_ + step <= max)
+            .map {
+              left =>
+          
+                val range =
+                  LeftClosedRightOpenInterval(left, left + step)
+          
+                ConceptCount(
+                  range,
+                  ages count (_.value.toInt isIn range)
+                )
+            }
 
-          val range =
-            LeftClosedRightOpenInterval(left, left + step)
-
-          ConceptCount(
-            range,
-            ages count (age => range contains age.value.toInt)
-          )
-      }
+      } yield distribution
+    )
+    .getOrElse(Seq.empty)
 
   }
 

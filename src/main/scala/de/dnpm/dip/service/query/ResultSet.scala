@@ -24,7 +24,11 @@ trait ResultSet[PatientRecord,Criteria]
 
   val id: Query.Id
 
-  def summary: Summary
+  def summary(
+    f: PatientRecord => Boolean = _ => true
+  ): Summary
+
+//  def summary: Summary
 
 
   def patientMatches(

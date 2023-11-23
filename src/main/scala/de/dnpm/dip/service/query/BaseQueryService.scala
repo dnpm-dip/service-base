@@ -447,7 +447,7 @@ with Logging
 
   }
 
-
+/*
   override def summary(
     id: Query.Id
   )(
@@ -463,7 +463,7 @@ with Logging
     } yield rs.map(_.summary)
 
   }
-
+*/
 
   override def resultSet(
     id: Query.Id

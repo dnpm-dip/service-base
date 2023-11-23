@@ -21,7 +21,6 @@ import play.api.libs.json.{
   Writes,
   OWrites,
   Format,
-//  OFormat
 }
 
 
@@ -119,23 +118,4 @@ object Query
   implicit val formatDelete: Reads[Delete] =
     Json.reads[Delete]
 
-/*
-  implicit val formatQueryId: Format[Id] =
-    Json.valueFormat[Id]
-
-  implicit def formatQuery[
-    Criteria: Format,
-    Filter <: Filters[_]: Format
-  ]: OFormat[Query[Criteria,Filter]] =
-    Json.format[Query[Criteria,Filter]]
-
-  implicit def formatSubmit[Criteria: Format]: OFormat[Submit[Criteria]] =
-    Json.format[Submit[Criteria]]
-
-  implicit def formatUpdate[Criteria: Format]: OFormat[Update[Criteria]] =
-    Json.format[Update[Criteria]]
-
-  implicit val formatDelete: OFormat[Delete] =
-    Json.format[Delete]
-*/
 }
