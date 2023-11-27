@@ -125,7 +125,7 @@ with Logging
             optPq.map(
               _.patch(
                 optName.map(name => _.copy(name = name)),
-                optCriteria.map(crit => _.copy(criteria = crit)),
+                optCriteria.map(crit => _.copy(criteria = crit.complete)),
               )
               .update(
                 _.copy(lastUpdate = Instant.now)

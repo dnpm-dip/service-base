@@ -9,7 +9,9 @@ import cats.data.EitherNel
 import play.api.libs.json.{
   Json,
   Format,
-  OFormat
+  OFormat,
+  Reads,
+  OWrites
 }
 
 
@@ -65,14 +67,14 @@ object PreparedQuery
   implicit def formatPrepQuery[Criteria: Format]: OFormat[PreparedQuery[Criteria]] =
     Json.format[PreparedQuery[Criteria]]
 
-  implicit def formatCreate[Criteria: Format]: OFormat[Create[Criteria]] =
-    Json.format[Create[Criteria]]
+  implicit def formatCreate[Criteria: Reads]: Reads[Create[Criteria]] =
+    Json.reads[Create[Criteria]]
 
-  implicit def formatUpdate[Criteria: Format]: OFormat[Update[Criteria]] =
-    Json.format[Update[Criteria]]
+  implicit def formatUpdate[Criteria: Reads]: Reads[Update[Criteria]] =
+    Json.reads[Update[Criteria]]
 
-  implicit val formatDelete: OFormat[Delete] =
-    Json.format[Delete]
+  implicit val formatDelete: Reads[Delete] =
+    Json.reads[Delete]
 
 }
 
