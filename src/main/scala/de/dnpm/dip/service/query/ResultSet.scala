@@ -28,8 +28,6 @@ trait ResultSet[PatientRecord,Criteria]
     f: PatientRecord => Boolean = _ => true
   ): Summary
 
-//  def summary: Summary
-
 
   def patientMatches(
     f: PatientRecord => Boolean = _ => true
@@ -46,22 +44,29 @@ trait ResultSet[PatientRecord,Criteria]
 }
 
 
-
 object ResultSet
 {
 
+  trait Distributions 
+  {
+    def gender: Seq[ConceptCount[Coding[Gender.Value]]]
+    def age: Seq[ConceptCount[Interval[Int]]]
+    def site: Seq[ConceptCount[Coding[Site]]]
+  }
+
+
   trait Summary
   {
+
+    type DistributionsType <: Distributions
+
     val id: Query.Id
 
     def numPatients: Int
 
-    def genderDistribution: Seq[ConceptCount[Coding[Gender.Value]]]
-
-    def ageDistribution: Seq[ConceptCount[Interval[Int]]]
-
-    def siteDistribution: Seq[ConceptCount[Coding[Site]]]
+    def distributions: DistributionsType
 
   }
 
 }
+
