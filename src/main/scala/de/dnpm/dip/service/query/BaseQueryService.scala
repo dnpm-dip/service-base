@@ -304,39 +304,6 @@ with Logging
         }
       }
 
-/*      
-      case Query.ApplyFilter(id,filters) => {
-
-        cache.get(id) match {
-
-          case None =>
-            s"Invalid Query ID ${id.value}"
-              .leftIor[Query[Criteria,Filter]]
-              .toIorNel
-              .pure[F]
-
-          case Some(query -> resultSet) => {
-              
-            for {
-              updatedQuery <-
-                Monad[F].pure {
-                  query.copy(
-                   filters = filters,
-                   lastUpdate = Instant.now
-                  )
-                }
-
-              _ = cache += updatedQuery -> resultSet.withFilter(toPredicate(filters))
-              
-            } yield updatedQuery.rightIor[String].toIorNel
-
-          }
-
-        }
-
-      }
-*/
-
       case Query.Delete(id) => {
 
         // Logging
@@ -381,8 +348,6 @@ with Logging
 
     //TODO: Logging
 
-    val expandedCriteria =
-      CriteriaExpander(criteria)
 
     val externalResults =
       mode match {
@@ -392,7 +357,7 @@ with Logging
               connector ! PeerToPeerQuery[Criteria,PatientRecord](
                 connector.localSite,
                 querier,
-                expandedCriteria
+                criteria
               )
           } yield
             results.foldLeft(
@@ -410,8 +375,11 @@ with Logging
       }
 
 
+    // Expand the query criteria only here,
+    // to save bandwidth transmitting them to peers and
+    // to avoid "log pollution" with potentially very long expanded criteria 
     val localResults =
-      (db ? expandedCriteria).map(_.toIor.toIorNel)
+      (db ? CriteriaExpander(criteria)).map(_.toIor.toIorNel)
 
     (localResults,externalResults).mapN(_ combine _)
 
@@ -446,24 +414,6 @@ with Logging
     }
 
   }
-
-/*
-  override def summary(
-    id: Query.Id
-  )(
-    implicit
-    env: Monad[F],
-    querier: Querier
-  ): F[Option[Results#Summary]] = {
-
-// TODO: Logging 
-   
-    for {
-      rs <- resultSet(id)
-    } yield rs.map(_.summary)
-
-  }
-*/
 
   override def resultSet(
     id: Query.Id
@@ -545,7 +495,8 @@ with Logging
           Criteria: ${req.criteria}"""
     )
 
-    db ? req.criteria
+    // Expand the query criteria
+    db ? CriteriaExpander(req.criteria)
 
   }
 
