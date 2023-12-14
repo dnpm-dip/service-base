@@ -92,7 +92,7 @@ trait QueryOps[
     env: Env,
     querier: Querier,
     func: Functor[F]
-  ): F[Option[Results#Summary]] =
+  ): F[Option[Results#SummaryType]] =
     self.resultSet(id)
       .map(
         _.map(

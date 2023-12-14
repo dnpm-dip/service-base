@@ -16,6 +16,120 @@ extends ResultSet[PatientRecord,Criteria]
 {
   self =>
 
+  import scala.util.chaining._
+  import scala.language.reflectiveCalls
+  import ReportingOps._
+
+
+  val id: Query.Id
+
+  val results: Seq[(Snapshot[PatientRecord],Criteria)]
+
+  protected lazy val records =
+    results
+      .collect {
+        case (Snapshot(record,_),_) => record
+      }
+
+
+  override def patientMatches(
+    f: PatientRecord => Boolean
+  ): Seq[PatientMatch[Criteria]] =
+    results
+      .collect {
+        case (Snapshot(patRec,_),matchingCriteria) if f(patRec) =>
+          PatientMatch.of(
+            patRec.patient,
+            matchingCriteria
+          )
+      }
+
+
+  override def patientRecord(
+    patId: Id[Patient]
+  ): Option[PatientRecord] =
+    records
+      .find(_.patient.id == patId)
+
+}
+
+/*
+trait BaseResultSet[
+  PatientRecord <: { val patient: Patient },
+  Criteria
+]
+extends ResultSet[PatientRecord,Criteria]
+{
+  self =>
+
+  import scala.util.chaining._
+  import scala.language.reflectiveCalls
+  import ReportingOps._
+
+
+  val id: Query.Id
+
+  val results: Seq[(Snapshot[PatientRecord],Criteria)]
+
+  protected lazy val records =
+    results
+      .collect {
+        case (Snapshot(record,_),_) => record
+      }
+
+
+  override def summary(
+    f: PatientRecord => Boolean
+  ): ResultSet.Summary = 
+    records
+      .collect {
+        case record if f(record) => record.patient
+      }
+      .pipe(
+        ps =>
+
+         ResultSet.Summary(
+           id,
+           ps.size,
+           ResultSet.Demographics
+           (
+             DistributionOf(ps.map(_.gender)),
+             AgeDistribution(ps.map(_.age)),
+             DistributionOf(ps.flatMap(_.managingSite))
+           )
+         )  
+      )
+
+
+  override def patientMatches(
+    f: PatientRecord => Boolean
+  ): Seq[PatientMatch[Criteria]] =
+    results
+      .collect {
+        case (Snapshot(patRec,_),matchingCriteria) if f(patRec) =>
+          PatientMatch.of(
+            patRec.patient,
+            matchingCriteria
+          )
+      }
+
+
+  override def patientRecord(
+    patId: Id[Patient]
+  ): Option[PatientRecord] =
+    records
+      .find(_.patient.id == patId)
+
+}
+
+trait BaseResultSet[
+  PatientRecord <: { val patient: Patient },
+  Criteria
+]
+extends ResultSet[PatientRecord,Criteria]
+{
+  self =>
+
   import scala.language.reflectiveCalls
 
 
@@ -23,7 +137,7 @@ extends ResultSet[PatientRecord,Criteria]
 
   val results: Seq[(Snapshot[PatientRecord],Criteria)]
 
-  def patientMatches(
+  override def patientMatches(
     f: PatientRecord => Boolean
   ): Seq[PatientMatch[Criteria]] =
     results
@@ -44,9 +158,5 @@ extends ResultSet[PatientRecord,Criteria]
     }
 
 
-  override lazy val cohort: Seq[PatientRecord] = 
-    results.map(_._1.data)
-
-
 }
-
+*/
