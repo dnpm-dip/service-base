@@ -25,7 +25,11 @@ import de.dnpm.dip.model.{
  * Default JSON representation of Map[K,V] is a JsArray of sub-JsArrays,
  * in which the first element is the key and second entry the value
  *
- * With this Entry type the key and value are fields on a special JsObject
+ * With this Entry type the key and value are fields on a JsObject
+ * { 
+ *   "key": <K>,
+ *   "value": <V>
+ * }
 */
 final case class Entry[+K,+V](
   key: K,
@@ -58,6 +62,19 @@ trait ReportingOps
   type DistributionsBy[+C,+T] =
     Seq[Entry[C,Distribution[T]]]
 
+
+
+  def mean[T: Numeric](ts: Iterable[T]): Double =
+    if (ts.nonEmpty)
+      Numeric[T].toDouble(ts.sum)/ts.size
+    else 
+      0.0
+
+/*
+  def mean[T: Numeric]: PartialFunction[Iterable[T],Double] = {
+    case ts if ts.nonEmpty => Numeric[T].toDouble(ts.sum)/ts.size
+  }
+*/
 
 
   def AgeDistribution(
@@ -105,20 +122,28 @@ trait ReportingOps
   }
 
 
-  def DistributionOf[T](
+  def DistributionBy[T,U](
     ts: Seq[T]
-  ): Distribution[T] =
-    ts.groupBy(identity)
+  )(
+    grp: T => U
+  ): Distribution[U] =
+    ts.groupBy(grp)
       .map {
-        case (t,seq) =>
+        case (u,seq) =>
           ConceptCount(
-            t,
+            u,
             seq.size,
             None
           )
       }
       .toSeq
       .sorted
+
+
+  def DistributionOf[T](
+    ts: Seq[T]
+  ): Distribution[T] =
+    DistributionBy(ts)(identity)
 
 
   def DistributionsOn[A,C,T](
