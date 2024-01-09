@@ -66,11 +66,10 @@ extends Report[T]
 
 object LocalReport
 {
-  implicit def writes[T: Writes]: Writes[LocalReport[T]] =
+  implicit def writes[T: Writes]: OWrites[LocalReport[T]] =
     Json.writes[LocalReport[T]]
       .transform(
-        (js: JsValue) => 
-          js.as[JsObject] + ("scope" -> Json.toJson(Report.Scope.Local))
+        _ + ("scope" -> Json.toJson(Report.Scope.Local))
       )
 
   implicit def reads[T: Reads]: Reads[LocalReport[T]] =
@@ -96,8 +95,7 @@ object GlobalReport
   implicit def writes[T: Writes]: OWrites[GlobalReport[T]] =
     Json.writes[GlobalReport[T]]
       .transform(
-        (js: JsValue) => 
-          js.as[JsObject] + ("scope" -> Json.toJson(Report.Scope.Global))
+        _ + ("scope" -> Json.toJson(Report.Scope.Global))
       )
 
   implicit def reads[T: Reads]: Reads[GlobalReport[T]] =

@@ -9,7 +9,10 @@ import de.dnpm.dip.coding.{
   Coding
 }
 import de.dnpm.dip.model.Site
-import play.api.libs.json.{Reads,Writes}
+import play.api.libs.json.{
+  Reads,
+  Writes
+}
 
 
 trait Connector[
@@ -74,5 +77,5 @@ trait Connector[
     self submit (req,site)
 
 
-
 }
+

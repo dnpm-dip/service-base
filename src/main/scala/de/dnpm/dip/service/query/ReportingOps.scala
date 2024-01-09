@@ -77,7 +77,7 @@ trait ReportingOps
 */
 
 
-  def AgeDistribution(
+  def ageDistribution(
     ages: Seq[Age],
     step: Int = 5
   ): Distribution[Interval[Int]] = {
@@ -122,7 +122,7 @@ trait ReportingOps
   }
 
 
-  def DistributionBy[T,U](
+  def distributionBy[T,U](
     ts: Seq[T]
   )(
     grp: T => U
@@ -140,13 +140,14 @@ trait ReportingOps
       .sorted
 
 
-  def DistributionOf[T](
+//  def DistributionOf[T](
+  def distribution[T](
     ts: Seq[T]
   ): Distribution[T] =
-    DistributionBy(ts)(identity)
+    distributionBy(ts)(identity)
 
 
-  def DistributionsOn[A,C,T](
+  def distributionsOn[A,C,T](
     records: Seq[A]
   )(
     csOn: A => Seq[C],
@@ -176,7 +177,7 @@ trait ReportingOps
       case (c,ts) =>
         Entry(
           c,
-          DistributionOf(ts)
+          distribution(ts)
         )
     }
     .toSeq

@@ -56,9 +56,9 @@ object ResultSet
   {
     def on(patients: Seq[Patient]) =
       ResultSet.Demographics(
-        DistributionOf(patients.map(_.gender)),
-        AgeDistribution(patients.map(_.age)),
-        DistributionOf(patients.flatMap(_.managingSite))
+        distribution(patients.map(_.gender)),
+        ageDistribution(patients.map(_.age)),
+        distribution(patients.flatMap(_.managingSite))
       )
   }
 
