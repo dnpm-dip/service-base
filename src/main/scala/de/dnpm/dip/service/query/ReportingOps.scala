@@ -45,7 +45,6 @@ trait ReportingOps
   }
 */
 
-
   def median[T: Numeric]: PartialFunction[Seq[T],Double] = {
     case ts if ts.nonEmpty =>
       ts.sorted
@@ -61,6 +60,87 @@ trait ReportingOps
   }
 
 
+  def binnedDistribution[T](
+    values: Seq[T],
+    binSize: T,
+  )(
+    implicit num: Numeric[T]
+  ): Distribution[Interval[T]] = {
+
+    values match {
+
+      case ts if ts.nonEmpty =>
+
+        val min = ts.min
+      
+        val max = ts.max
+
+        LazyList
+          .unfold(min)(
+            s => num.plus(s,binSize) match {
+              case t if num.lteq(t,max) => Some(LeftClosedRightOpenInterval(s,t),t)
+              case _ => None
+            }
+          )
+          .map(
+            range =>
+              ConceptCount(
+                range,
+                ts count (range.contains)
+              )
+          )
+
+      case _ => Seq.empty
+
+    }
+
+  }
+
+
+  def ageDistribution(
+    values: Seq[Age],
+    step: Int = 5
+  ): Distribution[Interval[Int]] = {
+
+    import Interval._  // for syntax "x isIn interval"
+  
+    values match {
+      case ages if ages.nonEmpty =>
+
+        // Get minimum age, rounded down to multiple of step size
+        val min =
+          ages.min
+            .pipe(_.value.toInt)
+            .pipe(n => n - (n % step))
+      
+        // Get maximum age, rounded up to multiple of step size
+        val max =
+          ages.max
+            .pipe(_.value.toInt)
+            .pipe(n => n + (n % step))
+
+        LazyList
+          .unfold(min)(
+            l => (l + step) match {
+              case r if r <= max =>
+                Some(LeftClosedRightOpenInterval(l,r),r)
+              case _ => None
+            }
+          )
+          .map(
+            range =>
+              ConceptCount(
+                range,
+                ages count (_.value.toInt isIn range)
+              )
+          )
+
+      case _ => Seq.empty
+    }
+
+  }
+
+/*
   def ageDistribution(
     ages: Seq[Age],
     step: Int = 5
@@ -104,7 +184,7 @@ trait ReportingOps
     .getOrElse(Seq.empty)
 
   }
-
+*/
 
   def distributionBy[T,U](
     ts: Seq[T]
@@ -122,7 +202,6 @@ trait ReportingOps
       }
       .toSeq
       .sorted
-//      .sorted(Ordering[Int].on[ConceptCount[U]](_.value).reverse)
 
 
   def distribution[T](
@@ -183,7 +262,6 @@ trait ReportingOps
       }
       .toSeq
       .sorted
-//      .sorted(Ordering[Int].on[ConceptCount[T]](_.value).reverse)
 
 }
 

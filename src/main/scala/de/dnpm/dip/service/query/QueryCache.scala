@@ -11,7 +11,6 @@ import de.dnpm.dip.model.Snapshot
 trait QueryCache[
   Criteria,
   Filter <: Filters[_],
-//  Filter <: Query.Filters,
   Results,
   PatientRecord
 ]{
@@ -51,7 +50,6 @@ trait QueryCache[
 class BaseQueryCache[
   Criteria,
   Filter <: Filters[_],
-//  Filter <: Query.Filters,
   Results,
   PatientRecord
 ]
