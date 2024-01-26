@@ -41,7 +41,7 @@ trait ResultSet[
 
 
   def patientMatches(
-    f: PatientRecord => Boolean
+    f: PatientRecord => Boolean = _ => true
   ): Seq[PatientMatch[Criteria]] =
     results
       .collect {
@@ -66,7 +66,7 @@ trait ResultSet[
 
 object ResultSet
 {
-
+/*
   final case class Demographics
   (
     genderDistribution: Seq[ConceptCount[Coding[Gender.Value]]],
@@ -81,6 +81,24 @@ object ResultSet
         distribution(patients.map(_.gender)),
         ageDistribution(patients.map(_.age)),
         distribution(patients.flatMap(_.managingSite))
+      )
+  }
+*/
+
+  final case class Demographics
+  (
+    genderDistribution: Distribution[Coding[Gender.Value]],
+    ageDistribution: Distribution[Interval[Int]],
+    siteDistribution: Distribution[Coding[Site]]
+  )
+
+  object Demographics extends ReportingOps
+  {
+    def on(patients: Seq[Patient]) =
+      ResultSet.Demographics(
+        Distribution.of(patients.map(_.gender)),
+        Distribution.ofAge(patients.map(_.age)),
+        Distribution.of(patients.flatMap(_.managingSite))
       )
   }
 

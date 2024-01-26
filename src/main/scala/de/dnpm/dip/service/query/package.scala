@@ -1,23 +1,50 @@
 package de.dnpm.dip.service
 
+import play.api.libs.json.{
+  Json,
+  OWrites
+}
 
 package object query
 {
 
-  type ConceptCount[+T] = Entry[T,Int]
+
+final case class Count
+(
+  count: Int,
+  percent: Double
+)
+
+object Count 
+{
+
+  def of(n: Int, total: Int): Count =
+    Count(n,(n.toDouble/total)*100)
+
+  def total(total: Int): Int => Count =
+    Count.of(_,total)
 
 
-  object ConceptCount
-  {
+  implicit val formatCount: OWrites[Count] =
+    Json.writes[Count]
+}
 
-    def apply[T](
-      t: T,
-      count: Int,
-      children: Option[Seq[ConceptCount[T]]] = None
-    ): ConceptCount[T] =
-      Entry(t,count,children)
 
-  }
+type ConceptCount[+T] = Entry[T,Count]
 
+object ConceptCount
+{
+
+  def apply[T](
+    t: T,
+    count: Count,
+    children: Option[Seq[ConceptCount[T]]] = None
+  ): ConceptCount[T] =
+    Entry(t,count,children)
+
+}
+
+
+type DistributionsBy[K,T] = Seq[Entry[K,Distribution[T]]]
 
 }
