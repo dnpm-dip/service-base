@@ -49,7 +49,7 @@ object Distribution
             )
         }
         .toSeq
-        .sortBy(_.value.count)
+        .sorted
     )
 
   }
@@ -181,7 +181,7 @@ object Distribution
             )
         }
         .toSeq
-        .sortBy(_.value.count)
+        .sorted
 
 
     val counter =
@@ -199,7 +199,7 @@ object Distribution
             )
         }
         .toSeq
-        .sortBy(_.value.count)
+        .sorted
     )
 
   }

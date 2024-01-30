@@ -26,7 +26,6 @@ import play.api.libs.json.{
  *   "value": <V>
  * }
 */
-//final case class Entry[K,V]
 final case class Entry[+K,+V]
 (
   key: K,
@@ -60,27 +59,10 @@ object Entry
       Entry(_,_,_)
     ) 
 
-/*
-  implicit def format[K: Format, V: Format]: OFormat[Entry[K,V]] =
-    (
-      (JsPath \ "key").format[K] and
-      (JsPath \ "value").format[V] and
-      (JsPath \ "children").lazyFormatNullable(Format.of[Seq[Entry[K,V]]]) // lazyFormat to handle recursivity
-    )(
-      Entry.apply _,
-      unlift(Entry.unapply)
-    ) 
-*/
-
 
   // Order Entries by decreasing number of occurrence
-  implicit def entryIntOrdering[K]: Ordering[Entry[K,Int]] =
-    Ordering[Int]
-      .on[Entry[K,Int]](_.value)
-      .reverse
+  implicit def entryOrdering[K,V: Ordering]: Ordering[Entry[K,V]] =
+    Ordering[V]
+      .on[Entry[K,V]](_.value)
 
-
-//  implicit def writes[K: Writes, V: Writes]: OWrites[Entry[K,V]] =
-//    Json.writes[Entry[K,V]]
 }
-

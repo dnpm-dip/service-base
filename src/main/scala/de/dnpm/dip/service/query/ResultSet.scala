@@ -24,7 +24,6 @@ trait ResultSet[
 
   import scala.util.chaining._
   import scala.language.reflectiveCalls
-  import ReportingOps._
 
 
   type SummaryType <: ResultSet.Summary
@@ -33,6 +32,15 @@ trait ResultSet[
   def id: Query.Id
 
   def results: Seq[(Snapshot[PatientRecord],Criteria)]
+
+
+  protected def records(
+    f: PatientRecord => Boolean
+  ): Seq[PatientRecord] =
+    results
+      .collect {
+        case (Snapshot(patRec,_),_) if f(patRec) => patRec
+      }
 
 
   def summary(
@@ -64,26 +72,9 @@ trait ResultSet[
 }
 
 
+
 object ResultSet
 {
-/*
-  final case class Demographics
-  (
-    genderDistribution: Seq[ConceptCount[Coding[Gender.Value]]],
-    ageDistribution: Seq[ConceptCount[Interval[Int]]],
-    siteDistribution: Seq[ConceptCount[Coding[Site]]]
-  )
-
-  object Demographics extends ReportingOps
-  {
-    def on(patients: Seq[Patient]) =
-      ResultSet.Demographics(
-        distribution(patients.map(_.gender)),
-        ageDistribution(patients.map(_.age)),
-        distribution(patients.flatMap(_.managingSite))
-      )
-  }
-*/
 
   final case class Demographics
   (

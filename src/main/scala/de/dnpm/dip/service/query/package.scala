@@ -25,12 +25,26 @@ object Count
     Count.of(_,total)
 
 
+  implicit val ordering: Ordering[Count] =
+    Ordering[Int]
+      .on[Count](_.count)
+      .reverse
+
+
   implicit val formatCount: OWrites[Count] =
     Json.writes[Count]
 }
 
 
 type ConceptCount[+T] = Entry[T,Count]
+
+/*
+implicit def conceptCountOrdering[T]: Ordering[ConceptCount[T]] =
+  Ordering[Int]
+    .on[ConceptCount[T]](_.value.count)
+    .reverse
+*/
+
 
 object ConceptCount
 {
