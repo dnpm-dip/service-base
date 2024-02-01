@@ -101,8 +101,7 @@ with Logging
           
     cache.values
       .collect { 
-        case snp :: _ => 
-          snp -> matcher(snp.data)
+        case snp :: _ => snp -> matcher(snp.data)
       }
       .collect {
         case (snp,Some(matches)) => snp -> matches

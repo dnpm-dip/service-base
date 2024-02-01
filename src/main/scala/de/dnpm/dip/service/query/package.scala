@@ -38,13 +38,6 @@ object Count
 
 type ConceptCount[+T] = Entry[T,Count]
 
-/*
-implicit def conceptCountOrdering[T]: Ordering[ConceptCount[T]] =
-  Ordering[Int]
-    .on[ConceptCount[T]](_.value.count)
-    .reverse
-*/
-
 
 object ConceptCount
 {

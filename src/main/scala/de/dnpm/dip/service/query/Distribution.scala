@@ -1,6 +1,7 @@
 package de.dnpm.dip.service.query
 
 
+import cats.Semigroup
 import play.api.libs.json.{
   Json,
   Writes,
@@ -26,6 +27,58 @@ object Distribution
 {
 
   import scala.util.chaining._
+
+
+  private def combine[T](
+    c1: ConceptCount[T],
+    c2: ConceptCount[T]
+  )(
+    implicit counter: Int => Count
+  ): ConceptCount[T] =
+    ConceptCount(
+      c1.key,
+      counter(c1.value.count + c2.value.count),
+      (c1.children,c2.children) match { 
+        case (Some(ch1),Some(ch2)) => Some(combineAll(ch1,ch2))
+        case (Some(ch1),_)         => Some(ch1)
+        case (_,Some(ch2))         => Some(ch2)
+        case (_,_)                 => None
+
+      }
+    )
+
+  private def combineAll[T](
+    c1s: Seq[ConceptCount[T]],
+    c2s: Seq[ConceptCount[T]]
+  )(
+    implicit counter: Int => Count
+  ): Seq[ConceptCount[T]] = {
+    (c1s ++ c2s)
+      .groupMapReduce(_.key)(identity)(combine(_,_))
+      .values
+      .toSeq
+      .sorted
+  }
+
+  implicit def semigroup[T]: Semigroup[Distribution[T]] = {
+
+    implicit def conceptCountSemigroup(
+      implicit counter: Int => Count
+    ): Semigroup[ConceptCount[T]] =
+      Semigroup.instance { combine(_,_) }
+
+
+    Semigroup.instance { 
+      (d1,d2) =>
+        implicit val counter =
+          Count.total(d1.total + d2.total)
+
+        Distribution(
+          d1.total + d2.total,
+          combineAll(d1.elements,d2.elements)
+        )
+    }
+  }
 
 
   def by[T,U](
@@ -162,16 +215,18 @@ object Distribution
   }
 
 
-  def byParent[T](
+  def byParentAndBy[T,U](
     ts: Seq[T],
-    parent: T => T
-  ): Distribution[T] = {
+  )(
+    parent: T => T,
+    f: T => U
+  ): Distribution[U] = {
 
-    def subCounts[T](
+    def subCounts(
       ts: Seq[T],
       counter: Int => Count
-    ): Seq[ConceptCount[T]] =
-      ts.groupBy(identity)
+    ): Seq[ConceptCount[U]] =
+      ts.groupBy(f)
         .map {
           case (t,seq) =>
             ConceptCount(
@@ -183,13 +238,12 @@ object Distribution
         .toSeq
         .sorted
 
-
     val counter =
       Count.total(ts.size)
 
     Distribution(
       ts.size,
-      ts.groupBy(parent)
+      ts.groupBy(parent andThen f)
         .map {
           case (p,children) =>
             ConceptCount(
@@ -203,6 +257,13 @@ object Distribution
     )
 
   }
+
+  def byParent[T](
+    ts: Seq[T],
+    parent: T => T,
+  ): Distribution[T] =
+    byParentAndBy(ts)(parent,identity)
+
 
 
   def associatedOn[A,C,T](

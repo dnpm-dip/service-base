@@ -49,6 +49,5 @@ trait ReportingOps
         }
   }
 
-
 }
 object ReportingOps extends ReportingOps
