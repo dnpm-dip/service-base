@@ -16,7 +16,6 @@ import de.dnpm.dip.model.{
 import play.api.libs.json.{
   Json,
   OWrites
-//  OFormat
 }
 
 

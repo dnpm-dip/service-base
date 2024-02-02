@@ -432,6 +432,38 @@ with Logging
   }
 
 
+  import scala.language.implicitConversions
+
+  protected implicit def toPredicate(filter: Filter): PatientRecord => Boolean
+
+  override def summary(
+    id: Query.Id,
+    filter: Filter,
+  )(
+    implicit
+    env: Monad[F],
+    querier: Querier,
+  ): F[Option[Results#SummaryType]] =
+    resultSet(id)
+      .map(
+        _.map(_.summary(filter))
+      )
+
+
+  override def patientMatches(
+    id: Query.Id,
+    filter: Filter,
+  )(
+    implicit
+    env: Monad[F],
+    querier: Querier,
+  ): F[Option[Seq[PatientMatch[Criteria]]]] = 
+    resultSet(id)
+      .map(
+        _.map(_.patientMatches(filter).asInstanceOf[Seq[PatientMatch[Criteria]]])
+      )
+
+
   override def patientRecord(
     id: Query.Id,
     patId: Id[Patient]

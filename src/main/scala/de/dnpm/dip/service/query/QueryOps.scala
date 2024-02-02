@@ -91,14 +91,7 @@ trait QueryOps[
     implicit
     env: Env,
     querier: Querier,
-    func: Functor[F]
-  ): F[Option[Results#SummaryType]] =
-    self.resultSet(id)
-      .map(
-        _.map(
-          _.summary(filter.asInstanceOf[Filters[PatientRecord]])
-        )
-      )
+  ): F[Option[Results#SummaryType]] 
 
 
   def patientMatches(
@@ -108,15 +101,7 @@ trait QueryOps[
     implicit
     env: Env,
     querier: Querier,
-    func: Functor[F],
-  ): F[Option[Seq[PatientMatch[Criteria]]]] = 
-    self.resultSet(id)
-      .map(
-        _.map(
-          _.patientMatches(filter.asInstanceOf[Filters[PatientRecord]])
-           .asInstanceOf[Seq[PatientMatch[Criteria]]]  //TODO: Look for type-safe way to handle compile problems with Criteria vs. Results#Criteria
-        )
-      )
+  ): F[Option[Seq[PatientMatch[Criteria]]]]
 
 
   def patientRecord(
