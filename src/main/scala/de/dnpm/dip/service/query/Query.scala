@@ -6,6 +6,13 @@ import java.time.{
   LocalDateTime
 }
 import cats.Applicative
+import play.api.libs.json.{
+  Json,
+  Reads,
+  Writes,
+  OWrites,
+  Format,
+}
 import de.dnpm.dip.coding.{
   Coding,
   CodeSystem,
@@ -15,13 +22,7 @@ import de.dnpm.dip.coding.{
   CodeSystemProviderSPI,
   SingleCodeSystemProvider
 }
-import play.api.libs.json.{
-  Json,
-  Reads,
-  Writes,
-  OWrites,
-  Format,
-}
+import de.dnpm.dip.model.Site
 
 
 final case class Querier(value: String) extends AnyVal
@@ -40,6 +41,7 @@ final case class Query[
   submittedAt: LocalDateTime,
   querier: Querier,
   mode: Coding[Query.Mode.Value],
+  siteStatus: Seq[Entry[Coding[Site],Boolean]],
   criteria: Criteria,
   filters: Filter,
   expiresAfter: Int,
@@ -81,7 +83,9 @@ object Query
 
   final case class Submit[Criteria]
   ( 
-    mode: Coding[Query.Mode.Value],
+//    mode: Coding[Query.Mode.Value],
+    mode: Option[Coding[Query.Mode.Value]],
+    sites: Option[Set[Coding[Site]]],
     criteria: Criteria
   )
   extends Command[Criteria,Nothing]
@@ -90,6 +94,7 @@ object Query
   ( 
     id: Id,
     mode: Option[Coding[Query.Mode.Value]],
+    sites: Option[Set[Coding[Site]]],
     criteria: Option[Criteria]
   )
   extends Command[Criteria,Nothing]

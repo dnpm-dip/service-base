@@ -1,11 +1,11 @@
 package de.dnpm.dip.service.query
 
 
+
 import java.net.URI
 import scala.util.Either
 import cats.Functor
 import cats.data.{
-  Ior,
   IorNel,
   NonEmptyList
 }
@@ -16,7 +16,6 @@ import de.dnpm.dip.model.{
   Snapshot,
   Site
 }
-
 
 
 trait QueryOps[
@@ -38,24 +37,18 @@ trait QueryOps[
   import scala.util.chaining._
 
 
-  def sites: List[Coding[Site]]
+  def sites(
+    implicit env: Env
+  ): F[Sites]
 
 
-  def process(
+  def !(
     cmd: Query.Command[Criteria,Filter]
   )(
     implicit
     env: Env,
     querier: Querier
   ): F[Error IorNel Query[Criteria,Filter]]
-
-  final def !(
-    cmd: Query.Command[Criteria,Filter]
-  )(
-    implicit
-    env: Env,
-    querier: Querier
-  ): F[Error IorNel Query[Criteria,Filter]] = self.process(cmd)
 
 
   def get(

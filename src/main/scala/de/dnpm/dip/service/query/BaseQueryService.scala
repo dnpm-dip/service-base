@@ -8,6 +8,7 @@ import java.time.{
 import cats.Monad
 import cats.data.{
   EitherNel,
+  Ior,
   IorNel,
   IorT
 }
@@ -44,6 +45,7 @@ extends QueryService[
 with Logging
 {
 
+  import scala.util.chaining._
   import cats.syntax.either._
   import cats.syntax.ior._
   import cats.syntax.applicative._
@@ -75,8 +77,27 @@ with Logging
   protected val preprocess: PatientRecord => PatientRecord  // Complete, etc...
 
 
-  override def sites: List[Coding[Site]] =
-    connector.localSite :: connector.otherSites
+  protected implicit val siteCompleter: Completer[Coding[Site]] =
+    Completer.of(
+      site =>
+       (connector.localSite :: connector.otherSites.toList)
+         .collectFirst {
+           case coding if coding.code == site.code =>
+             site.copy(display = coding.display)
+         }
+         .getOrElse(site)
+    )
+
+
+  override def sites(
+    implicit
+    env: Monad[F]
+  ): F[Sites] =
+    Sites(
+      connector.localSite,
+      connector.otherSites.toList
+    )
+    .pure
 
 
   override def !(
@@ -210,8 +231,8 @@ with Logging
 
   }
 
-
-  override def process(
+/*
+  override def !(
     cmd: Query.Command[Criteria,Filter]
   )(
     implicit
@@ -273,34 +294,50 @@ with Logging
 
           case Some(query) => {
 
-            val mode =
-              optMode.map(_.complete).getOrElse(query.mode)
+            //TODO: criteria validation
+            //
+            val (mode,modeChanged) =
+              optMode
+                .map(_.complete)
+                .pipe(
+                  mode => mode.getOrElse(query.mode) -> mode.filter(_ != query.mode).isDefined
+                ) 
 
-            val criteria =
-              optCriteria.map(_.complete).getOrElse(query.criteria)
+            val (criteria,criteriaChanged) =
+              optCriteria
+                .map(_.complete)
+                .pipe(
+                  crit => crit.getOrElse(query.criteria) -> crit.filter(_ != query.criteria).isDefined
+                ) 
 
-            //TODO: parameter validation
-
-            (
-              for {
-                results <-
-                  IorT { executeQuery(id,mode,criteria) }
-              
-                updatedQuery =
-                  query.copy(
-                    mode = mode,
-                    criteria = criteria,
-                    filters = DefaultFilter(results.map(_._1)),
-                    lastUpdate = Instant.now
-                  )
-              
-                _ = cache += (updatedQuery -> ResultSetFrom(updatedQuery.id,results))
-              
-              } yield updatedQuery
-            )
-            .value
-
+            if (modeChanged || criteriaChanged){
+              log.debug(s"Query mode or criteria changed, re-submitting...") 
+              (
+                for {
+                  results <-
+                    IorT { executeQuery(id,mode,criteria) }
+                
+                  updatedQuery =
+                    query.copy(
+                      mode = mode,
+                      criteria = criteria,
+                      filters = DefaultFilter(results.map(_._1)),
+                      lastUpdate = Instant.now
+                    )
+                
+                  _ = cache += (updatedQuery -> ResultSetFrom(updatedQuery.id,results))
+                
+                } yield updatedQuery
+              )
+              .value
+            } else {
+              log.debug(s"Query mode or criteria unchanged, nothing to do") 
+              query.rightIor[String]
+                .toIorNel
+                .pure[F]
+            }
           }
+
         }
       }
 
@@ -330,7 +367,6 @@ with Logging
     }
 
   }
-
 
   private def executeQuery(
     id: Query.Id,
@@ -384,6 +420,317 @@ with Logging
     (localResults,externalResults).mapN(_ combine _)
 
   }
+*/
+
+
+  import Query.Mode.{Local,Federated}
+
+  override def !(
+    cmd: Query.Command[Criteria,Filter]
+  )(
+    implicit
+    env: Monad[F],
+    querier: Querier
+  ): F[String IorNel Query[Criteria,Filter]] = {
+
+    import cats.syntax.apply._
+    import cats.instances.list._
+
+    def modeAndSites(
+      optMode: Option[Coding[Query.Mode.Value]],
+      optSites: Option[Set[Coding[Site]]]
+    ): (Coding[Query.Mode.Value],Set[Coding[Site]]) =
+      (optMode,optSites) match {
+        case (_,Some(sites)) =>
+          (
+            (sites - connector.localSite) match { 
+              case s if s.nonEmpty => Coding(Federated)
+              case _               => Coding(Local)
+            },
+            sites
+          )
+
+        case (Some(mode),None) => 
+          (
+            mode.complete,
+            mode match { 
+              case Query.Mode(Federated) => connector.otherSites + connector.localSite
+              case _                     => Set(connector.localSite)
+            }
+          )
+
+        case _ =>
+          (
+            Coding(Federated),
+            connector.otherSites + connector.localSite
+          )
+
+      }
+
+
+    cmd match {
+
+      case Query.Submit(optMode,optSites,crit) => {
+
+        log.info(s"Processing new query by $querier") 
+
+        val id =
+          cache.newQueryId
+
+        val (mode,sites) =
+          modeAndSites(optMode,optSites.map(_.complete))
+
+        //TODO: criteria validation
+        val criteria =
+          crit.complete
+
+        for {
+          resultsBySite <-
+            executeQuery(id,sites,criteria) 
+
+          siteStatus =
+            resultsBySite.map {
+              case (site,result) => Entry(site,result.isRight)
+            }
+            .toSeq
+
+          errsOrResults =
+            resultsBySite
+              .values
+              .map(_.toIor.toIorNel)
+              .reduce(_ combine _)
+
+          errsOrQuery =
+            errsOrResults.map {
+              results =>
+                Query[Criteria,Filter](
+                  id,
+                  LocalDateTime.now,
+                  querier,
+                  mode,
+                  siteStatus,
+                  criteria,
+                  DefaultFilter(results.map(_._1)),
+                  cache.timeoutSeconds,
+                  Instant.now
+                )
+                .tap(            
+                  q => cache += (q -> ResultSetFrom(id,results))
+                )
+            }
+ 
+        } yield errsOrQuery
+
+      }
+
+      case Query.Update(id,optMode,optSites,optCriteria) => {
+
+        log.info(s"Updating Query $id") 
+        
+        cache.getQuery(id) match {
+
+          case None =>
+            s"Invalid Query ID ${id.value}"
+              .leftIor[Query[Criteria,Filter]]
+              .toIorNel
+              .pure[F]
+
+          case Some(query) => {
+
+            val (mode,sites) =
+              modeAndSites(optMode,optSites.map(_.complete))
+
+            val sitesChanged =
+              sites != query.siteStatus.map(_.key).toSet
+
+            //TODO: criteria validation
+              
+            val (criteria,criteriaChanged) =
+              optCriteria
+                .map(_.complete)
+                .pipe(
+                  crit => crit.getOrElse(query.criteria) -> crit.filter(_ != query.criteria).isDefined
+                ) 
+
+            if (sitesChanged || criteriaChanged){
+
+              log.debug(s"Query target sites or criteria changed, re-submitting...") 
+
+              for {
+                resultsBySite <-
+                  executeQuery(id,sites,criteria) 
+              
+                siteStatus =
+                  resultsBySite.map {
+                    case (site,result) => Entry(site,result.isRight)
+                  }
+                  .toSeq
+              
+                errsOrResults =
+                  resultsBySite
+                    .values
+                    .map(_.toIor.toIorNel)
+                    .reduce(_ combine _)
+              
+                errsOrQuery =
+                  errsOrResults.map {
+                    results =>
+                      query.copy(
+                        mode = mode,
+                        siteStatus = siteStatus,
+                        criteria = criteria,
+                        filters = DefaultFilter(results.map(_._1)),
+                        lastUpdate = Instant.now
+                      )
+                      .tap(            
+                        q => cache += (q -> ResultSetFrom(id,results))
+                      )
+                  }
+              
+              } yield errsOrQuery
+
+            } else {
+              log.debug(s"Query target sites or criteria unchanged, nothing to do") 
+              query.rightIor[String]
+                .toIorNel
+                .pure[F]
+            }
+
+          }
+        }
+      }
+
+      case Query.Delete(id) => {
+
+        // Logging
+
+        cache.getQuery(id) match {
+
+          case None =>
+            s"Invalid Query ID ${id.value}"
+              .leftIor[Query[Criteria,Filter]]
+              .toIorNel
+              .pure[F]
+
+          case Some(query) => {
+            cache -= id
+            query.rightIor[String]
+              .toIorNel
+              .pure[F]
+          }
+
+        }
+
+      }
+
+    }
+
+  }
+
+
+  private def executeQuery(
+    id: Query.Id,
+    sites: Set[Coding[Site]],
+    criteria: Criteria
+  )(
+    implicit
+    env: Monad[F],
+    querier: Querier,
+  ): F[Map[Coding[Site],Either[String,Seq[(Snapshot[PatientRecord],Criteria)]]]] = {
+
+    import cats.syntax.apply._
+    import cats.instances.list._
+
+    //TODO: Logging
+
+    val externalResults =
+      (sites - connector.localSite) match {
+        case peers if peers.nonEmpty =>
+          connector ! (
+            PeerToPeerQuery[Criteria,PatientRecord](
+              connector.localSite,
+              querier,
+              criteria
+            ),
+            peers
+          )
+
+        case _ =>
+          Map.empty[Coding[Site],Either[String,Seq[(Snapshot[PatientRecord],Criteria)]]]
+            .pure[F]
+      }
+
+
+    // Expand the query criteria only here,
+    // to save bandwidth transmitting them to peers and
+    // to avoid "log pollution" with potentially very long expanded criteria 
+    val localResults =
+      sites.contains(connector.localSite) match {
+        case true =>
+          (db ? CriteriaExpander(criteria))
+            .map(results => Some(connector.localSite -> results))
+
+        case _ =>
+          None.pure[F]
+      }
+
+    (externalResults,localResults)
+      .mapN(_ ++ _)
+
+  }
+
+/*
+  private def executeQuery(
+    id: Query.Id,
+    sites: Set[Coding[Site]],
+    criteria: Criteria
+  )(
+    implicit
+    env: Monad[F],
+    querier: Querier,
+  ): F[Map[Coding[Site],Either[String,Seq[(Snapshot[PatientRecord],Criteria)]]]] = {
+
+    import cats.syntax.apply._
+    import cats.instances.list._
+
+    //TODO: Logging
+
+    val externalResults =
+      (sites - connector.localSite) match {
+        case peers if peers.nonEmpty =>
+          connector ! (
+            PeerToPeerQuery[Criteria,PatientRecord](
+              connector.localSite,
+              querier,
+              criteria
+            ),
+            peers
+          )
+
+        case _ =>
+          Map.empty[Coding[Site],Either[String,Seq[(Snapshot[PatientRecord],Criteria)]]]
+            .pure[F]
+      }
+
+
+    // Expand the query criteria only here,
+    // to save bandwidth transmitting them to peers and
+    // to avoid "log pollution" with potentially very long expanded criteria 
+    val localResults =
+      sites.contains(connector.localSite) match {
+        case true =>
+          (db ? CriteriaExpander(criteria))
+            .map(results => Some(connector.localSite -> results))
+
+        case _ =>
+          None.pure[F]
+      }
+
+    (externalResults,localResults)
+      .mapN(_ ++ _)
+
+  }
+*/
 
 
   override def queries(

@@ -23,12 +23,12 @@ trait Connector[
 
   def localSite: Coding[Site]
 
-  def otherSites: List[Coding[Site]]
+  def otherSites: Set[Coding[Site]]
 
 
   def submit[T <: PeerToPeerRequest: Writes](
     req: T,
-    sites: List[Coding[Site]] = self.otherSites
+    sites: Set[Coding[Site]] = self.otherSites
   )(
     implicit
     env: Env,
@@ -48,7 +48,7 @@ trait Connector[
     import cats.syntax.functor._
     import cats.syntax.either._
 
-    (self submit (req,List(site)))
+    (self submit (req,Set(site)))
       .map(_.head._2)
 
   }
@@ -56,7 +56,7 @@ trait Connector[
 
   final def ![T <: PeerToPeerRequest: Writes](
     req: T,
-    sites: List[Coding[Site]] = self.otherSites
+    sites: Set[Coding[Site]] = self.otherSites
   )(
     implicit
     env: Env,
