@@ -13,8 +13,7 @@ abstract class QueryPermissions
 (
   useCase: String
 )
-extends Enumeration 
-with Permissions
+extends Enumeration with Permissions
 {
 
   import scala.language.implicitConversions
@@ -40,39 +39,3 @@ with Permissions
 
 }
 
-
-/*
-abstract class QueryPermissions
-(
-  useCase: String
-)
-extends Permissions
-{
-
-  private val prefix =
-    useCase.toLowerCase
-
-  val SubmitQuery =
-    Permission(s"${prefix}_query_submit")
-
-  val ReadResultSummary =
-    Permission(s"${prefix}_result_summary_read")
-
-  val ReadPatientMatches =
-    Permission(s"${prefix}_patient_matches_read")
-
-  val ReadPatientRecord =
-    Permission(s"${prefix}_patient_record_read")
-
-
-  override def permissions: Set[Permission] =
-    Set(
-      SubmitQuery,
-      ReadResultSummary,
-      ReadPatientMatches,
-      ReadPatientRecord
-    )
-
-
-}
-*/

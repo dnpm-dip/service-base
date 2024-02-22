@@ -31,7 +31,7 @@ trait PermissionsSPI extends SPI[Permissions]
 object Permissions extends SPILoader[PermissionsSPI]
 {
   def getAll: Set[Permission] =
-    getInstances
+    getInstances(this.getClass.getClassLoader)
       .flatMap(_.permissions)
       .toSet
 }
@@ -48,7 +48,7 @@ trait RolesSPI extends SPI[Roles]
 object Roles extends SPILoader[RolesSPI]
 {
   def getAll: Set[Role] =
-    getInstances
+    getInstances(this.getClass.getClassLoader)
       .flatMap(_.roles)
       .toSet
 }
