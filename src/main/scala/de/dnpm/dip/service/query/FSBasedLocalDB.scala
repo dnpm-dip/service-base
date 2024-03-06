@@ -7,6 +7,7 @@ import java.io.{
   InputStream,
   FileInputStream
 }
+import scala.reflect.ClassTag
 import scala.util.{
   Either,
   Try,
@@ -38,13 +39,13 @@ class FSBackedLocalDB[
   PatientRecord <: { val patient: Patient } : Format
 ](
   val dataDir: File,
-  val prefix: String,
   val criteriaMatcher: Criteria => (PatientRecord => Option[Criteria]),
+)(
+  implicit classTag: ClassTag[PatientRecord]
 )
 extends LocalDB[
   F,
   C[F],
-//  Applicative[F],
   Criteria,
   PatientRecord
 ]
@@ -57,6 +58,9 @@ with Logging
   import cats.syntax.functor._
   import cats.syntax.applicative._
   import cats.syntax.either._
+
+  private val prefix =
+    classTag.runtimeClass.getSimpleName
 
 
   private def inputStream(
@@ -86,22 +90,28 @@ with Logging
 
     if (!dataDir.exists) dataDir.mkdirs
 
-    TrieMap.from(
-      dataDir.listFiles(
-        (_,name) => (name startsWith prefix) && (name endsWith ".json")
-      )
-      .to(LazyList)
-      .map(inputStream)
-      .map(Json.parse)
-      .map(Json.fromJson[Snapshot[PatientRecord]](_))
-      .map(_.get)
-      .groupBy(_.data.patient.id)
-      // get most recent snapshot for caching
-      .map {
-        case (patId,snps) => patId -> snps.maxBy(_.id)
-      }
+    dataDir.listFiles(
+      (_,name) => (name startsWith prefix) && (name endsWith ".json")
     )
-
+    .to(LazyList)
+    .map(inputStream)
+    .map(Json.parse)
+    .map(Json.fromJson[Snapshot[PatientRecord]](_))
+    .map(_.get)
+    // Lazily accumulate only the latest snapshot of each patient record,
+    // instead of using groupyBy(patientId) and then picking the latest snapshot,
+    // which requires all to be loaded into memory, whereas with this 
+    // implementation, elements can be garbage.collected along the way
+    .foldLeft(TrieMap.empty[Id[Patient],Snapshot[PatientRecord]]){ 
+      (acc,snp) =>
+        acc.updateWith(snp.data.patient.id){
+          case Some(s) =>
+            if (snp.id > s.id) Some(snp)
+            else Some(s)
+          case None => Some(snp)
+        }
+        acc
+    }
   }
 
 
@@ -160,10 +170,10 @@ with Logging
     )
     .sequence
     .fold(
-      _ => s"Error(s) occurred deleting data files of Patient ${patId.value}, check the log!".asLeft[Data.Deleted],
+      _ => s"Error(s) occurred deleting data files of Patient ${patId.value}, check the log".asLeft[Data.Deleted],
       _ => Data.Deleted(patId).asRight[String] 
     )
-    .pure[F]
+    .pure
 
   }
 
