@@ -23,9 +23,6 @@ object ValidationService
 
   sealed abstract class Outcome[+T]
 
-//  final case class Imported[T](data: T) extends Outcome[T]
-//  final case class IssuesDetenvted(result: ValidationReport) extends Outcome[Nothing]
-
   final case class DataValid[T](data: T) extends Outcome[T]
 
   final case class DataFatallyInvalid(report: ValidationReport) extends Outcome[Nothing]

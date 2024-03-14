@@ -27,7 +27,7 @@ import ValidationReport.Issue.Severity
 trait DataValidator[T] extends (T => ValidatedNel[ValidationReport.Issue,T])
 
 
-final case class SeverityMatcher(
+private final case class SeverityMatcher(
   threshold: ValidationReport.Issue.Severity.Value
 ){
   def unapply(report: ValidationReport): Boolean =
@@ -65,7 +65,8 @@ extends ValidationService[
   import cats.syntax.applicative._
 
 
-  private val Acceptable = SeverityMatcher(severityThreshold)
+  private val Acceptable =
+    SeverityMatcher(severityThreshold)
 
 
   override def !(

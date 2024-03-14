@@ -62,7 +62,6 @@ object Data
       implicit env: Env
     ): F[Either[Error,Outcome[UseCase#PatientRecord]]] = self.process(cmd)
 
-
   }
 
 }

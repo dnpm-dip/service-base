@@ -115,7 +115,7 @@ with Logging
 
   override def ?(
     patient: Id[Patient],
-    snapshotId: Option[Long] = None
+    timestamp: Option[Long] = None
   )(
     implicit env: C[F]
   ): F[Option[Snapshot[PatientRecord]]] = {
@@ -125,9 +125,9 @@ with Logging
     cache.get(patient)
       .flatMap {
         snps =>
-          snapshotId match {
+          timestamp match {
             case None     => snps.headOption
-            case Some(id) => snps.find(_.id == id)
+            case Some(ts) => snps.find(_.timestamp == ts)
           }
       }
       .pure

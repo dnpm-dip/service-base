@@ -25,12 +25,12 @@ trait Repository[F[_],Env,PatientRecord]
     implicit env: Env
   ): F[Iterable[(PatientRecord,ValidationReport)]]
 
+
   def ?(
     id: Id[Patient]
   )(
     implicit env: Env
   ): F[Option[(PatientRecord,ValidationReport)]]
-
   
 
   def delete(

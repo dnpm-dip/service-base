@@ -82,13 +82,23 @@ with Logging
   private def fileOf(
     snp: Snapshot[PatientRecord]
   ): File =
-    new File(dataDir,fileName(snp.data.patient.id,snp.id))
+    new File(dataDir,fileName(snp.data.patient.id,snp.timestamp))
 
 
 
   private val cache: Map[Id[Patient],Snapshot[PatientRecord]] = {
 
-    if (!dataDir.exists) dataDir.mkdirs
+    log.debug(s"Setting up file-system persistence to directory ${dataDir.getAbsolutePath}")
+
+    if (!dataDir.exists)
+      dataDir.mkdirs
+        .tap {
+          case false =>
+            log.warn(
+              s"Failed to create directory ${dataDir.getAbsolutePath}. Maybe ensure the executing user has appropriate permissions on the directory?"
+            )
+          case _ => ()
+        }
 
     dataDir.listFiles(
       (_,name) => (name startsWith prefix) && (name endsWith ".json")
@@ -106,7 +116,7 @@ with Logging
       (acc,snp) =>
         acc.updateWith(snp.data.patient.id){
           case Some(s) =>
-            if (snp.id > s.id) Some(snp)
+            if (snp.timestamp > s.timestamp) Some(snp)
             else Some(s)
           case None => Some(snp)
         }
