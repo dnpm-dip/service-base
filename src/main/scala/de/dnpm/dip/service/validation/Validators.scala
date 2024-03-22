@@ -36,6 +36,9 @@ import shapeless.{
 trait Validators
 {
 
+  private type HasId[T] = T <:< { def id: Id[T] }
+
+
   implicit class IssueBuilderValidatedNelExtensions[T](
     val v: ValidatedNel[Issue.Builder,T]
   ){
@@ -44,28 +47,25 @@ trait Validators
   }
 
 
+    
+  // for implicit conversions to NegatableValidator[Issue.Builder,T]
+  private implicit lazy val defaultIssueBuild: String => Issue.Builder =
+    Error(_)
+
+
+
   implicit def csCodingIssueValidator[T](
     implicit cs: CodeSystem[T]
-  ): NegatableValidator[Issue.Builder,Coding[T]] = {
-
-    // Required in scope for conversion into NegatableValidator
-    implicit lazy val err: String => Issue.Builder =
-      Error(_)
-
+  ): NegatableValidator[Issue.Builder,Coding[T]] =
     coding =>
       cs.concept(coding.code) must be (defined) otherwise (
         Error(s"Ungültiger Code '${coding.code.value}' gemäß Kodier-System '${cs.name}'${cs.version.map(v => s" (Version '$v')").getOrElse("")}")
       ) map (_ => coding)
-  }
+
 
   implicit def cspCodingValidator[T](
     implicit csp: CodeSystemProvider[T,cats.Id,Applicative[cats.Id]]
-  ): NegatableValidator[Issue.Builder,Coding[T]] = {
-
-    // Required in scope for conversion into NegatableValidator
-    implicit lazy val err: String => Issue.Builder =
-      Error(_)
-
+  ): NegatableValidator[Issue.Builder,Coding[T]] =
     coding => 
       coding.version
         .flatMap(csp.get)
@@ -73,18 +73,13 @@ trait Validators
         .pipe {
           cs => csCodingIssueValidator(cs).apply(coding)
         }
-  }
+
 
   implicit def coproductCodingValidator[H, T <: Coproduct](
     implicit
     csp: CodeSystemProvider[H,cats.Id,Applicative[cats.Id]],
     tVal: NegatableValidator[Issue.Builder,Coding[T]]
-  ): NegatableValidator[Issue.Builder,Coding[H :+: T]] = {
-
-    // Required in scope for conversion into NegatableValidator
-    implicit lazy val err: String => Issue.Builder =
-      Error(_)
-
+  ): NegatableValidator[Issue.Builder,Coding[H :+: T]] =
     coding =>
       (
         if (coding.system == csp.uri)
@@ -94,54 +89,37 @@ trait Validators
       )
       .map(_.asInstanceOf[Coding[H :+: T]])
       
-  }
+
   
   implicit def terminalCoproductCodingValidator[H](
     implicit
     csp: CodeSystemProvider[H,cats.Id,Applicative[cats.Id]]
-  ): NegatableValidator[Issue.Builder,Coding[H :+: CNil]] = {
-
-    // Required in scope for conversion into NegatableValidator
-    implicit lazy val err: String => Issue.Builder =
-      Error(_)
-
-    coding => validate(coding.asInstanceOf[Coding[H]]) map (_.asInstanceOf[Coding[H :+: CNil]])
-  }
+  ): NegatableValidator[Issue.Builder,Coding[H :+: CNil]] =
+    coding =>
+      validate(coding.asInstanceOf[Coding[H]]) map (_.asInstanceOf[Coding[H :+: CNil]])
 
 
 
-  implicit def referenceValidator[T](
+
+  implicit def referenceValidator[T: HasId](
     implicit
-    hasId: T <:< { def id: Id[T] },
     ts: Iterable[T],
     node: Path.Node[T]
-  ): NegatableValidator[Issue.Builder,Reference[T]] = {
-
-    // Required in scope for conversion into NegatableValidator
-    implicit lazy val err: String => Issue.Builder =
-      Error(_)
-
+  ): NegatableValidator[Issue.Builder,Reference[T]] =
     ref =>
       ref.resolveOn(ts) must be (defined) otherwise (
         Fatal(s"Nicht auflösbare Referenz-ID '${ref.id.getOrElse("N/A")}' auf Objekt '${node.name}'")
       ) map (_ => ref)
-  }
 
-  implicit def referenceValidatorTo[T](
+
+  implicit def referenceValidatorTo[T: HasId](
     implicit
-    hasId: T <:< { def id: Id[T] },
     t: T,
     node: Path.Node[T]
-  ): NegatableValidator[Issue.Builder,Reference[T]] = {
-
-    // Required in scope for conversion into NegatableValidator
-    implicit lazy val err: String => Issue.Builder =
-      Error(_)
-
+  ): NegatableValidator[Issue.Builder,Reference[T]] =
     ref =>
       ref.resolveOn(List(t)) must be (defined) otherwise (
         Fatal(s"Nicht auflösbare Referenz-ID '${ref.id.getOrElse("N/A")}' auf Objekt '${node.name}'")
       ) map (_ => ref)
-  }
 
 }
