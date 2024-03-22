@@ -2,9 +2,7 @@ package de.dnpm.dip.service.validation
 
 
 import scala.util.Either
-import cats.data.{
-  NonEmptyList
-}
+import cats.data.NonEmptyList
 import de.dnpm.dip.model.{
   Id,
   Gender,
@@ -42,7 +40,7 @@ object ValidationService
 
   final case class Filter
   (
-    severities: Option[Set[ValidationReport.Issue.Severity.Value]]
+    severities: Option[Set[Issue.Severity.Value]]
   )
 
   object Filter
@@ -62,6 +60,13 @@ trait ValidationService[
 
   import ValidationService._
 
+  def validate(
+    patRec: PatientRecord
+  )(
+    implicit env: Env
+  ): F[Outcome[PatientRecord]]
+
+
   def !(
     cmd: Command[PatientRecord]
   )(
@@ -74,12 +79,6 @@ trait ValidationService[
   )(
     implicit env: Env
   ): F[Iterable[DataValidationInfo]]
-
-
-  def ?(
-    implicit env: Env
-  ): F[Iterable[DataValidationInfo]] =
-    self ? Filter.empty
 
 
   def dataQualityReport(
@@ -96,4 +95,3 @@ trait ValidationService[
   ): F[Option[PatientRecord]]
 
 }
-

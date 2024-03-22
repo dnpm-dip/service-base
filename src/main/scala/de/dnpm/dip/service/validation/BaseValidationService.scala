@@ -15,20 +15,22 @@ import cats.data.{
   Validated,
   ValidatedNel
 }
-import cats.Applicative
+import cats.{
+  Applicative,
+  Monad
+}
 import de.dnpm.dip.util.Logging
 import de.dnpm.dip.model.{
   Id,
   Patient,
 }
-import ValidationReport.Issue.Severity
+import Issue.Severity
+import de.ekut.tbi.validation.Validator
 
-
-trait DataValidator[T] extends (T => ValidatedNel[ValidationReport.Issue,T])
 
 
 private final case class SeverityMatcher(
-  threshold: ValidationReport.Issue.Severity.Value
+  threshold: Severity.Value
 ){
   def unapply(report: ValidationReport): Boolean =
     report.issues.forall(
@@ -40,21 +42,21 @@ private final case class SeverityMatcher(
 object FatalIssues
 {
   def unapply(report: ValidationReport): Boolean =
-    report.issues.exists(_.severity == ValidationReport.Issue.Severity.Fatal)
+    report.issues.exists(_.severity == Issue.Severity.Fatal)
 }
 
 
 
 class BaseValidationService[
   F[+_],
-  PatientRecord <: { val patient: Patient }
+  PatientRecord <: { def patient: Patient }
 ](
-  private val validator: DataValidator[PatientRecord],
+  private val validator: Validator[Issue,PatientRecord],
   private val severityThreshold: Severity.Value,
-  private val repo: Repository[F,Applicative[F],PatientRecord]
+  private val repo: Repository[F,Monad[F],PatientRecord]
 )
 extends ValidationService[
-  F,Applicative[F],PatientRecord
+  F,Monad[F],PatientRecord
 ]{
 
   import ValidationService._
@@ -63,26 +65,87 @@ extends ValidationService[
   import cats.syntax.either._
   import cats.syntax.functor._
   import cats.syntax.applicative._
+  import cats.syntax.flatMap._
+  import scala.language.reflectiveCalls
 
 
   private val Acceptable =
     SeverityMatcher(severityThreshold)
 
 
+  override def validate(
+    data: PatientRecord
+  )(
+    implicit env: Monad[F]
+  ): F[Outcome[PatientRecord]] =
+    validator(data) match { 
+
+      case Validated.Valid(patientRecord) =>
+        DataValid(data)
+          .pure[F]
+
+      case Validated.Invalid(issues) =>
+
+        val report =
+          ValidationReport(
+            data.patient.id,
+            issues,
+            Instant.now
+          )          
+
+        DataInvalid(data,report)
+          .pure[F]
+
+    }
+
+
+
   override def !(
     cmd: Command[PatientRecord]
   )(
-    implicit env: Applicative[F] 
+    implicit env: Monad[F] 
   ): F[Either[Error,Outcome[PatientRecord]]] = {
 
-    import scala.language.reflectiveCalls
 
     cmd match {
 
       // TODO: Logging
 
       case Validate(data) =>
+        validate(data)
+          .flatMap { 
+            case v: DataValid[PatientRecord] =>
+              v.asRight[Error]
+               .pure[F]
+            
+            case inv @ DataInvalid(data,report) =>
+              report match {
+            
+                case FatalIssues() =>
+                  DataFatallyInvalid(report)
+                    .asRight[Error]
+                    .pure[F]
+            
+                case _ =>    
+                  repo.save(data,report)
+                    .map {
+                      case Right(_) =>
+                        inv.asRight[Error]
+                    
+                      case Left(err1) =>
+                        UnspecificError(err1)
+                          .asLeft[Outcome[PatientRecord]]
+                  }
+            
+              }
 
+            case _ =>
+              UnspecificError("Unexpected validation outcome")
+                .asLeft[Outcome[PatientRecord]]
+                .pure[F]
+
+          }
+/*
         validator(data) match { 
 
           case Validated.Valid(patientRecord) =>
@@ -120,17 +183,15 @@ extends ValidationService[
                 }
 
             }
-
         }
+*/
 
 
       case Delete(id) =>
         repo.delete(id).map {
-          case Left(err) =>
-            UnspecificError(err).asLeft[Outcome[PatientRecord]]
+          case Right(_)  => Deleted(id).asRight[Error]
 
-          case Right(_)  =>
-            Deleted(id).asRight[Error]
+          case Left(err) => UnspecificError(err).asLeft[Outcome[PatientRecord]]
         }
 
     }
@@ -141,7 +202,7 @@ extends ValidationService[
   override def ?(
     filter: Filter
   )(
-    implicit env: Applicative[F]
+    implicit env: Monad[F]
   ): F[Iterable[DataValidationInfo]] =
     (repo ? filter).map(
       _.map {
@@ -162,7 +223,7 @@ extends ValidationService[
   override def dataQualityReport(
     patId: Id[Patient]
   )(
-    implicit env: Applicative[F]
+    implicit env: Monad[F]
   ): F[Option[ValidationReport]] = 
     (repo ? patId).map(_.map(_._2))
 
@@ -170,7 +231,7 @@ extends ValidationService[
   override def patientRecord(
     patId: Id[Patient]
   )(
-    implicit env: Applicative[F]
+    implicit env: Monad[F]
   ): F[Option[PatientRecord]] =
     (repo ? patId).map(_.map(_._1))
 

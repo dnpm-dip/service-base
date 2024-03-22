@@ -9,15 +9,121 @@ import de.dnpm.dip.model.{
 }
 import play.api.libs.json.{
   Json,
-  Format
+  Format,
+  Reads,
+  Writes,
+  JsString
 }
 
 
+case class Issue
+(
+  severity: Issue.Severity.Value,
+  message: String,
+  path: Issue.Path
+)
+
+object Issue
+{
+
+  object Severity extends Enumeration
+  {
+    val Info    = Value("info")
+    val Warning = Value("warning")
+    val Error   = Value("error")
+    val Fatal   = Value("fatal")
+  
+    implicit val format: Format[Severity.Value] =
+      Json.formatEnum(this)
+  }
+  
+
+  case class Path(nodes: List[String])
+  {
+    def /(node: String): Path =
+      copy(nodes = nodes :+ node)
+
+    def /[T](t: T)(implicit node: Path.Node[T]): Path =
+      this/node.name
+
+/*
+    def up: Path =
+      if (nodes.nonEmpty)
+//        copy(nodes = nodes.slice(0,nodes.size))
+        copy(nodes = nodes.reverse.tail.reverse)
+      else 
+        Path.root
+*/
+
+    override def toString: String =
+      s"/${nodes.mkString("/")}"
+
+  }
+
+  object Path
+  {
+
+    @annotation.implicitNotFound("Couldn't find Path.Node[${T}] instance. Define one or ensure it is in implicit scope.")
+    sealed trait Node[T]{ val name: String }
+    object Node
+    {
+      def apply[T](implicit node: Node[T]) = node    
+
+      def apply[T](n: String): Node[T] =
+        new Node[T]{ val name = n }
+    }
+
+    val root: Path = Path(Nil)
+
+    def from(str: String): Path =
+      Path(str.split("/").toList)
+
+    implicit val reads: Reads[Path] =
+      Reads(js => js.validate[String].map(Path.from))
+
+    implicit val writes: Writes[Path] =
+      Writes(p => JsString(p.toString))
+  }
+
+
+  sealed trait Builder
+  {
+    def at(path: Path): Issue
+  }   
+
+  private case class BuilderImpl
+  (
+    sev: Severity.Value,
+    msg: String
+  )
+  extends Builder
+  {
+    def at(path: Path): Issue = Issue(sev,msg,path)
+  }
+
+
+  def Info(msg: String): Builder =
+    BuilderImpl(Severity.Info,msg)
+
+  def Warning(msg: String): Builder =
+    BuilderImpl(Severity.Warning,msg)
+
+  def Error(msg: String): Builder =
+    BuilderImpl(Severity.Error,msg)
+
+  def Fatal(msg: String): Builder =
+    BuilderImpl(Severity.Fatal,msg)
+
+  
+  implicit val format: Format[Issue] =
+    Json.format[Issue]
+
+}
 
 case class ValidationReport
 (
   patient: Id[Patient],
-  issues: NonEmptyList[ValidationReport.Issue],
+  issues: NonEmptyList[Issue],
   createdAt: Instant
 )
 {
@@ -31,77 +137,12 @@ object ValidationReport
 
   def apply(
     patient: Id[Patient],
-    issues: NonEmptyList[ValidationReport.Issue]
+    issues: NonEmptyList[Issue]
   ): ValidationReport =
     ValidationReport(patient,issues,Instant.now)
 
-  case class Issue
-  (
-    severity: Issue.Severity.Value,
-    message: String,
-    location: Issue.Location
-  )
 
-  object Issue
-  {
-
-    object Severity extends Enumeration
-    {
-      val Info    = Value("info")
-      val Warning = Value("warning")
-      val Error   = Value("error")
-      val Fatal   = Value("fatal")
-    
-      implicit val format: Format[Severity.Value] =
-        Json.formatEnum(this)
-    }
-    
-    case class Location
-    (
-      entryType: String,
-      id: String,
-      attribute: String
-    )
-
-
-    sealed trait Builder
-    {
-      def at(loc: Location): Issue
-    }   
-
-    private case class BuilderImpl
-    (
-      sev: Severity.Value,
-      msg: String
-    )
-    extends Builder
-    {
-      def at(loc: Location): Issue = Issue(sev,msg,loc)
-    }
-
-
-    def Info(msg: String): Builder =
-      BuilderImpl(Severity.Info,msg)
-
-    def Warning(msg: String): Builder =
-      BuilderImpl(Severity.Warning,msg)
-
-    def Error(msg: String): Builder =
-      BuilderImpl(Severity.Error,msg)
-
-    def Fatal(msg: String): Builder =
-      BuilderImpl(Severity.Fatal,msg)
-
-
-    implicit val formatLocation: Format[Location] =
-      Json.format[Location]
-    
-    implicit val format: Format[Issue] =
-      Json.format[Issue]
-
-  }
-
-
+  // For format[NonEmptyList[_]]
   import de.dnpm.dip.util.json._
 
   implicit val format: Format[ValidationReport] = 

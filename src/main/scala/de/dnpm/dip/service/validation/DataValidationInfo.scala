@@ -15,7 +15,7 @@ import play.api.libs.json.{
 final case class DataValidationInfo
 (
   id: Id[Patient],
-  numberOfIssues: Map[ValidationReport.Issue.Severity.Value,Int]
+  numberOfIssues: Map[Issue.Severity.Value,Int]
 )
 
 
