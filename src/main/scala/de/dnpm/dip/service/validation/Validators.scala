@@ -16,15 +16,22 @@ import de.dnpm.dip.coding.{
   CodeSystemProvider
 }
 import de.dnpm.dip.model.{
+  Diagnosis,
   Id,
+  MedicationTherapy,
   Observation,
   Patient,
-  Reference
+  Procedure,
+  Recommendation,
+  Reference,
+  Therapy,
+  TherapyRecommendation
 }
 import Issue.{
   Error,
   Fatal,
-  Path
+  Path,
+  Warning
 }
 import shapeless.{
   Coproduct,
@@ -47,14 +54,30 @@ trait Validators
   }
 
 
+
+  implicit val patientNode: Path.Node[Patient] =
+    Path.Node("Patient")
+
+  implicit def diagnosisNode[D <: Diagnosis]: Path.Node[D] =
+    Path.Node("Diagnose")
+
+  implicit def therapyRecommendationNode[R <: TherapyRecommendation]: Path.Node[R] =
+    Path.Node("Therapie-Empfehlung")
+
+  implicit def medTherapyNode[T <: MedicationTherapy[_]]: Path.Node[T] =
+    Path.Node("Systemische-Therapie")
+
+  implicit def procedureNode[P <: Procedure[_]]: Path.Node[P] =
+    Path.Node("Prozedur")
+
+
     
-  // for implicit conversions to NegatableValidator[Issue.Builder,T]
-  private implicit lazy val defaultIssueBuild: String => Issue.Builder =
+  // For implicit conversions to NegatableValidator[Issue.Builder,T]
+  private implicit lazy val defaultIssueBuilder: String => Issue.Builder =
     Error(_)
 
 
-
-  implicit def csCodingIssueValidator[T](
+  implicit def csCodingValidator[T](
     implicit cs: CodeSystem[T]
   ): NegatableValidator[Issue.Builder,Coding[T]] =
     coding =>
@@ -71,7 +94,7 @@ trait Validators
         .flatMap(csp.get)
         .getOrElse(csp.latest)
         .pipe {
-          cs => csCodingIssueValidator(cs).apply(coding)
+          cs => csCodingValidator(cs)(coding)
         }
 
 
@@ -99,8 +122,6 @@ trait Validators
       validate(coding.asInstanceOf[Coding[H]]) map (_.asInstanceOf[Coding[H :+: CNil]])
 
 
-
-
   implicit def referenceValidator[T: HasId](
     implicit
     ts: Iterable[T],
@@ -121,5 +142,74 @@ trait Validators
       ref.resolveOn(List(t)) must be (defined) otherwise (
         Fatal(s"Nicht auflösbare Referenz-ID '${ref.id.getOrElse("N/A")}' auf Objekt '${node.name}'")
       ) map (_ => ref)
+
+
+  implicit def baseTherapyValidator[T <: Therapy: HasId: Path.Node](
+    implicit
+    basePath: Path,
+    patient: Patient,
+    diagnoses: Iterable[Diagnosis],
+  ): Validator[Issue,T] = {
+    therapy =>
+      val path = basePath/therapy
+      (
+        validate(therapy.patient) at path/"Patient",
+        validate(therapy.indication) at path/"Indikation",
+        therapy.therapyLine must be (defined) otherwise (
+          Warning("Fehlende Angabe") at path/"Therapie-Linie"
+        ),
+        therapy.period must be (defined) otherwise (
+          Warning("Fehlende Angabe") at path/"Zeitraum"
+        ),
+      )
+      .errorsOr(therapy)
+  }
+
+
+/*
+  implicit def therapyValidator[
+    T <: Therapy: HasId: Path.Node,
+    D <: Diagnosis: HasId,
+    R <: TherapyRecommendation: HasId
+  ](
+    implicit
+    basePath: Path,
+    patient: Patient,
+    diagnoses: Iterable[D],
+    recommendations: Iterable[R]
+  ): Validator[Issue,T] = {
+    therapy =>
+      val path = basePath/therapy
+      (
+        validate(therapy.patient) at path/"Patient",
+        validate(therapy.indication) at path/"Indikation",
+        therapy.therapyLine must be (defined) otherwise (
+          Warning("Fehlende Angabe") at path/"Therapie-Linie"
+        ),
+        therapy.period must be (defined) otherwise (
+          Warning("Fehlende Angabe") at path/"Zeitraum"
+        ),
+        ifDefined (therapy.basedOn)(validate(_)) at path/"Therapie-Empfehlung",
+      )
+      .errorsOr(therapy)
+  }
+*/
+
+
+  implicit def observationValidator[V, Obs <: Observation[V]: HasId: Path.Node](
+    implicit
+    basePath: Path,
+    patient: Patient,
+    valueValidator: Validator[Issue.Builder,V]
+  ): Validator[Issue,Obs] = {
+    obs =>
+      val path = basePath/obs
+
+      (
+        validate(obs.patient) at path/"Patient",
+        validate(obs.value) at path/"Wert",
+      )
+      .errorsOr(obs)
+  }
 
 }

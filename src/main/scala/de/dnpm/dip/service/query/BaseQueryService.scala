@@ -72,7 +72,8 @@ with Logging
     rs: Seq[Snapshot[PatientRecord]]
   ): Filter
 
-  protected val ResultSetFrom: (Query.Id,Seq[(Snapshot[PatientRecord],Criteria)]) => Results
+//  protected val ResultSetFrom: (Query.Id,Seq[(Snapshot[PatientRecord],Criteria)]) => Results
+  protected val ResultSetFrom: (Query.Id,Criteria,Seq[(Snapshot[PatientRecord],Criteria)]) => Results
  
   protected val preprocess: PatientRecord => PatientRecord  // Complete, etc...
 
@@ -231,197 +232,6 @@ with Logging
 
   }
 
-/*
-  override def !(
-    cmd: Query.Command[Criteria,Filter]
-  )(
-    implicit
-    env: Monad[F],
-    querier: Querier
-  ): F[String IorNel Query[Criteria,Filter]] = {
-
-    cmd match {
-
-      case Query.Submit(md,crit) => {
-
-
-        log.info(s"Processing new query by $querier") 
-
-        val id = cache.newQueryId
-
-        val mode = md.complete
-
-        val criteria = crit.complete
-
-        (
-          for {
-            //TODO: parameter validation
-            
-            results <-
-              IorT { executeQuery(id,mode,criteria) }
-
-            query =
-              Query[Criteria,Filter](
-                id,
-                LocalDateTime.now,
-                querier,
-                mode,
-                criteria,
-                DefaultFilter(results.map(_._1)),
-                cache.timeoutSeconds,
-                Instant.now
-              )
-
-            _ = cache += (query -> ResultSetFrom(id,results))
- 
-          } yield query
-        )
-        .value
-
-      }
-
-      case Query.Update(id,optMode,optCriteria) => {
-
-        log.info(s"Updating Query $id") 
-        
-        cache.getQuery(id) match {
-
-          case None =>
-            s"Invalid Query ID ${id.value}"
-              .leftIor[Query[Criteria,Filter]]
-              .toIorNel
-              .pure[F]
-
-          case Some(query) => {
-
-            //TODO: criteria validation
-            //
-            val (mode,modeChanged) =
-              optMode
-                .map(_.complete)
-                .pipe(
-                  mode => mode.getOrElse(query.mode) -> mode.filter(_ != query.mode).isDefined
-                ) 
-
-            val (criteria,criteriaChanged) =
-              optCriteria
-                .map(_.complete)
-                .pipe(
-                  crit => crit.getOrElse(query.criteria) -> crit.filter(_ != query.criteria).isDefined
-                ) 
-
-            if (modeChanged || criteriaChanged){
-              log.debug(s"Query mode or criteria changed, re-submitting...") 
-              (
-                for {
-                  results <-
-                    IorT { executeQuery(id,mode,criteria) }
-                
-                  updatedQuery =
-                    query.copy(
-                      mode = mode,
-                      criteria = criteria,
-                      filters = DefaultFilter(results.map(_._1)),
-                      lastUpdate = Instant.now
-                    )
-                
-                  _ = cache += (updatedQuery -> ResultSetFrom(updatedQuery.id,results))
-                
-                } yield updatedQuery
-              )
-              .value
-            } else {
-              log.debug(s"Query mode or criteria unchanged, nothing to do") 
-              query.rightIor[String]
-                .toIorNel
-                .pure[F]
-            }
-          }
-
-        }
-      }
-
-      case Query.Delete(id) => {
-
-        // Logging
-
-        cache.getQuery(id) match {
-
-          case None =>
-            s"Invalid Query ID ${id.value}"
-              .leftIor[Query[Criteria,Filter]]
-              .toIorNel
-              .pure[F]
-
-          case Some(query) => {
-            cache -= id
-            query.rightIor[String]
-              .toIorNel
-              .pure
-          }
-
-        }
-
-      }
-
-    }
-
-  }
-
-  private def executeQuery(
-    id: Query.Id,
-    mode: Coding[Query.Mode.Value],
-    criteria: Criteria
-  )(
-    implicit
-    env: Monad[F],
-    querier: Querier,
-  ): F[String IorNel Seq[(Snapshot[PatientRecord],Criteria)]] = {
-
-    import cats.syntax.apply._
-    import cats.instances.list._
-    import Query.Mode.{Local,Federated}
-
-    //TODO: Logging
-
-
-    val externalResults =
-      mode match {
-        case Query.Mode(Federated) =>
-          for {
-            results <-
-              connector ! PeerToPeerQuery[Criteria,PatientRecord](
-                connector.localSite,
-                querier,
-                criteria
-              )
-          } yield
-            results.foldLeft(
-               Seq.empty[(Snapshot[PatientRecord],Criteria)].rightIor[String].toIorNel
-            ){
-              case (acc,(_,result)) =>
-                acc combine result.toIor.toIorNel      
-            }        
-
-        case Query.Mode(Local) | _ =>
-          Seq.empty[(Snapshot[PatientRecord],Criteria)]
-            .rightIor[String]
-            .toIorNel
-            .pure[F]
-      }
-
-
-    // Expand the query criteria only here,
-    // to save bandwidth transmitting them to peers and
-    // to avoid "log pollution" with potentially very long expanded criteria 
-    val localResults =
-      (db ? CriteriaExpander(criteria)).map(_.toIor.toIorNel)
-
-    (localResults,externalResults).mapN(_ combine _)
-
-  }
-*/
-
 
   import Query.Mode.{Local,Federated}
 
@@ -515,7 +325,8 @@ with Logging
                   Instant.now
                 )
                 .tap(            
-                  q => cache += (q -> ResultSetFrom(id,results))
+                  q => cache += (q -> ResultSetFrom(id,criteria,results))
+//                  q => cache += (q -> ResultSetFrom(id,results))
                 )
             }
  
@@ -583,7 +394,8 @@ with Logging
                         lastUpdate = Instant.now
                       )
                       .tap(            
-                        q => cache += (q -> ResultSetFrom(id,results))
+                        q => cache += (q -> ResultSetFrom(id,criteria,results))
+//                        q => cache += (q -> ResultSetFrom(id,results))
                       )
                   }
               
@@ -678,59 +490,6 @@ with Logging
       .mapN(_ ++ _)
 
   }
-
-/*
-  private def executeQuery(
-    id: Query.Id,
-    sites: Set[Coding[Site]],
-    criteria: Criteria
-  )(
-    implicit
-    env: Monad[F],
-    querier: Querier,
-  ): F[Map[Coding[Site],Either[String,Seq[(Snapshot[PatientRecord],Criteria)]]]] = {
-
-    import cats.syntax.apply._
-    import cats.instances.list._
-
-    //TODO: Logging
-
-    val externalResults =
-      (sites - connector.localSite) match {
-        case peers if peers.nonEmpty =>
-          connector ! (
-            PeerToPeerQuery[Criteria,PatientRecord](
-              connector.localSite,
-              querier,
-              criteria
-            ),
-            peers
-          )
-
-        case _ =>
-          Map.empty[Coding[Site],Either[String,Seq[(Snapshot[PatientRecord],Criteria)]]]
-            .pure[F]
-      }
-
-
-    // Expand the query criteria only here,
-    // to save bandwidth transmitting them to peers and
-    // to avoid "log pollution" with potentially very long expanded criteria 
-    val localResults =
-      sites.contains(connector.localSite) match {
-        case true =>
-          (db ? CriteriaExpander(criteria))
-            .map(results => Some(connector.localSite -> results))
-
-        case _ =>
-          None.pure[F]
-      }
-
-    (externalResults,localResults)
-      .mapN(_ ++ _)
-
-  }
-*/
 
 
   override def queries(

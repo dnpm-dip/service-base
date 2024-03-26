@@ -43,17 +43,17 @@ object Issue
     def /(node: String): Path =
       copy(nodes = nodes :+ node)
 
-    def /[T](t: T)(implicit node: Path.Node[T]): Path =
-      this/node.name
+    import scala.language.reflectiveCalls
 
-/*
-    def up: Path =
-      if (nodes.nonEmpty)
-//        copy(nodes = nodes.slice(0,nodes.size))
-        copy(nodes = nodes.reverse.tail.reverse)
-      else 
-        Path.root
-*/
+    def /[T](t: T)(
+      implicit
+      node: Path.Node[T],
+      hasId: T <:< { def id: Id[T] }
+    ): Path =
+      this/s"${node.name}[${t.id.value}]"
+
+//    def /[T](t: T)(implicit node: Path.Node[T]): Path =
+//      this/node.name
 
     override def toString: String =
       s"/${nodes.mkString("/")}"
