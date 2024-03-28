@@ -1,7 +1,6 @@
 package de.dnpm.dip.service.auth
 
 
-
 import de.dnpm.dip.util.{
   SPI,
   SPILoader
@@ -9,10 +8,7 @@ import de.dnpm.dip.util.{
 
 
 
-final case class Permission
-(
-  name: String
-)
+final case class Permission(name: String)
 
 final case class Role
 (
@@ -37,19 +33,22 @@ object Permissions extends SPILoader[PermissionsSPI]
 }
 
 
-
-trait Roles
+trait PermissionEnumeration extends Enumeration with Permissions
 {
-  def roles: Set[Role]
-}
 
-trait RolesSPI extends SPI[Roles]
+  import scala.language.implicitConversions
 
-object Roles extends SPILoader[RolesSPI]
-{
-  def getAll: Set[Role] =
-    getInstances(this.getClass.getClassLoader)
-      .flatMap(_.roles)
+
+  implicit def toPermission(v: Value): Permission =
+    Permission(v.toString)
+
+  override lazy val permissions: Set[Permission] =
+    this.values
+      .map(_.toString)
       .toSet
-}
+      .map(Permission(_))
 
+  def unapply(p: String): Option[Value] =
+    this.values.find(_.toString == p)
+
+}
