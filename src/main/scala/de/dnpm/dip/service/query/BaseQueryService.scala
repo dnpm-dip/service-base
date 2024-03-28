@@ -24,6 +24,7 @@ import de.dnpm.dip.model.{
   Snapshot,
   Site
 }
+import de.dnpm.dip.service.Connector
 import play.api.libs.json.{
   Format,
   Reads,
@@ -72,7 +73,6 @@ with Logging
     rs: Seq[Snapshot[PatientRecord]]
   ): Filter
 
-//  protected val ResultSetFrom: (Query.Id,Seq[(Snapshot[PatientRecord],Criteria)]) => Results
   protected val ResultSetFrom: (Query.Id,Criteria,Seq[(Snapshot[PatientRecord],Criteria)]) => Results
  
   protected val preprocess: PatientRecord => PatientRecord  // Complete, etc...
@@ -326,7 +326,6 @@ with Logging
                 )
                 .tap(            
                   q => cache += (q -> ResultSetFrom(id,criteria,results))
-//                  q => cache += (q -> ResultSetFrom(id,results))
                 )
             }
  
@@ -395,7 +394,6 @@ with Logging
                       )
                       .tap(            
                         q => cache += (q -> ResultSetFrom(id,criteria,results))
-//                        q => cache += (q -> ResultSetFrom(id,results))
                       )
                   }
               

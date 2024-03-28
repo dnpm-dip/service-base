@@ -1,4 +1,4 @@
-package de.dnpm.dip.service.query
+package de.dnpm.dip.service
 
 
 import scala.util.Either
@@ -78,4 +78,3 @@ trait Connector[
 
 
 }
-

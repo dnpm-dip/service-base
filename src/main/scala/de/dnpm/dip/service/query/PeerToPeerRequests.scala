@@ -1,7 +1,7 @@
 package de.dnpm.dip.service.query
 
 
-import java.time.Instant
+
 import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
   Id,
@@ -9,6 +9,7 @@ import de.dnpm.dip.model.{
   Site,
   Snapshot
 }
+import de.dnpm.dip.service.PeerToPeerRequest
 import play.api.libs.json.{
   Json,
   Format,
@@ -17,20 +18,12 @@ import play.api.libs.json.{
 }
 
 
-trait PeerToPeerRequest
-{
-  type ResultType
-
-  val origin: Coding[Site]
-  val querier: Querier
-}
-
 
 final case class PeerToPeerQuery[Criteria,PatientRecord]
 (
   origin: Coding[Site],
   querier: Querier,
-  criteria: Criteria,
+  criteria: Criteria
 )
 extends PeerToPeerRequest
 {
@@ -45,6 +38,7 @@ object PeerToPeerQuery
   implicit def writes[Criteria: Writes,PatientRecord: Writes]: Writes[PeerToPeerQuery[Criteria,PatientRecord]] =
     Json.writes[PeerToPeerQuery[Criteria,PatientRecord]]
 }
+
 
 
 final case class PatientRecordRequest[PatientRecord]
@@ -68,26 +62,3 @@ object PatientRecordRequest
     Json.writes[PatientRecordRequest[PatientRecord]]
 }
 
-
-
-/*
-final case class PeerToPeerRequest[+T]
-(
-  origin: Coding[Site],
-  querier: Option[Querier],
-  body: T,
-  submittedAt: Instant = Instant.now
-)
-
-
-object PeerToPeerRequest
-{
-
-  implicit def writes[T: Writes] =
-    Json.writes[PeerToPeerRequest[T]]
-
-  implicit def reads[T: Reads] =
-    Json.reads[PeerToPeerRequest[T]]
-
-}
-*/
