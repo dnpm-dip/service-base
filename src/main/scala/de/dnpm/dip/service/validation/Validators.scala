@@ -6,6 +6,7 @@ import cats.Applicative
 import cats.data.ValidatedNel
 import cats.syntax.validated._
 import de.ekut.tbi.validation.{
+  CanContain,
   NegatableValidator,
   Validator
 }
@@ -18,6 +19,7 @@ import de.dnpm.dip.coding.{
 import de.dnpm.dip.model.{
   Diagnosis,
   Id,
+  Interval,
   MedicationTherapy,
   Observation,
   Patient,
@@ -52,6 +54,18 @@ trait Validators
     def at(path: Path): ValidatedNel[Issue,T] =
       v.leftMap(_.map(_ at path))
   }
+
+
+  // CanContain implementation for Interval sub-types
+  implicit def intervalCanContain[T, C[x] <: Interval[x]]: CanContain[T,C[T]] =
+    new CanContain[T,C[T]]{
+
+      override def contains(c: C[T])(t: T): Boolean =
+        c contains t
+
+      override def containsOnly(c: C[T])(t: T): Boolean =
+        c contains t
+    }
 
 
 
@@ -196,7 +210,34 @@ trait Validators
 */
 
 
-  implicit def observationValidator[V, Obs <: Observation[V]: HasId: Path.Node](
+  def ObservationValidator[V,Obs <: Observation[V]: HasId: Path.Node](
+    basePath: Path,
+    valueValidator: Validator[Issue.Builder,V]
+  )(
+    implicit
+    patient: Patient,
+  ): Validator[Issue,Obs] = {
+    obs =>
+      val path = basePath/obs
+
+      (
+        validate(obs.patient) at path/"Patient",
+        valueValidator(obs.value) at path/"Wert",
+      )
+      .errorsOr(obs)
+  }
+
+  implicit def ObsValidator[V, Obs <: Observation[V]: HasId: Path.Node](
+    implicit
+    basePath: Path,
+    patient: Patient,
+    valueValidator: Validator[Issue.Builder,V]
+  ): Validator[Issue,Obs] =
+    ObservationValidator[V,Obs](basePath,valueValidator)
+
+
+/*
+  implicit def ObsValidator[V, Obs <: Observation[V]: HasId: Path.Node](
     implicit
     basePath: Path,
     patient: Patient,
@@ -211,5 +252,6 @@ trait Validators
       )
       .errorsOr(obs)
   }
+*/
 
 }

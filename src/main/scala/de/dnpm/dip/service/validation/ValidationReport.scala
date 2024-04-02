@@ -48,7 +48,8 @@ object Issue
     def /[T](t: T)(
       implicit
       node: Path.Node[T],
-      hasId: T <:< { def id: Id[T] }
+      hasId: T <:< { def id: Id[_] }
+//      hasId: T <:< { def id: Id[T] }
     ): Path =
       this/s"${node.name}[${t.id.value}]"
 
