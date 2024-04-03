@@ -45,16 +45,13 @@ object Issue
 
     import scala.language.reflectiveCalls
 
-    def /[T](t: T)(
-      implicit
-      node: Path.Node[T],
-      hasId: T <:< { def id: Id[_] }
-//      hasId: T <:< { def id: Id[T] }
+    def /[T](p: Path): Path =
+      this.copy(nodes = nodes :++ p.nodes)
+
+    def /[T: HasId](t: T)(
+      implicit node: Path.Node[T]
     ): Path =
       this/s"${node.name}[${t.id.value}]"
-
-//    def /[T](t: T)(implicit node: Path.Node[T]): Path =
-//      this/node.name
 
     override def toString: String =
       s"/${nodes.mkString("/")}"
@@ -84,12 +81,23 @@ object Issue
 
     implicit val writes: Writes[Path] =
       Writes(p => JsString(p.toString))
+
+
+    object syntax
+    {
+      implicit class PathSyntaxOps[T: HasId: Path.Node](val t: T){
+        def /(node: String) = Path.root/t/node
+      } 
+       
+    }
   }
 
 
   sealed trait Builder
   {
     def at(path: Path): Issue
+
+    def at(node: String): Issue = at(Path.root/node)
   }   
 
   private case class BuilderImpl

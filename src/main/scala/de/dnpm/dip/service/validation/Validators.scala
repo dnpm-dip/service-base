@@ -40,20 +40,28 @@ import shapeless.{
   :+:,
   CNil
 }
+import Path.syntax._
 
 
 trait Validators
 {
 
-  private type HasId[T] = T <:< { def id: Id[T] }
-
 
   implicit class IssueBuilderValidatedNelExtensions[T](
-    val v: ValidatedNel[Issue.Builder,T]
+    val validated: ValidatedNel[Issue.Builder,T]
   ){
     def at(path: Path): ValidatedNel[Issue,T] =
-      v.leftMap(_.map(_ at path))
+      validated.leftMap(_.map(_ at path))
   }
+
+
+  implicit class IssueValidatedNelExtensions[T](
+    val validated: ValidatedNel[Issue,T]
+  ){
+    def at(path: Path): ValidatedNel[Issue,T] =
+      validated.leftMap(_.map(issue => issue.copy(path = path/issue.path)))
+  }
+
 
 
   // CanContain implementation for Interval sub-types
@@ -135,11 +143,11 @@ trait Validators
     coding =>
       validate(coding.asInstanceOf[Coding[H]]) map (_.asInstanceOf[Coding[H :+: CNil]])
 
-
+      
   implicit def referenceValidator[T: HasId](
     implicit
     ts: Iterable[T],
-    node: Path.Node[T]
+    node: Path.Node[T],
   ): NegatableValidator[Issue.Builder,Reference[T]] =
     ref =>
       ref.resolveOn(ts) must be (defined) otherwise (
@@ -150,7 +158,7 @@ trait Validators
   implicit def referenceValidatorTo[T: HasId](
     implicit
     t: T,
-    node: Path.Node[T]
+    node: Path.Node[T],
   ): NegatableValidator[Issue.Builder,Reference[T]] =
     ref =>
       ref.resolveOn(List(t)) must be (defined) otherwise (
@@ -158,100 +166,52 @@ trait Validators
       ) map (_ => ref)
 
 
-  implicit def baseTherapyValidator[T <: Therapy: HasId: Path.Node](
-    implicit
-    basePath: Path,
-    patient: Patient,
-    diagnoses: Iterable[Diagnosis],
-  ): Validator[Issue,T] = {
-    therapy =>
-      val path = basePath/therapy
-      (
-        validate(therapy.patient) at path/"Patient",
-        validate(therapy.indication) at path/"Indikation",
-        therapy.therapyLine must be (defined) otherwise (
-          Warning("Fehlende Angabe") at path/"Therapie-Linie"
-        ),
-        therapy.period must be (defined) otherwise (
-          Warning("Fehlende Angabe") at path/"Zeitraum"
-        ),
-      )
-      .errorsOr(therapy)
-  }
-
-
-/*
   implicit def therapyValidator[
     T <: Therapy: HasId: Path.Node,
-    D <: Diagnosis: HasId,
-    R <: TherapyRecommendation: HasId
   ](
     implicit
-    basePath: Path,
     patient: Patient,
-    diagnoses: Iterable[D],
-    recommendations: Iterable[R]
+    diagnoses: Iterable[Diagnosis],
+    recommendations: Iterable[TherapyRecommendation]
   ): Validator[Issue,T] = {
     therapy =>
-      val path = basePath/therapy
       (
-        validate(therapy.patient) at path/"Patient",
-        validate(therapy.indication) at path/"Indikation",
+        validate(therapy.patient) at therapy/"Patient",
+        validate(therapy.indication) at therapy/"Indikation",
         therapy.therapyLine must be (defined) otherwise (
-          Warning("Fehlende Angabe") at path/"Therapie-Linie"
+          Warning("Fehlende Angabe") at therapy/"Therapie-Linie"
         ),
         therapy.period must be (defined) otherwise (
-          Warning("Fehlende Angabe") at path/"Zeitraum"
+          Warning("Fehlende Angabe") at therapy/"Zeitraum"
         ),
-        ifDefined (therapy.basedOn)(validate(_)) at path/"Therapie-Empfehlung",
+        ifDefined (therapy.basedOn)(validate(_)) at therapy/"Therapie-Empfehlung",
       )
       .errorsOr(therapy)
   }
-*/
+
 
 
   def ObservationValidator[V,Obs <: Observation[V]: HasId: Path.Node](
-    basePath: Path,
     valueValidator: Validator[Issue.Builder,V]
   )(
     implicit
     patient: Patient,
-  ): Validator[Issue,Obs] = {
+  ): Validator[Issue,Obs] =
     obs =>
-      val path = basePath/obs
-
       (
-        validate(obs.patient) at path/"Patient",
-        valueValidator(obs.value) at path/"Wert",
+        validate(obs.patient) at obs/"Patient",
+        valueValidator(obs.value) at obs/"Wert",
       )
       .errorsOr(obs)
-  }
+
 
   implicit def ObsValidator[V, Obs <: Observation[V]: HasId: Path.Node](
     implicit
-    basePath: Path,
     patient: Patient,
     valueValidator: Validator[Issue.Builder,V]
   ): Validator[Issue,Obs] =
-    ObservationValidator[V,Obs](basePath,valueValidator)
+    ObservationValidator[V,Obs](valueValidator)
 
 
-/*
-  implicit def ObsValidator[V, Obs <: Observation[V]: HasId: Path.Node](
-    implicit
-    basePath: Path,
-    patient: Patient,
-    valueValidator: Validator[Issue.Builder,V]
-  ): Validator[Issue,Obs] = {
-    obs =>
-      val path = basePath/obs
-
-      (
-        validate(obs.patient) at path/"Patient",
-        validate(obs.value) at path/"Wert",
-      )
-      .errorsOr(obs)
-  }
-*/
 
 }
