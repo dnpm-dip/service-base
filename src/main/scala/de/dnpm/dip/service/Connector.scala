@@ -21,8 +21,6 @@ trait Connector[
 ]{
   self =>
 
-  def localSite: Coding[Site]
-
   def otherSites: Set[Coding[Site]]
 
 

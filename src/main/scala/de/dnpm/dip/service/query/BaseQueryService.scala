@@ -78,16 +78,15 @@ with Logging
   protected val preprocess: PatientRecord => PatientRecord  // Complete, etc...
 
 
-  protected implicit val siteCompleter: Completer[Coding[Site]] =
+  protected implicit val siteCompleter: Completer[Coding[Site]] = {
+
+    val sites = Site.local :: connector.otherSites.toList
+
     Completer.of(
       site =>
-       (connector.localSite :: connector.otherSites.toList)
-         .collectFirst {
-           case coding if coding.code == site.code =>
-             site.copy(display = coding.display)
-         }
-         .getOrElse(site)
+        sites.find(_.code == site.code).getOrElse(site)
     )
+  }
 
 
   override def sites(
@@ -95,11 +94,10 @@ with Logging
     env: Monad[F]
   ): F[Sites] =
     Sites(
-      connector.localSite,
+      Site.local,
       connector.otherSites.toList
     )
     .pure
-
 
   override def !(
     cmd: PreparedQuery.Command[Criteria]
@@ -246,6 +244,7 @@ with Logging
     import cats.syntax.apply._
     import cats.instances.list._
 
+
     def modeAndSites(
       optMode: Option[Coding[Query.Mode.Value]],
       optSites: Option[Set[Coding[Site]]]
@@ -253,7 +252,7 @@ with Logging
       (optMode,optSites) match {
         case (_,Some(sites)) =>
           (
-            (sites - connector.localSite) match { 
+            (sites - Site.local) match { 
               case s if s.nonEmpty => Coding(Federated)
               case _               => Coding(Local)
             },
@@ -264,15 +263,15 @@ with Logging
           (
             mode.complete,
             mode match { 
-              case Query.Mode(Federated) => connector.otherSites + connector.localSite
-              case _                     => Set(connector.localSite)
+              case Query.Mode(Federated) => connector.otherSites + Site.local
+              case _                     => Set(Site.local)
             }
           )
 
         case _ =>
           (
             Coding(Federated),
-            connector.otherSites + connector.localSite
+            connector.otherSites + Site.local
           )
 
       }
@@ -454,11 +453,11 @@ with Logging
     //TODO: Logging
 
     val externalResults =
-      (sites - connector.localSite) match {
+      (sites - Site.local) match {
         case peers if peers.nonEmpty =>
           connector ! (
             PeerToPeerQuery[Criteria,PatientRecord](
-              connector.localSite,
+              Site.local,
               querier,
               criteria
             ),
@@ -475,10 +474,10 @@ with Logging
     // to save bandwidth transmitting them to peers and
     // to avoid "log pollution" with potentially very long expanded criteria 
     val localResults =
-      sites.contains(connector.localSite) match {
+      sites.contains(Site.local) match {
         case true =>
           (db ? CriteriaExpander(criteria))
-            .map(results => Some(connector.localSite -> results))
+            .map(results => Some(Site.local -> results))
 
         case _ =>
           None.pure[F]
@@ -598,7 +597,7 @@ with Logging
 
     //TODO: Logging
 
-    if (site == connector.localSite){
+    if (site == Site.local){
       (db ? (patient,snapshot))
         .map(
           _.toRight(s"Invalid Patient ID ${patient.value}${snapshot.map(snp => s" and/or Snapshot ID $snp").getOrElse("")}")
@@ -607,7 +606,7 @@ with Logging
     } else {
       connector ! (
         PatientRecordRequest[PatientRecord](
-          connector.localSite,
+          Site.local,
           querier,
           patient,
           snapshot
