@@ -52,16 +52,35 @@ trait Validators
   ){
     def at(path: Path): ValidatedNel[Issue,T] =
       validated.leftMap(_.map(_ at path))
+
+    def at(node: String): ValidatedNel[Issue,T] =
+      validated.leftMap(_.map(_ at Path.root/node))
   }
 
 
   implicit class IssueValidatedNelExtensions[T](
     val validated: ValidatedNel[Issue,T]
   ){
-    def at(path: Path): ValidatedNel[Issue,T] =
-      validated.leftMap(_.map(issue => issue.copy(path = path/issue.path)))
-  }
+    def on(path: Path): ValidatedNel[Issue,T] =
+      validated.leftMap(_.map(issue => issue.copy(path = path /: issue.path)))
 
+    def on(node: String): ValidatedNel[Issue,T] =
+      validated.leftMap(_.map(issue => issue.copy(path = node /: issue.path)))
+
+    def on(t: T)(implicit hasId: HasId[T], node: Path.Node[T]): ValidatedNel[Issue,T] =
+      validated.leftMap(_.map(issue => issue.copy(path = t /: issue.path)))
+
+
+    import cats.Semigroup
+
+    def combineWith(other: ValidatedNel[Issue,T]) = {
+
+      implicit val sg: Semigroup[T] =
+        Semigroup.instance((t,_) => t)
+
+      validated combine other
+    }
+  }
 
 
   // CanContain implementation for Interval sub-types
@@ -176,17 +195,17 @@ trait Validators
   ): Validator[Issue,T] = {
     therapy =>
       (
-        validate(therapy.patient) at therapy/"Patient",
-        validate(therapy.indication) at therapy/"Indikation",
+        validate(therapy.patient) at "Patient",
+        validate(therapy.indication) at "Indikation",
         therapy.therapyLine must be (defined) otherwise (
-          Warning("Fehlende Angabe") at therapy/"Therapie-Linie"
+          Warning("Fehlende Angabe") at "Therapie-Linie"
         ),
         therapy.period must be (defined) otherwise (
-          Warning("Fehlende Angabe") at therapy/"Zeitraum"
+          Warning("Fehlende Angabe") at "Zeitraum"
         ),
-        ifDefined (therapy.basedOn)(validate(_)) at therapy/"Therapie-Empfehlung",
+        ifDefined (therapy.basedOn)(validate(_)) at "Therapie-Empfehlung",
       )
-      .errorsOr(therapy)
+      .errorsOr(therapy) on therapy
   }
 
 
@@ -199,10 +218,10 @@ trait Validators
   ): Validator[Issue,Obs] =
     obs =>
       (
-        validate(obs.patient) at obs/"Patient",
-        valueValidator(obs.value) at obs/"Wert",
+        validate(obs.patient) at "Patient",
+        valueValidator(obs.value) at "Wert",
       )
-      .errorsOr(obs)
+      .errorsOr(obs) on obs
 
 
   implicit def ObsValidator[V, Obs <: Observation[V]: HasId: Path.Node](
@@ -211,7 +230,5 @@ trait Validators
     valueValidator: Validator[Issue.Builder,V]
   ): Validator[Issue,Obs] =
     ObservationValidator[V,Obs](valueValidator)
-
-
 
 }

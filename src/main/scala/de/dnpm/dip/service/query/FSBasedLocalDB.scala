@@ -95,11 +95,11 @@ with Logging
         .tap {
           case false =>
             log.warn(
-              s"Failed to create directory ${dataDir.getAbsolutePath}. Maybe ensure the executing user has appropriate permissions on the directory?"
+              s"Failed to create directory ${dataDir.getAbsolutePath}. Ensure the executing user has appropriate permissions on the directory."
             )
           case _ => ()
         }
-
+    
     dataDir.listFiles(
       (_,name) => (name startsWith prefix) && (name endsWith ".json")
     )
@@ -107,6 +107,12 @@ with Logging
     .map(inputStream)
     .map(Json.parse)
     .map(Json.fromJson[Snapshot[PatientRecord]](_))
+    .tapEach( 
+      _.fold(
+        _.map(_.toString).foreach(log.error),
+        _ => ()
+      ) 
+    )
     .map(_.get)
     // Lazily accumulate only the latest snapshot of each patient record,
     // instead of using groupyBy(patientId) and then picking the latest snapshot,
@@ -122,6 +128,7 @@ with Logging
         }
         acc
     }
+    
   }
 
 

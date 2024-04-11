@@ -45,13 +45,26 @@ object Issue
 
     import scala.language.reflectiveCalls
 
-    def /[T](p: Path): Path =
+    def /(p: Path): Path =
       this.copy(nodes = nodes :++ p.nodes)
 
     def /[T: HasId](t: T)(
       implicit node: Path.Node[T]
     ): Path =
       this/s"${node.name}[${t.id.value}]"
+
+
+    def /:(p: Path): Path =
+      this.copy(nodes = p.nodes ++: nodes)
+
+    def /:(node: String): Path =
+      copy(nodes = node +: nodes)
+
+    def /:[T: HasId](t: T)(
+      implicit node: Path.Node[T]
+    ): Path =
+      s"${node.name}[${t.id.value}]" /: this
+
 
     override def toString: String =
       s"/${nodes.mkString("/")}"
