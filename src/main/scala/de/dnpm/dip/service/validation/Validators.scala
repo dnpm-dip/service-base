@@ -21,6 +21,7 @@ import de.dnpm.dip.model.{
   Id,
   Interval,
   MedicationTherapy,
+  Obs,
   Observation,
   Patient,
   Procedure,
@@ -55,6 +56,9 @@ trait Validators
 
     def at(node: String): ValidatedNel[Issue,T] =
       validated.leftMap(_.map(_ at Path.root/node))
+
+//    def at[T](node: Path.Node[T]): ValidatedNel[Issue,T] =
+//      validated.leftMap(_.map(_ at Path.root/node.name))
   }
 
 
@@ -69,17 +73,6 @@ trait Validators
 
     def on(t: T)(implicit hasId: HasId[T], node: Path.Node[T]): ValidatedNel[Issue,T] =
       validated.leftMap(_.map(issue => issue.copy(path = t /: issue.path)))
-
-
-    import cats.Semigroup
-
-    def combineWith(other: ValidatedNel[Issue,T]) = {
-
-      implicit val sg: Semigroup[T] =
-        Semigroup.instance((t,_) => t)
-
-      validated combine other
-    }
   }
 
 
@@ -185,7 +178,7 @@ trait Validators
       ) map (_ => ref)
 
 
-  implicit def therapyValidator[
+  def TherapyValidator[
     T <: Therapy: HasId: Path.Node,
   ](
     implicit
@@ -203,19 +196,23 @@ trait Validators
         therapy.period must be (defined) otherwise (
           Warning("Fehlende Angabe") at "Zeitraum"
         ),
-        ifDefined (therapy.basedOn)(validate(_)) at "Therapie-Empfehlung",
+        validateOpt(therapy.basedOn) at "Therapie-Empfehlung",
       )
       .errorsOr(therapy) on therapy
   }
 
 
+  def RangeValidator[T](range: Interval[T]): Validator[Issue.Builder,T] =
+    t => t must be (in (range)) otherwise (
+      Error(s"Ungültiger Wert $t, nicht in Referenz-Bereich $range")
+    ) 
 
-  def ObservationValidator[V,Obs <: Observation[V]: HasId: Path.Node](
-    valueValidator: Validator[Issue.Builder,V]
+
+  def ObservationValidator[O <: Obs: HasId: Path.Node](
+    valueValidator: Validator[Issue.Builder,O#ValueType]
   )(
-    implicit
-    patient: Patient,
-  ): Validator[Issue,Obs] =
+    implicit patient: Patient
+  ): Validator[Issue,O] =
     obs =>
       (
         validate(obs.patient) at "Patient",
@@ -224,11 +221,19 @@ trait Validators
       .errorsOr(obs) on obs
 
 
-  implicit def ObsValidator[V, Obs <: Observation[V]: HasId: Path.Node](
+  def ObservationValidator[O <: Obs: HasId: Path.Node](
+    referenceRange: Interval[O#ValueType]
+  )(
+    implicit patient: Patient
+  ): Validator[Issue,O] =
+    ObservationValidator[O](RangeValidator(referenceRange))
+
+
+  def ObservationValidator[O <: Obs: HasId: Path.Node](
     implicit
     patient: Patient,
-    valueValidator: Validator[Issue.Builder,V]
-  ): Validator[Issue,Obs] =
-    ObservationValidator[V,Obs](valueValidator)
+    valueValidator: Validator[Issue.Builder,O#ValueType]
+  ): Validator[Issue,O] =
+    ObservationValidator[O](valueValidator)
 
 }

@@ -75,7 +75,10 @@ object Issue
   {
 
     @annotation.implicitNotFound("Couldn't find Path.Node[${T}] instance. Define one or ensure it is in implicit scope.")
-    sealed trait Node[T]{ val name: String }
+    sealed trait Node[T]{
+      val name: String 
+      override def toString = name
+    }
     object Node
     {
       def apply[T](implicit node: Node[T]) = node    
