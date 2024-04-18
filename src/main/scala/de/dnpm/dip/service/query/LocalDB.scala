@@ -8,6 +8,10 @@ import de.dnpm.dip.model.{
   Snapshot,
   Site
 }
+import de.dnpm.dip.service.Data.{
+  Saved,
+  Deleted
+}
 
 
 trait LocalDB[
@@ -21,14 +25,14 @@ trait LocalDB[
     dataSet: PatientRecord
   )(
     implicit env: Env
-  ): F[Either[String,Data.Saved[PatientRecord]]]
+  ): F[Either[String,Saved[PatientRecord]]]
 
 
   def delete(
     patient: Id[Patient],
   )(
     implicit env: Env
-  ): F[Either[String,Data.Deleted]]
+  ): F[Either[String,Deleted]]
 
 
   def ?(

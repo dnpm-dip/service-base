@@ -25,6 +25,10 @@ import de.dnpm.dip.model.{
   Snapshot,
   Site
 }
+import de.dnpm.dip.service.Data.{
+  Saved,
+  Deleted
+}
 import play.api.libs.json.{
   Json,
   Format
@@ -136,7 +140,7 @@ with Logging
     dataSet: PatientRecord
   )(
     implicit env: C[F]
-  ): F[Either[String,Data.Saved[PatientRecord]]] = {
+  ): F[Either[String,Saved[PatientRecord]]] = {
   
     //TODO: Logging
    
@@ -151,8 +155,8 @@ with Logging
       _ => cache update (dataSet.patient.id,snp)
     )
     .fold(
-      _.getMessage.asLeft[Data.Saved[PatientRecord]],
-      _ => Data.Saved(snp).asRight[String]
+      _.getMessage.asLeft[Saved[PatientRecord]],
+      _ => Saved(snp).asRight[String]
     )
     .pure
 
@@ -163,7 +167,7 @@ with Logging
     patId: Id[Patient],
   )(
     implicit env: C[F]
-  ): F[Either[String,Data.Deleted]] = {
+  ): F[Either[String,Deleted]] = {
 
     import java.nio.file.Files
     import cats.syntax.traverse._
@@ -187,8 +191,8 @@ with Logging
     )
     .sequence
     .fold(
-      _ => s"Error(s) occurred deleting data files of Patient ${patId.value}, check the log".asLeft[Data.Deleted],
-      _ => Data.Deleted(patId).asRight[String] 
+      _ => s"Error(s) occurred deleting data files of Patient ${patId.value}, check the log".asLeft[Deleted],
+      _ => Deleted(patId).asRight[String] 
     )
     .pure
 

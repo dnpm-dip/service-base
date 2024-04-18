@@ -24,7 +24,10 @@ import de.dnpm.dip.model.{
   Snapshot,
   Site
 }
-import de.dnpm.dip.service.Connector
+import de.dnpm.dip.service.{
+  Connector,
+  Data
+}
 import play.api.libs.json.{
   Format,
   Reads,
@@ -75,12 +78,13 @@ with Logging
 
   protected val ResultSetFrom: (Query.Id,Criteria,Seq[(Snapshot[PatientRecord],Criteria)]) => Results
  
-  protected val preprocess: PatientRecord => PatientRecord  // Complete, etc...
+//  protected val preprocess: PatientRecord => PatientRecord  // Complete, etc...
 
 
   protected implicit val siteCompleter: Completer[Coding[Site]] = {
 
-    val sites = Site.local :: connector.otherSites.toList
+    val sites =
+      Site.local :: connector.otherSites.toList
 
     Completer.of(
       site =>
@@ -209,26 +213,25 @@ with Logging
   }
 
 
-  override def process(
+  override def !(
     cmd: Data.Command[PatientRecord]
   )(
     implicit 
     env: Monad[F]
-  ): F[Either[String,Data.Outcome[PatientRecord]]] = {
-
+  ): F[Either[Data.Error,Data.Outcome[PatientRecord]]] =
     //TODO: Logging
     
     cmd match {
 
       case Data.Save(dataSet) =>
-        (preprocess andThen db.save)(dataSet)
+        db.save(dataSet)
+          .map(_.leftMap(Data.GenericError(_)))
 
       case Data.Delete(patient) =>
         db.delete(patient)
+          .map(_.leftMap(Data.GenericError(_)))
 
     }
-
-  }
 
 
   import Query.Mode.{Local,Federated}

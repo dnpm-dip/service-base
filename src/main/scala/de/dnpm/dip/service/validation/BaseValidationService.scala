@@ -24,6 +24,12 @@ import de.dnpm.dip.model.{
   Id,
   Patient,
 }
+import de.dnpm.dip.service.Data.{
+  Error,
+  FatalIssuesDetected,
+  UnacceptableIssuesDetected,
+  GenericError
+}
 import Issue.Severity
 import de.ekut.tbi.validation.Validator
 
@@ -38,26 +44,21 @@ private final case class SeverityMatcher(
     )
 }
 
-
-object FatalIssues
+private object FatalIssues
 {
   def unapply(report: ValidationReport): Boolean =
-    report.issues.exists(_.severity == Issue.Severity.Fatal)
+    report.issues.exists(_.severity == Severity.Fatal)
 }
-
-
 
 class BaseValidationService[
   F[+_],
   PatientRecord <: { def patient: Patient }
 ](
   private val validator: Validator[Issue,PatientRecord],
-  private val severityThreshold: Severity.Value,
-  private val repo: Repository[F,Monad[F],PatientRecord]
+  private val repo: Repository[F,Monad[F],PatientRecord],
+  private val severityThreshold: Severity.Value = Severity.Warning
 )
-extends ValidationService[
-  F,Monad[F],PatientRecord
-]{
+extends ValidationService[F,Monad[F],PatientRecord]{
 
   import ValidationService._
 
@@ -77,126 +78,81 @@ extends ValidationService[
     data: PatientRecord
   )(
     implicit env: Monad[F]
-  ): F[Outcome[PatientRecord]] =
-    validator(data) match { 
+  ): F[Either[Error,Outcome[PatientRecord]]] =
+    for {
+      validationResult <- validator(data).pure
 
-      case Validated.Valid(patientRecord) =>
-        DataValid(data)
-          .pure[F]
-
-      case Validated.Invalid(issues) =>
-
-        val report =
-          ValidationReport(
-            data.patient.id,
-            issues,
-            Instant.now
-          )          
-
-        DataInvalid(data,report)
-          .pure[F]
-
-    }
-
-
-
-  override def !(
-    cmd: Command[PatientRecord]
-  )(
-    implicit env: Monad[F] 
-  ): F[Either[Error,Outcome[PatientRecord]]] = {
-
-
-    cmd match {
-
-      // TODO: Logging
-
-      case Validate(data) =>
-        validate(data)
-          .flatMap { 
-            case v: DataValid[PatientRecord] =>
-              v.asRight[Error]
-               .pure[F]
-            
-            case inv @ DataInvalid(data,report) =>
-              report match {
-            
-                case FatalIssues() =>
-                  DataFatallyInvalid(report)
-                    .asRight[Error]
-                    .pure[F]
-            
-                case _ =>    
-                  repo.save(data,report)
-                    .map {
-                      case Right(_) =>
-                        inv.asRight[Error]
-                    
-                      case Left(err1) =>
-                        UnspecificError(err1)
-                          .asLeft[Outcome[PatientRecord]]
-                  }
-            
-              }
-
-            case _ =>
-              UnspecificError("Unexpected validation outcome")
-                .asLeft[Outcome[PatientRecord]]
-                .pure[F]
-
-          }
-/*
-        validator(data) match { 
-
+      result =
+        validationResult match { 
           case Validated.Valid(patientRecord) =>
-            DataValid(data)
-              .asRight[Error]
-              .pure[F]
-
-
+            DataValid(data).asRight[Error]
+          
           case Validated.Invalid(issues) =>
-
             val report =
               ValidationReport(
                 data.patient.id,
                 issues,
                 Instant.now
               )          
-
+          
             report match {
+              case Acceptable()  => DataAcceptableWithIssues(data,report).asRight[Error]
+              case FatalIssues() => FatalIssuesDetected(report).asLeft[Outcome[PatientRecord]]
+              case _             => UnacceptableIssuesDetected(report).asLeft[Outcome[PatientRecord]]
+            }
+          
+        }
 
-              case FatalIssues() =>
-                DataFatallyInvalid(report)
-                  .asRight[Error]
-                  .pure[F]
+    } yield result
 
-              case _ =>    
-                repo.save(data,report)
-                  .map {
-                    case Right(_) =>
-                      DataInvalid(data,report)
-                        .asRight[Error]
-                  
-                    case Left(err1) =>
-                      UnspecificError(err1)
-                        .asLeft[Outcome[PatientRecord]]
+
+  override def !(
+    cmd: Command[PatientRecord]
+  )(
+    implicit env: Monad[F] 
+  ): F[Either[Error,Outcome[PatientRecord]]] =
+    cmd match {
+
+      // TODO: Logging
+
+      case Validate(data) =>
+        for {
+          outcome <- validate(data)
+
+          result <- outcome match { 
+            case v @ Right(DataValid(_)) => v.pure
+            
+            case acc @ Right(DataAcceptableWithIssues(_,report)) =>
+              repo.save(data,report)
+                .map {
+                  case Right(_)  => acc
+                  case Left(err) => GenericError(err).asLeft[Outcome[PatientRecord]]
                 }
 
-            }
-        }
-*/
+            case unacc @ Left(UnacceptableIssuesDetected(report)) =>
+              repo.save(data,report)
+                .map {
+                  case Right(_)  => unacc
+                  case Left(err) => GenericError(err).asLeft[Outcome[PatientRecord]]
+                }
+
+            case err @ Left(_) => err.pure
+
+            // Won't occur but required for exhaustive pattern match
+            case Right(Deleted(_)) =>
+              GenericError("Unexpected validation outcome").asLeft[Outcome[PatientRecord]].pure
+          }
+
+        } yield result
 
 
       case Delete(id) =>
         repo.delete(id).map {
           case Right(_)  => Deleted(id).asRight[Error]
-
-          case Left(err) => UnspecificError(err).asLeft[Outcome[PatientRecord]]
+          case Left(err) => GenericError(err).asLeft[Outcome[PatientRecord]]
         }
 
     }
-
-  }
 
 
   override def ?(

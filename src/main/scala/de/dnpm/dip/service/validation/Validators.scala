@@ -33,6 +33,7 @@ import de.dnpm.dip.model.{
 import Issue.{
   Error,
   Fatal,
+  Info,
   Path,
   Warning
 }
@@ -57,8 +58,6 @@ trait Validators
     def at(node: String): ValidatedNel[Issue,T] =
       validated.leftMap(_.map(_ at Path.root/node))
 
-//    def at[T](node: Path.Node[T]): ValidatedNel[Issue,T] =
-//      validated.leftMap(_.map(_ at Path.root/node.name))
   }
 
 
@@ -176,6 +175,19 @@ trait Validators
       ref.resolveOn(List(t)) must be (defined) otherwise (
         Fatal(s"Nicht auflösbare Referenz-ID '${ref.id.getOrElse("N/A")}' auf Objekt '${node.name}'")
       ) map (_ => ref)
+
+
+  implicit val patientValidator: Validator[Issue,Patient] =
+    patient =>
+      (
+        patient.healthInsurance must be (defined) otherwise (
+          Warning("Fehlende Angabe") at "Krankenkasse"
+        ),
+        patient.dateOfDeath must be (defined) otherwise (
+          Info("Fehlende optionale Angabe, ggf. nachprüfen") at "Todesdatum"
+        )
+      )
+      .errorsOr(patient) on patient
 
 
   def TherapyValidator[

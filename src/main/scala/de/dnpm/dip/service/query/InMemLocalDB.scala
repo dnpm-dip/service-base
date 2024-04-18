@@ -18,7 +18,10 @@ import de.dnpm.dip.model.{
   Snapshot,
   Site
 }
-
+import de.dnpm.dip.service.Data.{
+  Saved,
+  Deleted
+}
 
 
 class InMemLocalDB[
@@ -53,7 +56,7 @@ with Logging
     dataSet: PatientRecord
   )(
     implicit env: C[F]
-  ): F[Either[String,Data.Saved[PatientRecord]]] = {
+  ): F[Either[String,Saved[PatientRecord]]] = {
   
     //TODO: Logging
    
@@ -64,7 +67,7 @@ with Logging
       case None       => Some(List(snp))
     }
 
-    Data.Saved(snp)
+    Saved(snp)
       .asRight[String]
       .pure
 
@@ -75,7 +78,7 @@ with Logging
     patId: Id[Patient],
   )(
     implicit env: C[F]
-  ): F[Either[String,Data.Deleted]] = {
+  ): F[Either[String,Deleted]] = {
 
     import java.nio.file.Files
     import cats.syntax.traverse._
@@ -84,7 +87,7 @@ with Logging
 
     cache -= patId
 
-    Data.Deleted(patId)
+    Deleted(patId)
       .asRight[String]
       .pure[F]
 

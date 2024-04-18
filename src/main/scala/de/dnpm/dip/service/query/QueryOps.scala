@@ -16,6 +16,7 @@ import de.dnpm.dip.model.{
   Snapshot,
   Site
 }
+import de.dnpm.dip.service.Data
 
 
 trait QueryOps[
@@ -145,13 +146,7 @@ trait QueryService[
   UseCase <: UseCaseConfig,
   Error
 ]
-extends Data.Ops[
-  F,Env,UseCase,Error
-]
-with QueryOps[
-  F,Env,UseCase,Error
-]
-with PreparedQueryOps[
-  F,Env,UseCase#Criteria,Error
-]
+extends Data.Ops[F,Env,UseCase#PatientRecord]
+with QueryOps[F,Env,UseCase,Error]
+with PreparedQueryOps[F,Env,UseCase#Criteria,Error]
 
