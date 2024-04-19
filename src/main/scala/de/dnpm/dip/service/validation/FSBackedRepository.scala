@@ -9,6 +9,7 @@ import java.io.{
 }
 import scala.util.{
   Either,
+  Try,
   Using
 }
 import scala.util.chaining._
@@ -16,6 +17,7 @@ import scala.collection.concurrent.{
   Map,
   TrieMap
 }
+import scala.reflect.ClassTag
 import cats.Monad
 import cats.syntax.applicative._
 import cats.syntax.either._
@@ -37,27 +39,22 @@ class FSBackedRepository[
 ]
 (
   val dataDir: File
+)(
+  implicit classTag: ClassTag[PatientRecord]
 )
 extends Repository[F,Monad[F],PatientRecord]
 {
 
   import scala.language.reflectiveCalls
 
-
-  private val recordsDir: File =
-    new File(dataDir,"patientRecords")
-      .tap(_.mkdirs)
-
-  private val reportsDir: File =
-    new File(dataDir,"validationReports")
-      .tap(_.mkdirs)
-
+  private val prefix =
+    classTag.runtimeClass.getSimpleName 
 
   private def recordFile(id: Id[Patient]): File =
-    new File(recordsDir, s"PatientRecord_${id.value}.json")
+    new File(dataDir, s"${prefix}_${id.value}.json")
 
   private def reportFile(id: Id[Patient]): File =
-    new File(reportsDir, s"ValidationReport_${id.value}.json")
+    new File(dataDir, s"ValidationReport_${id.value}.json")
 
 
   private def file(record: PatientRecord): File =
@@ -70,6 +67,7 @@ extends Repository[F,Monad[F],PatientRecord]
   private def toPrettyJson[T: Writes](t: T): String =
     Json.toJson(t) pipe Json.prettyPrint
 
+
   private def readAsJson[T: Reads]: InputStream => T =
     Json.parse(_)
       .pipe(Json.fromJson[T](_)) 
@@ -78,8 +76,8 @@ extends Repository[F,Monad[F],PatientRecord]
 
   private val cache: Map[Id[Patient],(PatientRecord,ValidationReport)] =
     TrieMap.from(
-      recordsDir.listFiles(
-        (_,name) => (name startsWith "PatientRecord") && (name endsWith ".json")
+      dataDir.listFiles(
+        (_,name) => (name startsWith prefix) && (name endsWith ".json")
       )
       .to(LazyList)
       .map(new FileInputStream(_))
@@ -94,29 +92,6 @@ extends Repository[F,Monad[F],PatientRecord]
       }
     )
   
-
-/*
-    val records =
-      recordsDir.listFiles(
-        (_,name) => (name startsWith "PatientRecord") && (name endsWith ".json")
-      )
-      .to(LazyList)
-      .map(new FileInputStream(_))
-      .map(readAsJson[PatientRecord])
-
-    val reports =
-      dataDir.listFiles(
-        (_,name) => (name startsWith "ValidationReport") && (name endsWith ".json")
-      )
-      .to(LazyList)
-      .map(new FileInputStream(_))
-      .map(readAsJson[ValidationReport])
-
-    TrieMap.from(
-      records.map(rec => rec.patient.id -> (rec,reports.find(_.patient == rec.patient.id).get))
-    )
-*/
-
 
   override def save(
     data: PatientRecord,
@@ -169,15 +144,16 @@ extends Repository[F,Monad[F],PatientRecord]
     id: Id[Patient]
   )(
     implicit env: Monad[F]
-  ): F[Either[String,Unit]] = {
-
-    recordFile(id).delete
-    reportFile(id).delete
-
-    cache -= id
-
-    ().asRight[String].pure
-  }
-
+  ): F[Either[String,Unit]] =
+    Try {
+      recordFile(id).delete
+      reportFile(id).delete
+      cache -= id
+    }
+    .fold(
+      t => t.getMessage.asLeft[Unit],
+      _ => ().asRight[String]
+    )
+    .pure
 
 }

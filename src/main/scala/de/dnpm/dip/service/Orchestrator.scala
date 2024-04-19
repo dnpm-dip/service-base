@@ -48,22 +48,15 @@ object Data
   final case class GenericError(msg: String) extends Error
 
 
-  trait Ops[
-    F[_],
-    Env,
-    PatientRecord
-  ]
+  trait Ops[F[_],Env,PatientRecord]
   {
-    def !(
-      cmd: Command[PatientRecord]
-    )(
+    def !(cmd: Command[PatientRecord])(
       implicit env: Env
     ): F[Either[Error,Outcome[PatientRecord]]]
 
   }
 
 }
-
 
 
 final class Orchestrator[F[_],PatientRecord: Completer]

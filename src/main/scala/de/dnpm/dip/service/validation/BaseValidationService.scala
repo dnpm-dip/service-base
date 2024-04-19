@@ -36,11 +36,11 @@ import de.ekut.tbi.validation.Validator
 
 
 private final case class SeverityMatcher(
-  threshold: Severity.Value
+  cutoff: Severity.Value
 ){
   def unapply(report: ValidationReport): Boolean =
     report.issues.forall(
-      issue => Ordering[Severity.Value].lteq(issue.severity,threshold)
+      issue => Ordering[Severity.Value].lt(issue.severity,cutoff)
     )
 }
 
@@ -56,7 +56,7 @@ class BaseValidationService[
 ](
   private val validator: Validator[Issue,PatientRecord],
   private val repo: Repository[F,Monad[F],PatientRecord],
-  private val severityThreshold: Severity.Value = Severity.Warning
+  private val severityCutoff: Severity.Value = Severity.Error
 )
 extends ValidationService[F,Monad[F],PatientRecord]{
 
@@ -71,7 +71,7 @@ extends ValidationService[F,Monad[F],PatientRecord]{
 
 
   private val Acceptable =
-    SeverityMatcher(severityThreshold)
+    SeverityMatcher(severityCutoff)
 
 
   override def validate(
@@ -120,23 +120,27 @@ extends ValidationService[F,Monad[F],PatientRecord]{
           outcome <- validate(data)
 
           result <- outcome match { 
-            case v @ Right(DataValid(_)) => v.pure
+            case Right(DataValid(_)) =>
+              // In case this were a consecutive export which now turns out valid,
+              // delete the patient's previously saved validationReport and record
+              repo.delete(data.patient.id)
+              outcome.pure
             
-            case acc @ Right(DataAcceptableWithIssues(_,report)) =>
+            case Right(DataAcceptableWithIssues(_,report)) =>
               repo.save(data,report)
                 .map {
-                  case Right(_)  => acc
+                  case Right(_)  => outcome
                   case Left(err) => GenericError(err).asLeft[Outcome[PatientRecord]]
                 }
 
-            case unacc @ Left(UnacceptableIssuesDetected(report)) =>
+            case Left(UnacceptableIssuesDetected(report)) =>
               repo.save(data,report)
                 .map {
-                  case Right(_)  => unacc
+                  case Right(_)  => outcome
                   case Left(err) => GenericError(err).asLeft[Outcome[PatientRecord]]
                 }
 
-            case err @ Left(_) => err.pure
+            case Left(_) => outcome.pure
 
             // Won't occur but required for exhaustive pattern match
             case Right(Deleted(_)) =>

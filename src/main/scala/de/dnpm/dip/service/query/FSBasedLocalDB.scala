@@ -151,9 +151,7 @@ with Logging
         Json.toJson(snp) pipe Json.stringify
       )
     }
-    .map(
-      _ => cache update (dataSet.patient.id,snp)
-    )
+    .map(_ => cache update (dataSet.patient.id,snp))
     .fold(
       _.getMessage.asLeft[Saved[PatientRecord]],
       _ => Saved(snp).asRight[String]
