@@ -8,7 +8,7 @@ import de.dnpm.dip.model.{
 }
 import play.api.libs.json.{
   Json,
-  Writes
+  OWrites
 }
 
 
@@ -21,7 +21,7 @@ final case class DataValidationInfo
 
 object DataValidationInfo
 {
-  implicit val format: Writes[DataValidationInfo] =
+  implicit val format: OWrites[DataValidationInfo] =
     Json.writes[DataValidationInfo]
 }
 

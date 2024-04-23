@@ -119,17 +119,18 @@ extends Repository[F,Monad[F],PatientRecord]
     filter: ValidationService.Filter
   )(
     implicit env: Monad[F]
-  ): F[Iterable[(PatientRecord,ValidationReport)]] = {
+  ): F[Iterable[(PatientRecord,ValidationReport)]] =
+    filter.severities match {
 
-    val severities = 
-      filter.severities.getOrElse(Set.empty)
+      case Some(severities) =>
+        cache.values.filter { case (_,report) => severities contains report.maxSeverity }
+         .pure
 
-    cache.values
-      .filter { 
-        case (_,report) => severities contains report.maxSeverity
-      }
-      .pure
-  }
+      case None =>
+        cache.values.pure
+
+    }
+  
 
   def ?(
     id: Id[Patient]

@@ -39,17 +39,19 @@ class InMemRepository[F[_],PatientRecord] extends Repository[F,Monad[F],PatientR
     filter: ValidationService.Filter
   )(
     implicit env: Monad[F]
-  ): F[Iterable[(PatientRecord,ValidationReport)]] = {
+  ): F[Iterable[(PatientRecord,ValidationReport)]] =
+    filter.severities match {
 
-    val severities = 
-      filter.severities.getOrElse(Set.empty)
+      case Some(severities) =>
+        db.values.filter {
+          case (_,report) => severities contains report.maxSeverity
+        }
+        .pure
 
-    db.values
-      .filter { 
-        case (_,report) => severities contains report.maxSeverity
-      }
-      .pure
-  }
+      case None =>
+        db.values.pure
+    }
+
 
   def ?(
     id: Id[Patient]

@@ -10,6 +10,7 @@ import de.dnpm.dip.model.{
 import play.api.libs.json.{
   Json,
   Format,
+  OFormat,
   Reads,
   Writes,
   JsString
@@ -170,7 +171,7 @@ object ValidationReport
   // For format[NonEmptyList[_]]
   import de.dnpm.dip.util.json._
 
-  implicit val format: Format[ValidationReport] = 
+  implicit val format: OFormat[ValidationReport] = 
     Json.format[ValidationReport]
 
 }

@@ -36,11 +36,11 @@ import de.ekut.tbi.validation.Validator
 
 
 private final case class SeverityMatcher(
-  cutoff: Severity.Value
+  max: Severity.Value
 ){
   def unapply(report: ValidationReport): Boolean =
     report.issues.forall(
-      issue => Ordering[Severity.Value].lt(issue.severity,cutoff)
+      issue => issue.severity < max
     )
 }
 
@@ -56,7 +56,7 @@ class BaseValidationService[
 ](
   private val validator: Validator[Issue,PatientRecord],
   private val repo: Repository[F,Monad[F],PatientRecord],
-  private val severityCutoff: Severity.Value = Severity.Error
+  private val maxSeverity: Severity.Value = Severity.Error
 )
 extends ValidationService[F,Monad[F],PatientRecord]{
 
@@ -71,7 +71,7 @@ extends ValidationService[F,Monad[F],PatientRecord]{
 
 
   private val Acceptable =
-    SeverityMatcher(severityCutoff)
+    SeverityMatcher(maxSeverity)
 
 
   override def validate(
