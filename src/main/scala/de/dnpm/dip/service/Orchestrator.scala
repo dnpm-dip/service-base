@@ -65,7 +65,6 @@ final class Orchestrator[F[_],PatientRecord: Completer]
   queryService: Data.Ops[F,Monad[F],PatientRecord],
 )
 extends Data.Ops[F,Monad[F],PatientRecord]
-//with Logging
 {
 
   import Data._ 

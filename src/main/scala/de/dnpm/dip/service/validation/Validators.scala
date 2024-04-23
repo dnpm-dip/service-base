@@ -16,6 +16,7 @@ import de.dnpm.dip.coding.{
   CodeSystem,
   CodeSystemProvider
 }
+import de.dnpm.dip.coding.hgvs.HGVS
 import de.dnpm.dip.model.{
   Diagnosis,
   Id,
@@ -153,6 +154,13 @@ trait Validators
   ): NegatableValidator[Issue.Builder,Coding[H :+: CNil]] =
     coding =>
       validate(coding.asInstanceOf[Coding[H]]) map (_.asInstanceOf[Coding[H :+: CNil]])
+
+
+  implicit val proteinChangeValidator: Validator[Issue,Coding[HGVS.Protein]] =
+    coding =>
+      coding.code.value must matchRegex (HGVS.Protein.threeLetterCode) otherwise (
+        Error(s"Ungültiger Code '${coding.code}', erwarte 3-Buchstaben-Format") at "Amino-Säure-Austausch"
+      ) map (_ => coding)
 
       
   implicit def referenceValidator[T: HasId](
