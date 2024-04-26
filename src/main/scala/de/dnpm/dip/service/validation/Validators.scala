@@ -205,7 +205,7 @@ trait Validators
     patient: Patient,
     diagnoses: Iterable[Diagnosis],
     recommendations: Iterable[TherapyRecommendation]
-  ): Validator[Issue,T] = {
+  ): Validator[Issue,T] =
     therapy =>
       (
         validate(therapy.patient) at "Patient",
@@ -219,7 +219,6 @@ trait Validators
         validateOpt(therapy.basedOn) at "Therapie-Empfehlung",
       )
       .errorsOr(therapy) on therapy
-  }
 
 
   def RangeValidator[T](range: Interval[T]): Validator[Issue.Builder,T] =
