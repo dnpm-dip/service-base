@@ -7,6 +7,14 @@ import de.dnpm.dip.util.{
 }
 
 
+final case class Role
+(
+  name: String,
+  permissions: Set[Permission],
+  description: Option[String] = None
+)
+
+
 trait Roles
 {
   def roles: Set[Role]
