@@ -163,20 +163,21 @@ extends ValidationService[F,Monad[F],PatientRecord]{
     filter: Filter
   )(
     implicit env: Monad[F]
-  ): F[Iterable[DataValidationInfo]] =
+  ): F[Seq[ValidationInfo]] =
     (repo ? filter).map(
       _.map {
         case (_,validationReport) =>
-          DataValidationInfo(
+          ValidationInfo(
             validationReport.patient,
             validationReport.issues
               .toList
               .groupBy(_.severity)
               .map {
-                case (severity,issues) => severity -> issues.size
+                case (severity,issues) => severity.toString -> issues.size
               }
           )
       }
+      .toSeq
     )
 
 

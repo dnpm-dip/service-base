@@ -105,7 +105,40 @@ trait Validators
     Path.Node("Prozedur")
 
 
-    
+  def MissingValue(
+    name: String,
+    severity: Issue.Severity.Value = Issue.Severity.Warning
+  ): Issue =
+    Issue(
+      severity,
+      s"Fehlende Angabe '$name'",
+      Path.root/name
+    )
+
+  def MissingOptValue(
+    name: String
+  ): Issue =
+    Issue(
+      Issue.Severity.Info,
+      s"Fehlende optionale Angabe '$name', ggf. nachprüfen, ob nachzureichen",
+      Path.root/name
+    )
+
+  def MissingResult(
+    name: String,
+    severity: Issue.Severity.Value = Issue.Severity.Warning
+  ): Issue = 
+    Issue(
+      severity,
+      s"Fehlende(r) Befund(e) '$name'",
+      Path.root/name
+    )
+
+  def MissingResult[T: Path.Node]: Issue =
+    MissingResult(Path.Node[T].name)
+
+
+
   // For implicit conversions to NegatableValidator[Issue.Builder,T]
   private implicit lazy val defaultIssueBuilder: String => Issue.Builder =
     Error(_)
@@ -158,7 +191,7 @@ trait Validators
 
   implicit val proteinChangeValidator: Validator[Issue,Coding[HGVS.Protein]] =
     coding =>
-      coding.code.value must matchRegex (HGVS.Protein.threeLetterCode) otherwise (
+      coding.code.value must (matchRegex (HGVS.Protein.threeLetterCode) or contain ("?")) otherwise (
         Error(s"Ungültiger Code '${coding.code}', erwarte 3-Buchstaben-Format") at "Amino-Säure-Austausch"
       ) map (_ => coding)
 
@@ -188,12 +221,8 @@ trait Validators
   implicit val patientValidator: Validator[Issue,Patient] =
     patient =>
       (
-        patient.healthInsurance must be (defined) otherwise (
-          Warning("Fehlende Angabe") at "Krankenkasse"
-        ),
-        patient.dateOfDeath must be (defined) otherwise (
-          Info("Fehlende optionale Angabe, ggf. nachprüfen") at "Todesdatum"
-        )
+        patient.healthInsurance must be (defined) otherwise (MissingValue("Krankenkasse")),
+        patient.dateOfDeath must be (defined) otherwise (MissingOptValue("Todesdatum"))
       )
       .errorsOr(patient) on patient
 
@@ -210,12 +239,8 @@ trait Validators
       (
         validate(therapy.patient) at "Patient",
         validate(therapy.indication) at "Indikation",
-        therapy.therapyLine must be (defined) otherwise (
-          Warning("Fehlende Angabe") at "Therapie-Linie"
-        ),
-        therapy.period must be (defined) otherwise (
-          Warning("Fehlende Angabe") at "Zeitraum"
-        ),
+        therapy.therapyLine must be (defined) otherwise (MissingValue("Therapie-Linie")),
+        therapy.period must be (defined) otherwise (MissingValue("Zeitraum")),
         validateOpt(therapy.basedOn) at "Therapie-Empfehlung",
       )
       .errorsOr(therapy) on therapy
@@ -254,5 +279,7 @@ trait Validators
     valueValidator: Validator[Issue.Builder,O#ValueType]
   ): Validator[Issue,O] =
     ObservationValidator[O](valueValidator)
+
+
 
 }
