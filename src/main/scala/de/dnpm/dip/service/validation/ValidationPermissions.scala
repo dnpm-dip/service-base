@@ -18,9 +18,13 @@ abstract class ValidationPermissions(
 extends PermissionEnumeration
 {
 
-  val ReadValidationInfos      = Value(s"${useCase}ReadValidationInfos")
-  val ReadValidationReport     = Value(s"${useCase}ReadValidationReport")
-  val ReadInvalidPatientRecord = Value(s"${useCase}ReadInvalidPatientRecord")
+  val ReadValidationInfos      = Value(s"${useCase}_validation_infos_read")
+  val ReadValidationReport     = Value(s"${useCase}_validation_report_read")
+  val ReadInvalidPatientRecord = Value(s"${useCase}_validation_patient_record_read")
+
+//  val ReadValidationInfos      = Value(s"${useCase}ReadValidationInfos")
+//  val ReadValidationReport     = Value(s"${useCase}ReadValidationReport")
+//  val ReadInvalidPatientRecord = Value(s"${useCase}ReadInvalidPatientRecord")
 
   override val descriptions =
     Map(

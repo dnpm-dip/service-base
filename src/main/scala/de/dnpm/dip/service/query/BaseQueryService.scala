@@ -5,6 +5,10 @@ import java.time.{
   Instant,
   LocalDateTime
 }
+import scala.util.{
+  Left,
+  Right
+}
 import cats.Monad
 import cats.data.{
   EitherNel,
@@ -26,6 +30,7 @@ import de.dnpm.dip.model.{
 }
 import de.dnpm.dip.service.{
   Connector,
+  ConnectionStatus,
   Data
 }
 import play.api.libs.json.{
@@ -44,7 +49,7 @@ abstract class BaseQueryService[
   fcrit: Format[UseCase#Criteria]
 )
 extends QueryService[
-  F,Monad[F],UseCase,String
+  F,Monad[F],UseCase
 ]
 with Logging
 {
@@ -78,8 +83,6 @@ with Logging
 
   protected val ResultSetFrom: (Query.Id,Criteria,Seq[(Snapshot[PatientRecord],Criteria)]) => Results
  
-//  protected val preprocess: PatientRecord => PatientRecord  // Complete, etc...
-
 
   protected implicit val siteCompleter: Completer[Coding[Site]] = {
 
@@ -242,7 +245,8 @@ with Logging
     implicit
     env: Monad[F],
     querier: Querier
-  ): F[String IorNel Query[Criteria,Filter]] = {
+  ): F[String IorNel Query.Outcome[Criteria,Filter]] = {
+//  ): F[Either[Query.NoResults,String IorNel Query[Criteria,Filter]]] = {
 
     import cats.syntax.apply._
     import cats.instances.list._
@@ -300,18 +304,58 @@ with Logging
           resultsBySite <-
             executeQuery(id,sites,criteria) 
 
-          siteStatus =
-            resultsBySite.map {
-              case (site,result) => Entry(site,result.isRight)
-            }
-            .toSeq
-
           errsOrResults =
             resultsBySite
               .values
               .map(_.toIor.toIorNel)
               .reduce(_ combine _)
+/*
+          errsOrQuery =
+            errsOrResults.exists(_.nonEmpty) match {
+              case true =>
+                errsOrResults.map(
+                  results =>
+                  Query[Criteria,Filter](
+                    id,
+                    LocalDateTime.now,
+                    querier,
+                    mode,
+                    siteStatus,
+                    criteria,
+                    DefaultFilter(results.map(_._1)),
+                    cache.timeoutSeconds,
+                    Instant.now
+                  )
+                  .tap(q => cache += (q -> ResultSetFrom(id,criteria,results)))
+                )
+               .asRight
 
+              case false => 
+                Query.NoResults
+                  .asLeft
+            }
+*/
+
+          errsOrQuery =
+            errsOrResults.map(
+              results => 
+                if (results.nonEmpty)
+                  Query[Criteria,Filter](
+                    id,
+                    LocalDateTime.now,
+                    querier,
+                    mode,
+                    ConnectionStatus.from(resultsBySite),
+                    criteria,
+                    DefaultFilter(results.map(_._1)),
+                    cache.timeoutSeconds,
+                    Instant.now
+                  )
+                  .tap(q => cache += (q -> ResultSetFrom(id,criteria,results)))
+                else 
+                  Query.NoResults
+            )
+/*
           errsOrQuery =
             errsOrResults.map {
               results =>
@@ -330,7 +374,7 @@ with Logging
                   q => cache += (q -> ResultSetFrom(id,criteria,results))
                 )
             }
- 
+*/
         } yield errsOrQuery
 
       }
@@ -353,7 +397,7 @@ with Logging
               modeAndSites(optMode,optSites.map(_.complete))
 
             val sitesChanged =
-              sites != query.siteStatus.map(_.key).toSet
+              sites != query.peers.map(_.site).toSet
 
             //TODO: criteria validation
               
@@ -372,18 +416,13 @@ with Logging
                 resultsBySite <-
                   executeQuery(id,sites,criteria) 
               
-                siteStatus =
-                  resultsBySite.map {
-                    case (site,result) => Entry(site,result.isRight)
-                  }
-                  .toSeq
-              
                 errsOrResults =
                   resultsBySite
                     .values
                     .map(_.toIor.toIorNel)
                     .reduce(_ combine _)
-              
+
+/*              
                 errsOrQuery =
                   errsOrResults.map {
                     results =>
@@ -398,9 +437,49 @@ with Logging
                         q => cache += (q -> ResultSetFrom(id,criteria,results))
                       )
                   }
+*/
+              
+                errsOrQuery =
+                  errsOrResults.map(
+                    results =>
+                      if (results.nonEmpty)
+                        query.copy(
+                          mode = mode,
+                          peers = ConnectionStatus.from(resultsBySite),
+                          criteria = criteria,
+                          filters = DefaultFilter(results.map(_._1)),
+                          lastUpdate = Instant.now
+                        )
+                        .tap(q => cache += (q -> ResultSetFrom(id,criteria,results)))
+                      else 
+                        Query.NoResults
+                  )
+
+/*
+                errsOrQuery =
+                  errsOrResults.exists(_.nonEmpty) match {
+                    case true => 
+                      errsOrResults.map(
+                        results =>
+                          query.copy(
+                            mode = mode,
+                            siteStatus = siteStatus,
+                            criteria = criteria,
+                            filters = DefaultFilter(results.map(_._1)),
+                            lastUpdate = Instant.now
+                          )
+                          .tap(q => cache += (q -> ResultSetFrom(id,criteria,results)))
+                      )
+                      .asRight
+
+                    case false =>
+                      Query.NoResults
+                        .asLeft
+                  }
+*/
               
               } yield errsOrQuery
-
+              
             } else {
               log.debug(s"Query target sites or criteria unchanged, nothing to do") 
               query.rightIor[String]
@@ -422,12 +501,15 @@ with Logging
             s"Invalid Query ID ${id.value}"
               .leftIor[Query[Criteria,Filter]]
               .toIorNel
+//              .asRight
               .pure[F]
 
           case Some(query) => {
             cache -= id
-            query.rightIor[String]
+            query
+              .rightIor[String]
               .toIorNel
+//              .asRight
               .pure[F]
           }
 

@@ -49,7 +49,8 @@ trait QueryOps[
     implicit
     env: Env,
     querier: Querier
-  ): F[Error IorNel Query[Criteria,Filter]]
+  ): F[Error IorNel Query.Outcome[Criteria,Filter]]
+//  ): F[Error IorNel Query[Criteria,Filter]]
 
 
   def get(
@@ -119,7 +120,6 @@ trait QueryOps[
   ): F[Either[Error,Snapshot[PatientRecord]]]
 
 
-
   // Peer-to-peer Ops
   def !(
     req: PeerToPeerQuery[Criteria,PatientRecord]
@@ -144,9 +144,8 @@ trait QueryService[
   F[+_],
   Env,
   UseCase <: UseCaseConfig,
-  Error
 ]
 extends Data.Ops[F,Env,UseCase#PatientRecord]
-with QueryOps[F,Env,UseCase,Error]
-with PreparedQueryOps[F,Env,UseCase#Criteria,Error]
+with QueryOps[F,Env,UseCase,String]
+with PreparedQueryOps[F,Env,UseCase#Criteria,String]
 

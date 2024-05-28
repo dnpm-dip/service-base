@@ -23,6 +23,7 @@ import de.dnpm.dip.coding.{
   SingleCodeSystemProvider
 }
 import de.dnpm.dip.model.Site
+import de.dnpm.dip.service.ConnectionStatus
 
 
 final case class Querier(value: String) extends AnyVal
@@ -33,6 +34,7 @@ object Querier
 }
 
 
+
 final case class Query[
   Criteria,
   Filter <: Filters[_]
@@ -41,12 +43,16 @@ final case class Query[
   submittedAt: LocalDateTime,
   querier: Querier,
   mode: Coding[Query.Mode.Value],
-  siteStatus: Seq[Entry[Coding[Site],Boolean]],
+//  siteStatus: Seq[Entry[Coding[Site],Boolean]],
+  peers: Seq[ConnectionStatus],
   criteria: Criteria,
   filters: Filter,
   expiresAfter: Int,
   lastUpdate: Instant
 )
+extends Query.Outcome[Criteria,Filter]
+
+
 
 
 object Query
@@ -83,7 +89,6 @@ object Query
 
   final case class Submit[Criteria]
   ( 
-//    mode: Coding[Query.Mode.Value],
     mode: Option[Coding[Query.Mode.Value]],
     sites: Option[Set[Coding[Site]]],
     criteria: Criteria
@@ -103,6 +108,9 @@ object Query
     id: Id,
   )
   extends Command[Nothing,Nothing]
+
+  sealed trait Outcome[+Criteria,+Filter]
+  final case object NoResults extends Outcome[Nothing,Nothing] 
 
 
   implicit val formatQueryId: Format[Id] =
