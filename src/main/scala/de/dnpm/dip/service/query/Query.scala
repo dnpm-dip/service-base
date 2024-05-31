@@ -6,6 +6,7 @@ import java.time.{
   LocalDateTime
 }
 import cats.Applicative
+import cats.data.NonEmptyList
 import play.api.libs.json.{
   Json,
   Reads,
@@ -43,16 +44,12 @@ final case class Query[
   submittedAt: LocalDateTime,
   querier: Querier,
   mode: Coding[Query.Mode.Value],
-//  siteStatus: Seq[Entry[Coding[Site],Boolean]],
   peers: Seq[ConnectionStatus],
   criteria: Criteria,
   filters: Filter,
   expiresAfter: Int,
   lastUpdate: Instant
 )
-extends Query.Outcome[Criteria,Filter]
-
-
 
 
 object Query
@@ -109,8 +106,12 @@ object Query
   )
   extends Command[Nothing,Nothing]
 
-  sealed trait Outcome[+Criteria,+Filter]
-  final case object NoResults extends Outcome[Nothing,Nothing] 
+
+  sealed trait Error
+  final case object NoResults extends Error
+  final case object InvalidId extends Error
+  final case class ConnectionErrors(messages: NonEmptyList[String]) extends Error
+  final case class GenericError(message: String) extends Error
 
 
   implicit val formatQueryId: Format[Id] =

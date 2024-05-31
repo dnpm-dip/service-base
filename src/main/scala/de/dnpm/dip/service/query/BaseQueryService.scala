@@ -6,6 +6,7 @@ import java.time.{
   LocalDateTime
 }
 import scala.util.{
+  Either,
   Left,
   Right
 }
@@ -245,8 +246,8 @@ with Logging
     implicit
     env: Monad[F],
     querier: Querier
-  ): F[String IorNel Query.Outcome[Criteria,Filter]] = {
-//  ): F[Either[Query.NoResults,String IorNel Query[Criteria,Filter]]] = {
+  ): F[Either[Query.Error,Query[Criteria,Filter]]] = {
+//  ): F[Query.Error Ior Query[Criteria,Filter]] = {
 
     import cats.syntax.apply._
     import cats.instances.list._
@@ -309,72 +310,31 @@ with Logging
               .values
               .map(_.toIor.toIorNel)
               .reduce(_ combine _)
-/*
-          errsOrQuery =
-            errsOrResults.exists(_.nonEmpty) match {
-              case true =>
-                errsOrResults.map(
-                  results =>
-                  Query[Criteria,Filter](
-                    id,
-                    LocalDateTime.now,
-                    querier,
-                    mode,
-                    siteStatus,
-                    criteria,
-                    DefaultFilter(results.map(_._1)),
-                    cache.timeoutSeconds,
-                    Instant.now
-                  )
-                  .tap(q => cache += (q -> ResultSetFrom(id,criteria,results)))
-                )
-               .asRight
-
-              case false => 
-                Query.NoResults
-                  .asLeft
-            }
-*/
 
           errsOrQuery =
-            errsOrResults.map(
-              results => 
-                if (results.nonEmpty)
-                  Query[Criteria,Filter](
-                    id,
-                    LocalDateTime.now,
-                    querier,
-                    mode,
-                    ConnectionStatus.from(resultsBySite),
-                    criteria,
-                    DefaultFilter(results.map(_._1)),
-                    cache.timeoutSeconds,
-                    Instant.now
-                  )
-                  .tap(q => cache += (q -> ResultSetFrom(id,criteria,results)))
-                else 
-                  Query.NoResults
-            )
-/*
-          errsOrQuery =
-            errsOrResults.map {
-              results =>
+            errsOrResults.toEither match {
+              case Right(results) if (results.nonEmpty) =>
                 Query[Criteria,Filter](
                   id,
                   LocalDateTime.now,
                   querier,
                   mode,
-                  siteStatus,
+                  ConnectionStatus.from(resultsBySite),
                   criteria,
                   DefaultFilter(results.map(_._1)),
                   cache.timeoutSeconds,
                   Instant.now
                 )
-                .tap(            
-                  q => cache += (q -> ResultSetFrom(id,criteria,results))
-                )
+                .tap(q => cache += (q -> ResultSetFrom(id,criteria,results)))
+                .asRight
+
+              case Right(_) =>
+                Query.NoResults.asLeft
+                  
+              case Left(errs) =>
+                Query.ConnectionErrors(errs).asLeft
             }
-*/
+
         } yield errsOrQuery
 
       }
@@ -386,9 +346,8 @@ with Logging
         cache.getQuery(id) match {
 
           case None =>
-            s"Invalid Query ID ${id.value}"
-              .leftIor[Query[Criteria,Filter]]
-              .toIorNel
+            Query.InvalidId
+              .asLeft
               .pure[F]
 
           case Some(query) => {
@@ -422,68 +381,35 @@ with Logging
                     .map(_.toIor.toIorNel)
                     .reduce(_ combine _)
 
-/*              
                 errsOrQuery =
-                  errsOrResults.map {
-                    results =>
-                      query.copy(
-                        mode = mode,
-                        siteStatus = siteStatus,
-                        criteria = criteria,
-                        filters = DefaultFilter(results.map(_._1)),
-                        lastUpdate = Instant.now
+                  errsOrResults.toEither match {
+                    case Right(results) if (results.nonEmpty) =>
+                      Query[Criteria,Filter](
+                        id,
+                        LocalDateTime.now,
+                        querier,
+                        mode,
+                        ConnectionStatus.from(resultsBySite),
+                        criteria,
+                        DefaultFilter(results.map(_._1)),
+                        cache.timeoutSeconds,
+                        Instant.now
                       )
-                      .tap(            
-                        q => cache += (q -> ResultSetFrom(id,criteria,results))
-                      )
-                  }
-*/
-              
-                errsOrQuery =
-                  errsOrResults.map(
-                    results =>
-                      if (results.nonEmpty)
-                        query.copy(
-                          mode = mode,
-                          peers = ConnectionStatus.from(resultsBySite),
-                          criteria = criteria,
-                          filters = DefaultFilter(results.map(_._1)),
-                          lastUpdate = Instant.now
-                        )
-                        .tap(q => cache += (q -> ResultSetFrom(id,criteria,results)))
-                      else 
-                        Query.NoResults
-                  )
-
-/*
-                errsOrQuery =
-                  errsOrResults.exists(_.nonEmpty) match {
-                    case true => 
-                      errsOrResults.map(
-                        results =>
-                          query.copy(
-                            mode = mode,
-                            siteStatus = siteStatus,
-                            criteria = criteria,
-                            filters = DefaultFilter(results.map(_._1)),
-                            lastUpdate = Instant.now
-                          )
-                          .tap(q => cache += (q -> ResultSetFrom(id,criteria,results)))
-                      )
+                      .tap(q => cache += (q -> ResultSetFrom(id,criteria,results)))
                       .asRight
-
-                    case false =>
-                      Query.NoResults
-                        .asLeft
+      
+                    case Right(_) =>
+                      Query.NoResults.asLeft
+                        
+                    case Left(errs) =>
+                      Query.ConnectionErrors(errs).asLeft
                   }
-*/
               
               } yield errsOrQuery
               
             } else {
               log.debug(s"Query target sites or criteria unchanged, nothing to do") 
-              query.rightIor[String]
-                .toIorNel
+              query.asRight
                 .pure[F]
             }
 
@@ -498,18 +424,13 @@ with Logging
         cache.getQuery(id) match {
 
           case None =>
-            s"Invalid Query ID ${id.value}"
-              .leftIor[Query[Criteria,Filter]]
-              .toIorNel
-//              .asRight
+            Query.InvalidId
+              .asLeft
               .pure[F]
 
           case Some(query) => {
             cache -= id
-            query
-              .rightIor[String]
-              .toIorNel
-//              .asRight
+            query.asRight
               .pure[F]
           }
 

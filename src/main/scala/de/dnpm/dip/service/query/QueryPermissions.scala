@@ -16,15 +16,10 @@ abstract class QueryPermissions
 extends PermissionEnumeration
 {
 
-  val SubmitQuery        = Value(s"${useCase}_query_submit")
-  val ReadResultSummary  = Value(s"${useCase}_result_summary_read")
-  val ReadPatientMatches = Value(s"${useCase}_patient_matches_read")
-  val ReadPatientRecord  = Value(s"${useCase}_patient_record_read")
-
-//  val SubmitQuery        = Value(s"${useCase}SubmitQuery")
-//  val ReadResultSummary  = Value(s"${useCase}ReadResultSummary")
-//  val ReadPatientMatches = Value(s"${useCase}ReadPatientMatches")
-//  val ReadPatientRecord  = Value(s"${useCase}ReadPatientRecord")
+  val SubmitQuery        = Value(s"${useCase.toLowerCase}_query_submit")
+  val ReadResultSummary  = Value(s"${useCase.toLowerCase}_result_summary_read")
+  val ReadPatientMatches = Value(s"${useCase.toLowerCase}_patient_matches_read")
+  val ReadPatientRecord  = Value(s"${useCase.toLowerCase}_patient_record_read")
 
 
   override val descriptions =

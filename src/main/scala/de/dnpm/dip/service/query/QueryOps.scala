@@ -6,6 +6,7 @@ import java.net.URI
 import scala.util.Either
 import cats.Functor
 import cats.data.{
+  Ior,
   IorNel,
   NonEmptyList
 }
@@ -49,8 +50,7 @@ trait QueryOps[
     implicit
     env: Env,
     querier: Querier
-  ): F[Error IorNel Query.Outcome[Criteria,Filter]]
-//  ): F[Error IorNel Query[Criteria,Filter]]
+  ): F[Either[Query.Error,Query[Criteria,Filter]]]
 
 
   def get(
