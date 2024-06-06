@@ -11,6 +11,7 @@ import de.dnpm.dip.util.{
 final case class Permission
 (
   name: String,
+  display: String,
   description: Option[String] = None
 )
 
@@ -36,17 +37,23 @@ trait PermissionEnumeration extends Enumeration with Permissions
 
   import scala.language.implicitConversions
 
-  val descriptions: Value => String
+  val display: Value => String
+
+  val description: Value => String
   
 
   implicit def toPermission(v: Value): Permission =
-    Permission(v.toString)
+    Permission(
+      v.toString,
+      display(v),
+      Some(description(v))
+    )
+
 
   override lazy val permissions: Set[Permission] =
     this.values
       .toSet[Value]
-      .map(v => v.toString -> descriptions(v))
-      .map { case (name,desc) => Permission(name,Some(desc)) }
+      .map(toPermission)
 
   def unapply(p: String): Option[Value] =
     this.values.find(_.toString == p)

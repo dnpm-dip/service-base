@@ -10,6 +10,7 @@ import de.dnpm.dip.util.{
 final case class Role
 (
   name: String,
+  display: String,
   permissions: Set[Permission],
   description: Option[String] = None
 )

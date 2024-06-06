@@ -19,7 +19,7 @@ final case class ConnectionStatus
 (
   site: Coding[Site],
   status: ConnectionStatus.Value,
-  details: String
+  details: Option[String]
 )
 
 object ConnectionStatus extends Enumeration
@@ -39,14 +39,14 @@ object ConnectionStatus extends Enumeration
             ConnectionStatus(
               site,
               Online,
-              "-"
+              None
             )
 
           case Left(msg) =>
             ConnectionStatus(
               site,
               Offline,
-              msg
+              Some(msg)
             )
         }
     }
