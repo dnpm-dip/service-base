@@ -238,7 +238,7 @@ trait Validators
     therapy =>
       (
         validate(therapy.patient) at "Patient",
-        validate(therapy.indication) at "Indikation",
+        validateOpt(therapy.indication) at "Indikation",
         therapy.therapyLine must be (defined) otherwise (MissingValue("Therapie-Linie")),
         therapy.period must be (defined) otherwise (MissingValue("Zeitraum")),
         validateOpt(therapy.basedOn) at "Therapie-Empfehlung",

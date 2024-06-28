@@ -238,7 +238,7 @@ with Logging
     }
 
 
-  import Query.Mode.{Local,Federated}
+  import Query.Mode.{Local,Federated,Custom}
 
   override def !(
     cmd: Query.Command[Criteria,Filter]
@@ -247,41 +247,24 @@ with Logging
     env: Monad[F],
     querier: Querier
   ): F[Either[Query.Error,Query[Criteria,Filter]]] = {
-//  ): F[Query.Error Ior Query[Criteria,Filter]] = {
 
     import cats.syntax.apply._
     import cats.instances.list._
 
-
     def modeAndSites(
-      optMode: Option[Coding[Query.Mode.Value]],
+      mode: Coding[Query.Mode.Value],
       optSites: Option[Set[Coding[Site]]]
     ): (Coding[Query.Mode.Value],Set[Coding[Site]]) =
-      (optMode,optSites) match {
-        case (_,Some(sites)) =>
-          (
-            (sites - Site.local) match { 
-              case s if s.nonEmpty => Coding(Federated)
-              case _               => Coding(Local)
-            },
-            sites
-          )
+      mode match {
+        case Query.Mode(Local) => 
+          Coding(Local) -> Set(Site.local)
 
-        case (Some(mode),None) => 
-          (
-            mode.complete,
-            mode match { 
-              case Query.Mode(Federated) => connector.otherSites + Site.local
-              case _                     => Set(Site.local)
-            }
-          )
+        case Query.Mode(Custom) => 
+          //TODO: consider changing to return an error if site list is undefined on "custom" query
+          Coding(Custom) -> optSites.getOrElse(connector.otherSites + Site.local)
 
-        case _ =>
-          (
-            Coding(Federated),
-            connector.otherSites + Site.local
-          )
-
+        case _ => 
+          Coding(Federated) -> (connector.otherSites + Site.local)
       }
 
 
@@ -295,7 +278,7 @@ with Logging
           cache.newQueryId
 
         val (mode,sites) =
-          modeAndSites(optMode,optSites.map(_.complete))
+          modeAndSites(optMode,optSites.complete)
 
         //TODO: criteria validation
         val criteria =
@@ -353,7 +336,7 @@ with Logging
           case Some(query) => {
 
             val (mode,sites) =
-              modeAndSites(optMode,optSites.map(_.complete))
+              modeAndSites(optMode.getOrElse(query.mode),optSites.complete)
 
             val sitesChanged =
               sites != query.peers.map(_.site).toSet
@@ -362,7 +345,7 @@ with Logging
               
             val (criteria,criteriaChanged) =
               optCriteria
-                .map(_.complete)
+                .complete
                 .pipe(
                   crit => crit.getOrElse(query.criteria) -> crit.filter(_ != query.criteria).isDefined
                 ) 

@@ -64,11 +64,14 @@ object Query
   {
     val Local     = Value("local")
     val Federated = Value("federated")
+    val Custom    = Value("custom")
 
-    override val display = {
-      case Local     => "Lokal"
-      case Federated => "Föderiert"
-    }
+    override val display =
+      Map(
+        Local     -> "Lokal",
+        Federated -> "Föderiert (Standort-übergreifend)",
+        Custom    -> "Nutzer-definiert (gezielte Standort-Auswahl)"
+      )
 
     final class ProviderSPI extends CodeSystemProviderSPI
     {
@@ -86,7 +89,7 @@ object Query
 
   final case class Submit[Criteria]
   ( 
-    mode: Option[Coding[Query.Mode.Value]],
+    mode: Coding[Query.Mode.Value],
     sites: Option[Set[Coding[Site]]],
     criteria: Criteria
   )
