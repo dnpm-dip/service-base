@@ -56,7 +56,7 @@ object PreparedQuery
   extends Command[Nothing]
 
 
-  final case class Query(
+  final case class Filter(
     querier: Option[Querier] = None
   )
 
@@ -106,7 +106,7 @@ trait PreparedQueryOps[
 
 
   def ?(
-    query: PreparedQuery.Query
+   filter: PreparedQuery.Filter
   )(
     implicit
     env: Env,
@@ -151,7 +151,7 @@ trait PreparedQueryDB[
 
 
   def query(
-    query: PreparedQuery.Query
+    filter: PreparedQuery.Filter
   )(
     implicit env: Env
   ): F[Seq[PreparedQuery[Criteria]]]

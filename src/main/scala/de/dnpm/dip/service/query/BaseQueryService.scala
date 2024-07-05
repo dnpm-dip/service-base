@@ -35,6 +35,7 @@ import de.dnpm.dip.service.{
   Data
 }
 import play.api.libs.json.{
+  Json,
   Format,
   Reads,
   Writes
@@ -121,6 +122,7 @@ with Logging
     cmd match {
 
       case Create(name,criteria) =>
+        log.info(s"Processing new PreparedQuery by $querier")
 
         for { 
           id <-
@@ -145,6 +147,8 @@ with Logging
 
       case Update(id,optName,optCriteria) =>
 
+        log.info(s"Updating PreparedQuery $id by $querier")
+
         for {
           optPq <-
             preparedQueryDB.get(id)
@@ -167,7 +171,7 @@ with Logging
                   .map(_ => updated.asRight[String])
 
               case None => 
-                s"Invalid PreparedQuery ID ${id.value}"
+                s"Invalid PreparedQuery ID $id"
                   .asLeft[PreparedQuery[Criteria]]
                   .pure
             }
@@ -176,10 +180,13 @@ with Logging
 
 
       case Delete(id) =>
+
+        log.info(s"Deleting PreparedQuery $id by $querier")
+
         preparedQueryDB
           .delete(id)
           .map(
-            _.toRight(s"Invalid PreparedQuery ID ${id.value}")
+            _.toRight(s"Invalid PreparedQuery ID $id")
              .toEitherNel
           )
 
@@ -196,7 +203,7 @@ with Logging
     querier: Querier
   ): F[Option[PreparedQuery[Criteria]]] = {
 
-    // TODO: Logging
+    log.info(s"Retrieving PreparedQuery $id for $querier")
 
     preparedQueryDB.get(id)
 
@@ -204,16 +211,16 @@ with Logging
 
 
   override def ?(
-    q: PreparedQuery.Query
+    filter: PreparedQuery.Filter
   )(
     implicit
     env: Monad[F],
     querier: Querier
   ): F[Seq[PreparedQuery[Criteria]]] = {
 
-    // TODO: Logging
+    log.info(s"Retrieving PreparedQueries for $querier")
     
-    preparedQueryDB.query(q)
+    preparedQueryDB.query(filter)
   }
 
 
@@ -223,15 +230,16 @@ with Logging
     implicit 
     env: Monad[F]
   ): F[Either[Data.Error,Data.Outcome[PatientRecord]]] =
-    //TODO: Logging
     
     cmd match {
 
       case Data.Save(dataSet) =>
+        log.info(s"Saving new patient record")
         db.save(dataSet)
           .map(_.leftMap(Data.GenericError(_)))
 
       case Data.Delete(patient) =>
+        log.info(s"Deleting all data for Patient $patient")
         db.delete(patient)
           .map(_.leftMap(Data.GenericError(_)))
 
@@ -270,9 +278,9 @@ with Logging
 
     cmd match {
 
-      case Query.Submit(optMode,optSites,crit) => {
+      case sub @ Query.Submit(optMode,optSites,crit) => {
 
-        log.info(s"Processing new query by $querier") 
+        log.info(s"Processing new query by $querier: \n${Json.prettyPrint(Json.toJson(sub))}") 
 
         val id =
           cache.newQueryId
@@ -322,9 +330,9 @@ with Logging
 
       }
 
-      case Query.Update(id,optMode,optSites,optCriteria) => {
+      case up @ Query.Update(id,optMode,optSites,optCriteria) => {
 
-        log.info(s"Updating Query $id") 
+        log.info(s"Updating Query $id by $querier: \n${Json.prettyPrint(Json.toJson(up))}") 
         
         cache.getQuery(id) match {
 
@@ -402,7 +410,7 @@ with Logging
 
       case Query.Delete(id) => {
 
-        // Logging
+        log.info(s"Deleting Query $id by $querier") 
 
         cache.getQuery(id) match {
 
@@ -484,7 +492,7 @@ with Logging
     querier: Querier
   ): F[Seq[Query[Criteria,Filter]]] = {
 
-    //TODO: Logging
+    log.info(s"Getting current Queries for $querier")
 
     cache.queries.pure
   }
@@ -499,11 +507,9 @@ with Logging
     querier: Querier
   ): F[Option[Query[Criteria,Filter]]] = {
 
-// TODO: Logging 
+    log.info(s"Getting Query $id for $querier")
 
-    Monad[F].pure {
-      cache.getQuery(id)
-    }
+    cache.getQuery(id).pure
 
   }
 
@@ -515,11 +521,9 @@ with Logging
     querier: Querier
   ): F[Option[Results]] = {
 
-// TODO: Logging 
+    log.info(s"Getting ResultSet of Query $id for $querier")
 
-    Monad[F].pure {
-      cache.getResults(id)
-    }
+    cache.getResults(id).pure
 
   }
 
@@ -535,12 +539,15 @@ with Logging
     implicit
     env: Monad[F],
     querier: Querier,
-  ): F[Option[Results#SummaryType]] =
+  ): F[Option[Results#SummaryType]] = {
+
+    log.info(s"Getting ResultSet Summary of Query $id for $querier")
+
     resultSet(id)
       .map(
         _.map(_.summary(filter))
       )
-
+  }
 
   override def patientMatches(
     id: Query.Id,
@@ -549,12 +556,15 @@ with Logging
     implicit
     env: Monad[F],
     querier: Querier,
-  ): F[Option[Seq[PatientMatch[Criteria]]]] = 
+  ): F[Option[Seq[PatientMatch[Criteria]]]] = {
+    
+    log.info(s"Getting Patient Matches of Query $id for $querier")
+
     resultSet(id)
       .map(
         _.map(_.patientMatches(filter).asInstanceOf[Seq[PatientMatch[Criteria]]])
       )
-
+  }
 
   override def patientRecord(
     id: Query.Id,
@@ -565,12 +575,11 @@ with Logging
     querier: Querier
   ): F[Option[PatientRecord]] = {
 
-//TODO: Logging
+    log.info(s"Getting Patient Record $patId of Query $id for $querier")
 
     cache.getResults(id)
       .flatMap(_.patientRecord(patId))
       .pure
-    
   }
 
 
@@ -584,7 +593,9 @@ with Logging
     querier: Querier
   ): F[Either[String,Snapshot[PatientRecord]]] = {
 
-    //TODO: Logging
+    log.info(
+      s"Retrieving Patient Record $patient ${snapshot.map(snp => s"(Snapshot $snp)").getOrElse("")} from Site ${site.code.value} for $querier"
+    )
 
     if (site == Site.local){
       (db ? (patient,snapshot))
@@ -616,7 +627,7 @@ with Logging
     log.info(
       s"""Processing peer-to-peer query from site ${req.origin.code.value}
           Querier: ${req.querier.value}
-          Criteria: ${req.criteria}"""
+          Criteria:\n${Json.prettyPrint(Json.toJson(req.criteria))}"""
     )
 
     // Expand the query criteria

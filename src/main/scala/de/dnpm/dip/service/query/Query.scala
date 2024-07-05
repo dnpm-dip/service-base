@@ -12,7 +12,7 @@ import play.api.libs.json.{
   Reads,
   Writes,
   OWrites,
-  Format,
+  Format
 }
 import de.dnpm.dip.coding.{
   Coding,
@@ -126,11 +126,11 @@ object Query
   ]: OWrites[Query[Criteria,Filter]] =
     Json.writes[Query[Criteria,Filter]]
 
-  implicit def formatSubmit[Criteria: Reads]: Reads[Submit[Criteria]] =
-    Json.reads[Submit[Criteria]]
+  implicit def formatSubmit[Criteria: Format]: Format[Submit[Criteria]] =
+    Json.format[Submit[Criteria]]
 
-  implicit def formatUpdate[Criteria: Format]: Reads[Update[Criteria]] =
-    Json.reads[Update[Criteria]]
+  implicit def formatUpdate[Criteria: Format]: Format[Update[Criteria]] =
+    Json.format[Update[Criteria]]
 
   implicit val formatDelete: Reads[Delete] =
     Json.reads[Delete]

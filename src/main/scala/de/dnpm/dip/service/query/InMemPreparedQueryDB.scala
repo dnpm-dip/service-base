@@ -26,7 +26,7 @@ extends PreparedQueryDB[
   import cats.syntax.either._
 
 
-  private val pqs: Map[PreparedQuery.Id,PreparedQuery[Criteria]] =
+  private val cache: Map[PreparedQuery.Id,PreparedQuery[Criteria]] =
     TrieMap.empty
 
 
@@ -43,7 +43,7 @@ extends PreparedQueryDB[
     implicit env: C[F]
   ): F[Either[String,PreparedQuery[Criteria]]] =
     pq.tap(
-      p => pqs += (pq.id -> p)
+      p => cache += (pq.id -> p)
     )
     .asRight[String]
     .pure
@@ -54,8 +54,8 @@ extends PreparedQueryDB[
   )(
     implicit env: C[F]
   ): F[Option[PreparedQuery[Criteria]]] =
-    pqs.get(id)
-      .tapEach(_ => pqs -= id)
+    cache.get(id)
+      .tapEach(_ => cache -= id)
       .headOption
       .pure
 
@@ -65,22 +65,21 @@ extends PreparedQueryDB[
   )(
     implicit env: C[F]
   ): F[Option[PreparedQuery[Criteria]]] =
-    pqs.get(id)
+    cache.get(id)
       .pure
 
 
   override def query(
-    query: PreparedQuery.Query
+    filter: PreparedQuery.Filter
   )(
     implicit env: C[F]
   ): F[Seq[PreparedQuery[Criteria]]] =
-    pqs.values
-      .filter(
-        pq =>
-          query.querier.fold(true)(_ == pq.querier)
-      )
-      .toSeq
-      .pure
-
+    filter.querier.fold(
+      cache.values
+    )(
+      q => cache.values.filter(_.querier == q)
+    )
+    .toSeq
+    .pure
 
 }

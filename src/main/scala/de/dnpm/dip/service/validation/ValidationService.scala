@@ -67,7 +67,6 @@ trait ValidationService[
   )(
     implicit env: Env
   ): F[Seq[ValidationInfo]]
-//  ): F[Iterable[ValidationInfo]]
 
 
   def dataQualityReport(

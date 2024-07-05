@@ -58,7 +58,10 @@ class BaseValidationService[
   private val repo: Repository[F,Monad[F],PatientRecord],
   private val maxSeverity: Severity.Value = Severity.Error
 )
-extends ValidationService[F,Monad[F],PatientRecord]{
+extends ValidationService[F,Monad[F],PatientRecord]
+with Logging
+{
+
 
   import ValidationService._
 
@@ -78,7 +81,10 @@ extends ValidationService[F,Monad[F],PatientRecord]{
     data: PatientRecord
   )(
     implicit env: Monad[F]
-  ): F[Either[Error,Outcome[PatientRecord]]] =
+  ): F[Either[Error,Outcome[PatientRecord]]] = {
+
+    log.info("Performing simple PatientRecord validation (non-importing))")
+
     for {
       validationResult <- validator(data).pure
 
@@ -104,7 +110,7 @@ extends ValidationService[F,Monad[F],PatientRecord]{
         }
 
     } yield result
-
+  }
 
   override def !(
     cmd: Command[PatientRecord]
@@ -113,20 +119,21 @@ extends ValidationService[F,Monad[F],PatientRecord]{
   ): F[Either[Error,Outcome[PatientRecord]]] =
     cmd match {
 
-      // TODO: Logging
-
       case Validate(data) =>
+        log.info(s"Validating PatientRecord ${data.patient.id} before import")
         for {
           outcome <- validate(data)
 
           result <- outcome match { 
             case Right(DataValid(_)) =>
+              log.debug(s"Data valid: deleting previously saved validation reports")
               // In case this were a consecutive export which now turns out valid,
               // delete the patient's previously saved validationReport and record
               repo.delete(data.patient.id)
               outcome.pure
             
             case Right(DataAcceptableWithIssues(_,report)) =>
+              log.debug(s"Data acceptable but with with issues: Saving data set and validation report")
               repo.save(data,report)
                 .map {
                   case Right(_)  => outcome
@@ -134,6 +141,7 @@ extends ValidationService[F,Monad[F],PatientRecord]{
                 }
 
             case Left(UnacceptableIssuesDetected(report)) =>
+              log.debug(s"Unacceptable issues: Saving data set and validation report")
               repo.save(data,report)
                 .map {
                   case Right(_)  => outcome
@@ -151,6 +159,7 @@ extends ValidationService[F,Monad[F],PatientRecord]{
 
 
       case Delete(id) =>
+        log.info(s"Deleting all data of Patient $id")
         repo.delete(id).map {
           case Right(_)  => Deleted(id).asRight[Error]
           case Left(err) => GenericError(err).asLeft[Outcome[PatientRecord]]
