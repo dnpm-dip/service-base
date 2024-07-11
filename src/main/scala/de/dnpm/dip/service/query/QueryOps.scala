@@ -31,12 +31,15 @@ trait QueryOps[
 
   type PatientRecord = UseCase#PatientRecord
   type Criteria      = UseCase#Criteria
-  type Filter        = UseCase#Filter
   type Results       = UseCase#Results
+  type Filter        = UseCase#Filter
 
 
   import cats.syntax.functor._
   import scala.util.chaining._
+  import scala.language.implicitConversions
+
+  implicit def filterToPredicate(filter: Filter): PatientRecord => Boolean
 
 
   def sites(
@@ -79,6 +82,7 @@ trait QueryOps[
   ): F[Option[Results]]
 
 
+/*
   def summary(
     id: Query.Id,
     filter: Filter,
@@ -88,16 +92,15 @@ trait QueryOps[
     querier: Querier,
   ): F[Option[Results#SummaryType]] 
 
-
   def patientMatches(
     id: Query.Id,
-    filter: Filter,
+    filter: Filter
   )(
     implicit
     env: Env,
     querier: Querier,
   ): F[Option[Seq[PatientMatch[Criteria]]]]
-
+*/
 
   def patientRecord(
     id: Query.Id,
@@ -107,7 +110,6 @@ trait QueryOps[
     env: Env,
     querier: Querier
   ): F[Option[PatientRecord]]
-
 
   def retrievePatientRecord(
     site: Coding[Site],

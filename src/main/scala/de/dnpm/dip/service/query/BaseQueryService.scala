@@ -527,11 +527,7 @@ with Logging
 
   }
 
-
-  import scala.language.implicitConversions
-
-  protected implicit def toPredicate(filter: Filter): PatientRecord => Boolean
-
+/*
   override def summary(
     id: Query.Id,
     filter: Filter,
@@ -562,9 +558,11 @@ with Logging
 
     resultSet(id)
       .map(
-        _.map(_.patientMatches(filter).asInstanceOf[Seq[PatientMatch[Criteria]]])
+        _.map(_.patientMatches(filter))
+//        _.map(_.patientMatches(filter).asInstanceOf[Seq[PatientMatch[Criteria]]])
       )
   }
+*/
 
   override def patientRecord(
     id: Query.Id,

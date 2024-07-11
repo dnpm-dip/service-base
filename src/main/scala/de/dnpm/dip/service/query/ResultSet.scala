@@ -20,7 +20,6 @@ trait ResultSet[
   Criteria
 ]
 {
-  self =>
 
   import scala.util.chaining._
   import scala.language.reflectiveCalls
@@ -33,6 +32,39 @@ trait ResultSet[
 
   def results: Seq[(Snapshot[PatientRecord],Criteria)]
 
+/*
+  import scala.language.implicitConversions
+
+  protected implicit def toPredicate(filter: Filter): PatientRecord => Boolean
+
+  protected def records(filter: Filter): Seq[PatientRecord] = {
+
+    val f: PatientRecord => Boolean = filter
+
+    results
+      .collect {
+        case (Snapshot(patRec,_),_) if f(patRec) => patRec
+      }
+
+  }
+
+  def summary(f: Filter): SummaryType
+
+
+  def patientMatches(filter: Filter): Seq[PatientMatch[Criteria]] = {
+
+    val f: PatientRecord => Boolean = filter
+
+    results
+      .collect {
+        case (Snapshot(patRec,_),matchingCriteria) if f(patRec) =>
+          PatientMatch.of(
+            patRec.patient,
+            matchingCriteria
+          )
+      }
+  }
+*/
 
   protected def records(
     f: PatientRecord => Boolean

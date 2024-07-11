@@ -110,6 +110,10 @@ object PatientFilter
     )
 
 
+  lazy val empty: PatientFilter =
+    PatientFilter(None,None,None,None)
+
+
   implicit val format: OWrites[PatientFilter] =
     Json.writes[PatientFilter]
 
