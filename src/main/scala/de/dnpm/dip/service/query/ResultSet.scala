@@ -65,8 +65,16 @@ trait ResultSet[
       }
   }
 */
+  
+  protected def snapshots(
+    f: PatientRecord => Boolean
+  ): Seq[Snapshot[PatientRecord]] =
+    results
+      .collect {
+        case (snp,_) if f(snp.data) => snp
+      }
 
-  protected def records(
+  protected def patientRecords(
     f: PatientRecord => Boolean
   ): Seq[PatientRecord] =
     results

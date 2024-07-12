@@ -32,6 +32,7 @@ trait QueryOps[
   type PatientRecord = UseCase#PatientRecord
   type Criteria      = UseCase#Criteria
   type Results       = UseCase#Results
+//  type Filter        = Results#Filter
   type Filter        = UseCase#Filter
 
 
