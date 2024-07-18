@@ -17,6 +17,7 @@ import de.dnpm.dip.coding.{
   CodeSystemProvider
 }
 import de.dnpm.dip.coding.hgvs.HGVS
+import de.dnpm.dip.coding.UnregisteredMedication
 import de.dnpm.dip.model.{
   Diagnosis,
   Id,
@@ -144,6 +145,12 @@ trait Validators
     Error(_)
 
 
+  // Unregistered Medications are valid by default,
+  // as they cannot be validated against a given CodeSystem
+  implicit val unregisteredMedicationValidator: NegatableValidator[Issue.Builder,Coding[UnregisteredMedication]] =
+    _.validNel[Issue.Builder]
+
+
   implicit def csCodingValidator[T](
     implicit cs: CodeSystem[T]
   ): NegatableValidator[Issue.Builder,Coding[T]] =
@@ -167,6 +174,32 @@ trait Validators
 
   implicit def coproductCodingValidator[H, T <: Coproduct](
     implicit
+    cs: Coding.System[H],
+    hVal: NegatableValidator[Issue.Builder,Coding[H]],
+    tVal: NegatableValidator[Issue.Builder,Coding[T]]
+  ): NegatableValidator[Issue.Builder,Coding[H :+: T]] =
+    coding =>
+      (
+        if (coding.system == cs.uri)
+          hVal(coding.asInstanceOf[Coding[H]])
+        else
+          tVal(coding.asInstanceOf[Coding[T]])
+      )
+      .map(_.asInstanceOf[Coding[H :+: T]])
+      
+
+  
+  implicit def terminalCoproductCodingValidator[H](
+    implicit
+    hVal: NegatableValidator[Issue.Builder,Coding[H]],
+  ): NegatableValidator[Issue.Builder,Coding[H :+: CNil]] =
+    coding =>
+      hVal(coding.asInstanceOf[Coding[H]])
+        .map(_.asInstanceOf[Coding[H :+: CNil]])
+
+/*
+  implicit def coproductCodingValidator[H, T <: Coproduct](
+    implicit
     csp: CodeSystemProvider[H,cats.Id,Applicative[cats.Id]],
     tVal: NegatableValidator[Issue.Builder,Coding[T]]
   ): NegatableValidator[Issue.Builder,Coding[H :+: T]] =
@@ -179,7 +212,6 @@ trait Validators
       )
       .map(_.asInstanceOf[Coding[H :+: T]])
       
-
   
   implicit def terminalCoproductCodingValidator[H](
     implicit
@@ -187,7 +219,7 @@ trait Validators
   ): NegatableValidator[Issue.Builder,Coding[H :+: CNil]] =
     coding =>
       validate(coding.asInstanceOf[Coding[H]]) map (_.asInstanceOf[Coding[H :+: CNil]])
-
+*/
 
   implicit val proteinChangeValidator: Validator[Issue,Coding[HGVS.Protein]] =
     coding =>
