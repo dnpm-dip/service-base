@@ -30,7 +30,59 @@ trait ResultSet[
 
   def id: Query.Id
 
+//  def results: Seq[(Snapshot[PatientRecord],Option[Criteria])]
   def results: Seq[(Snapshot[PatientRecord],Criteria)]
+
+  
+  protected def snapshots(
+    f: PatientRecord => Boolean
+  ): Seq[Snapshot[PatientRecord]] =
+    results
+      .collect {
+        case (snp,_) if f(snp.data) => snp
+      }
+
+  protected def patientRecords(
+    f: PatientRecord => Boolean
+  ): Seq[PatientRecord] =
+    results
+      .collect {
+        case (Snapshot(patRec,_),_) if f(patRec) => patRec
+      }
+
+
+  def summary(
+    f: PatientRecord => Boolean = _ => true
+  ): SummaryType
+
+
+  def demographics(
+    f: PatientRecord => Boolean = _ => true
+  ): ResultSet.Demographics =
+    ResultSet.Demographics
+      .on(patientRecords(f).map(_.patient))
+
+
+  def patientMatches(
+    f: PatientRecord => Boolean = _ => true
+  ): Seq[PatientMatch[Criteria]] =
+    results
+      .collect {
+        case (Snapshot(patRec,_),matchingCriteria) if f(patRec) =>
+          PatientMatch.of(
+            patRec.patient,
+            matchingCriteria
+          )
+      }
+
+
+  def patientRecord(
+    patId: Id[Patient]
+  ): Option[PatientRecord] =
+    results
+      .collectFirst {
+        case (Snapshot(patRec,_),_) if patRec.patient.id == patId => patRec
+      }
 
 /*
   import scala.language.implicitConversions
@@ -65,52 +117,7 @@ trait ResultSet[
       }
   }
 */
-  
-  protected def snapshots(
-    f: PatientRecord => Boolean
-  ): Seq[Snapshot[PatientRecord]] =
-    results
-      .collect {
-        case (snp,_) if f(snp.data) => snp
-      }
-
-  protected def patientRecords(
-    f: PatientRecord => Boolean
-  ): Seq[PatientRecord] =
-    results
-      .collect {
-        case (Snapshot(patRec,_),_) if f(patRec) => patRec
-      }
-
-
-  def summary(
-    f: PatientRecord => Boolean = _ => true
-  ): SummaryType
-
-
-  def patientMatches(
-    f: PatientRecord => Boolean = _ => true
-  ): Seq[PatientMatch[Criteria]] =
-    results
-      .collect {
-        case (Snapshot(patRec,_),matchingCriteria) if f(patRec) =>
-          PatientMatch.of(
-            patRec.patient,
-            matchingCriteria
-          )
-      }
-
-
-  def patientRecord(
-    patId: Id[Patient]
-  ): Option[PatientRecord] =
-    results
-      .collectFirst {
-        case (Snapshot(patRec,_),_) if patRec.patient.id == patId => patRec
-      }
-
 }
-
 
 
 object ResultSet
