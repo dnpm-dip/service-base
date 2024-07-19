@@ -23,7 +23,10 @@ import de.dnpm.dip.coding.{
   CodeSystemProviderSPI,
   SingleCodeSystemProvider
 }
-import de.dnpm.dip.model.Site
+import de.dnpm.dip.model.{
+  Site,
+  Snapshot
+}
 import de.dnpm.dip.service.ConnectionStatus
 
 
@@ -45,7 +48,7 @@ final case class Query[
   querier: Querier,
   mode: Coding[Query.Mode.Value],
   peers: Seq[ConnectionStatus],
-  criteria: Criteria,
+  criteria: Option[Criteria],
   filters: Filter,
   expiresAfter: Int,
   lastUpdate: Instant
@@ -91,7 +94,7 @@ object Query
   ( 
     mode: Coding[Query.Mode.Value],
     sites: Option[Set[Coding[Site]]],
-    criteria: Criteria
+    criteria: Option[Criteria]
   )
   extends Command[Criteria,Nothing]
 
@@ -108,6 +111,23 @@ object Query
     id: Id,
   )
   extends Command[Nothing,Nothing]
+
+
+
+  final case class Match[PatientRecord,Criteria]
+  (
+    record: Snapshot[PatientRecord],
+    matchingCriteria: Option[Criteria]
+  ) 
+  object Match
+  {
+    implicit def reads[PatientRecord: Reads,Criteria: Reads]: Reads[Match[PatientRecord,Criteria]] =
+      Json.reads[Match[PatientRecord,Criteria]]
+    
+    implicit def writes[PatientRecord: Writes,Criteria: Writes]: Writes[Match[PatientRecord,Criteria]] =
+      Json.writes[Match[PatientRecord,Criteria]]
+  }
+
 
 
   sealed trait Error

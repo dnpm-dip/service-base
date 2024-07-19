@@ -84,7 +84,7 @@ with Logging
   ): Filter
 
 
-  protected val ResultSetFrom: (Query.Id,Criteria,Seq[(Snapshot[PatientRecord],Criteria)]) => Results
+  protected val ResultSetFrom: (Query.Id,Seq[Query.Match[PatientRecord,Criteria]]) => Results
  
 
   protected implicit val siteCompleter: Completer[Coding[Site]] = {
@@ -313,11 +313,11 @@ with Logging
                   mode,
                   ConnectionStatus.from(resultsBySite),
                   criteria,
-                  DefaultFilter(results.map(_._1)),
+                  DefaultFilter(results.map(_.record)),
                   cache.timeoutSeconds,
                   Instant.now
                 )
-                .tap(q => cache += (q -> ResultSetFrom(id,criteria,results)))
+                .tap(q => cache += (q -> ResultSetFrom(id,results)))
                 .asRight
 
               case Right(_) =>
@@ -352,12 +352,15 @@ with Logging
 
             //TODO: criteria validation
               
-            val (criteria,criteriaChanged) =
-              optCriteria
-                .complete
-                .pipe(
-                  crit => crit.getOrElse(query.criteria) -> crit.filter(_ != query.criteria).isDefined
-                ) 
+            val criteria =
+              optCriteria.complete
+
+            val criteriaChanged =
+              (criteria,query.criteria) match {
+                case (Some(n),Some(prev)) if n == prev => false
+                case _ => true
+              }
+
 
             if (sitesChanged || criteriaChanged){
 
@@ -383,11 +386,11 @@ with Logging
                         mode,
                         ConnectionStatus.from(resultsBySite),
                         criteria,
-                        DefaultFilter(results.map(_._1)),
+                        DefaultFilter(results.map(_.record)),
                         cache.timeoutSeconds,
                         Instant.now
                       )
-                      .tap(q => cache += (q -> ResultSetFrom(id,criteria,results)))
+                      .tap(q => cache += (q -> ResultSetFrom(id,results)))
                       .asRight
       
                     case Right(_) =>
@@ -438,12 +441,13 @@ with Logging
   private def executeQuery(
     id: Query.Id,
     sites: Set[Coding[Site]],
-    criteria: Criteria
+    criteria: Option[Criteria]
+//    criteria: Criteria
   )(
     implicit
     env: Monad[F],
     querier: Querier,
-  ): F[Map[Coding[Site],Either[String,Seq[(Snapshot[PatientRecord],Criteria)]]]] = {
+  ): F[Map[Coding[Site],Either[String,Seq[Query.Match[PatientRecord,Criteria]]]]] = {
 
     import cats.syntax.apply._
     import cats.instances.list._
@@ -463,7 +467,7 @@ with Logging
           )
 
         case _ =>
-          Map.empty[Coding[Site],Either[String,Seq[(Snapshot[PatientRecord],Criteria)]]]
+          Map.empty[Coding[Site],Either[String,Seq[Query.Match[PatientRecord,Criteria]]]]
             .pure[F]
       }
 
@@ -474,7 +478,7 @@ with Logging
     val localResults =
       sites.contains(Site.local) match {
         case true =>
-          (db ? CriteriaExpander(criteria))
+          (db ? criteria.map(CriteriaExpander))
             .map(results => Some(Site.local -> results))
 
         case _ =>
@@ -528,42 +532,6 @@ with Logging
 
   }
 
-/*
-  override def summary(
-    id: Query.Id,
-    filter: Filter,
-  )(
-    implicit
-    env: Monad[F],
-    querier: Querier,
-  ): F[Option[Results#SummaryType]] = {
-
-    log.info(s"Getting ResultSet Summary of Query $id for $querier")
-
-    resultSet(id)
-      .map(
-        _.map(_.summary(filter))
-      )
-  }
-
-  override def patientMatches(
-    id: Query.Id,
-    filter: Filter,
-  )(
-    implicit
-    env: Monad[F],
-    querier: Querier,
-  ): F[Option[Seq[PatientMatch[Criteria]]]] = {
-    
-    log.info(s"Getting Patient Matches of Query $id for $querier")
-
-    resultSet(id)
-      .map(
-        _.map(_.patientMatches(filter))
-//        _.map(_.patientMatches(filter).asInstanceOf[Seq[PatientMatch[Criteria]]])
-      )
-  }
-*/
 
   override def patientRecord(
     id: Query.Id,
@@ -621,7 +589,7 @@ with Logging
   )(
     implicit
     env: Monad[F]
-  ): F[Either[String,Seq[(Snapshot[PatientRecord],Criteria)]]] = {
+  ): F[Either[String,Seq[Query.Match[PatientRecord,Criteria]]]] = {
 
     log.info(
       s"""Processing peer-to-peer query from site ${req.origin.code.value}
@@ -630,7 +598,7 @@ with Logging
     )
 
     // Expand the query criteria
-    db ? CriteriaExpander(req.criteria)
+    db ? req.criteria.map(CriteriaExpander)
 
   }
 

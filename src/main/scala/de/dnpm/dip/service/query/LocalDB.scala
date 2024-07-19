@@ -36,10 +36,10 @@ trait LocalDB[
 
 
   def ?(
-    criteria: Criteria
+    criteria: Option[Criteria]
   )(
     implicit env: Env
-  ): F[Either[String,Seq[(Snapshot[PatientRecord],Criteria)]]]
+  ): F[Either[String,Seq[Query.Match[PatientRecord,Criteria]]]]
 
 
   def ?(

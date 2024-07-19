@@ -39,6 +39,7 @@ trait QueryOps[
   import scala.util.chaining._
   import scala.language.implicitConversions
 
+
   implicit def filterToPredicate(filter: Filter): PatientRecord => Boolean
 
 
@@ -82,26 +83,6 @@ trait QueryOps[
   ): F[Option[Results]]
 
 
-/*
-  def summary(
-    id: Query.Id,
-    filter: Filter,
-  )(
-    implicit
-    env: Env,
-    querier: Querier,
-  ): F[Option[Results#SummaryType]] 
-
-  def patientMatches(
-    id: Query.Id,
-    filter: Filter
-  )(
-    implicit
-    env: Env,
-    querier: Querier,
-  ): F[Option[Seq[PatientMatch[Criteria]]]]
-*/
-
   def patientRecord(
     id: Query.Id,
     patId: Id[Patient]
@@ -128,7 +109,7 @@ trait QueryOps[
   )(
     implicit
     env: Env
-  ): F[Either[Error,Seq[(Snapshot[PatientRecord],Criteria)]]]
+  ): F[Either[Error,Seq[Query.Match[PatientRecord,Criteria]]]]
 
 
   def !(

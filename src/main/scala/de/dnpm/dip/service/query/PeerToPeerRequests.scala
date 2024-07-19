@@ -18,17 +18,17 @@ import play.api.libs.json.{
 }
 
 
-
 final case class PeerToPeerQuery[Criteria,PatientRecord]
 (
   origin: Coding[Site],
   querier: Querier,
-  criteria: Criteria
+  criteria: Option[Criteria]
 )
 extends PeerToPeerRequest
 {
-  type ResultType = Seq[(Snapshot[PatientRecord],Criteria)]
+  type ResultType = Seq[Query.Match[PatientRecord,Criteria]]
 }
+
 
 object PeerToPeerQuery
 {

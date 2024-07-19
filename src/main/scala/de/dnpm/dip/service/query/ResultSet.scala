@@ -30,7 +30,7 @@ trait ResultSet[
 
   def id: Query.Id
 
-  def results: Seq[(Snapshot[PatientRecord],Option[Criteria])]
+  def results: Seq[Query.Match[PatientRecord,Criteria]]
 
   
   protected def snapshots(
@@ -38,7 +38,7 @@ trait ResultSet[
   ): Seq[Snapshot[PatientRecord]] =
     results
       .collect {
-        case (snp,_) if f(snp.data) => snp
+        case Query.Match(snp,_) if f(snp.data) => snp
       }
 
   protected def patientRecords(
@@ -46,7 +46,7 @@ trait ResultSet[
   ): Seq[PatientRecord] =
     results
       .collect {
-        case (Snapshot(patRec,_),_) if f(patRec) => patRec
+        case Query.Match(Snapshot(patRec,_),_) if f(patRec) => patRec
       }
 
 
@@ -67,7 +67,7 @@ trait ResultSet[
   ): Seq[PatientMatch[Criteria]] =
     results
       .collect {
-        case (Snapshot(patRec,_),matchingCriteria) if f(patRec) =>
+        case Query.Match(Snapshot(patRec,_),matchingCriteria) if f(patRec) =>
           PatientMatch.of(
             patRec.patient,
             matchingCriteria
@@ -80,7 +80,7 @@ trait ResultSet[
   ): Option[PatientRecord] =
     results
       .collectFirst {
-        case (Snapshot(patRec,_),_) if patRec.patient.id == patId => patRec
+        case Query.Match(Snapshot(patRec,_),_) if patRec.patient.id == patId => patRec
       }
 
 /*

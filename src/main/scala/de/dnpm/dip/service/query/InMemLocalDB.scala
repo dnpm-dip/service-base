@@ -60,7 +60,7 @@ with Logging
   
     //TODO: Logging
    
-    val snp = Snapshot(dataSet)
+    val snp = Snapshot.of(dataSet)
 
     cache.updateWith(dataSet.patient.id){
       case Some(snps) => Some(snp :: snps)
@@ -95,6 +95,35 @@ with Logging
 
 
   override def ?(
+    criteria: Option[Criteria]
+  )(
+    implicit env: C[F]
+  ): F[Either[String,Seq[Query.Match[PatientRecord,Criteria]]]] = {
+
+    criteria.fold(
+      cache.values
+        .collect {
+          case snp :: _ => Query.Match(snp,criteria)
+        }
+    ){
+      crit =>
+        val matcher =
+          criteriaMatcher(crit)
+              
+        cache.values
+          .collect { 
+            case snp :: _ => Query.Match(snp,matcher(snp.data))
+          }
+          .filter(_.matchingCriteria.isDefined)
+    }
+    .toSeq
+    .pure
+    .map(_.asRight[String])
+
+  }
+
+/*
+  override def ?(
     criteria: Criteria
   )(
     implicit env: C[F]
@@ -114,7 +143,7 @@ with Logging
       .map(_.asRight[String])
 
   }
-
+*/
 
   override def ?(
     patient: Id[Patient],
