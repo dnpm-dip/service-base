@@ -83,6 +83,7 @@ with Logging
     rs: Seq[Snapshot[PatientRecord]]
   ): Filter
 
+
   protected val ResultSetFrom: (Query.Id,Criteria,Seq[(Snapshot[PatientRecord],Criteria)]) => Results
  
 

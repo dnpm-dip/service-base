@@ -30,8 +30,7 @@ trait ResultSet[
 
   def id: Query.Id
 
-//  def results: Seq[(Snapshot[PatientRecord],Option[Criteria])]
-  def results: Seq[(Snapshot[PatientRecord],Criteria)]
+  def results: Seq[(Snapshot[PatientRecord],Option[Criteria])]
 
   
   protected def snapshots(
