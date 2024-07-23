@@ -11,6 +11,7 @@ import de.dnpm.dip.model.{
   Age,
   Site,
   Interval,
+  ClosedInterval,
   LeftClosedRightOpenInterval
 }
 
@@ -128,24 +129,33 @@ object Distribution
         val counter =
           Count.total(ages.size)
 
-        // Get minimum age, rounded down to multiple of step size
+        // Get minimum age, rounded down to next multiple of step size
         val min =
           ages.min
-            .pipe(_.value.toInt)
-            .pipe(n => n - (n % step))
+            .pipe(_.value)
+            .pipe(v => (v/step).floor.toInt * step)
 
-        // Get maximum age, rounded up to multiple of step size
+        // Get maximum age, rounded up to next multiple of step size
         val max =
           ages.max
-            .pipe(_.value.toInt)
-            .pipe(n => n + (n % step))
+            .pipe(_.value)
+            .pipe(
+              v =>
+                (v/step).ceil.toInt * step match {
+                  case max if max == min => max + step // ensure at least 1 interval is created even in case there's only one distinct age value, i.e. min == max
+                  case max => max
+                }
+            )
 
         Distribution(
           ages.size,
           LazyList
             .unfold(min)(
               l => (l + step) match {
-                case r if r <= max => Some(LeftClosedRightOpenInterval(l,r),r)
+                case r if r < max  => Some(LeftClosedRightOpenInterval(l,r),r)
+
+                case r if r == max => Some(ClosedInterval(l,r),r)
+
                 case _             => None
               }
             )
