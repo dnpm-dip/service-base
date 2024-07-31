@@ -25,9 +25,6 @@ trait ResultSet[
   import scala.language.reflectiveCalls
 
 
-  type SummaryType <: ResultSet.Summary
-
-
   def id: Query.Id
 
   def results: Seq[Query.Match[PatientRecord,Criteria]]
@@ -48,12 +45,6 @@ trait ResultSet[
       .collect {
         case Query.Match(Snapshot(patRec,_),_) if f(patRec) => patRec
       }
-
-
-  def summary(
-    f: PatientRecord => Boolean = _ => true
-  ): SummaryType
-
 
   def demographics(
     f: PatientRecord => Boolean = _ => true
@@ -124,6 +115,7 @@ object ResultSet
 
   final case class Demographics
   (
+    patientCount: Int,
     genderDistribution: Distribution[Coding[Gender.Value]],
     ageDistribution: Distribution[Interval[Int]],
     siteDistribution: Distribution[Coding[Site]]
@@ -133,22 +125,14 @@ object ResultSet
   {
     def on(patients: Seq[Patient]) =
       ResultSet.Demographics(
+        patients.size,
         Distribution.of(patients.map(_.gender)),
         Distribution.ofAge(patients.map(_.age)),
         Distribution.of(patients.flatMap(_.managingSite))
       )
+
+    implicit val writesDemographics: OWrites[Demographics] =
+      Json.writes[Demographics]
   }
-
-
-  trait Summary
-  {
-    val id: Query.Id
-    val patientCount: Int
-    val demographics: Demographics
-  }
-
-
-  implicit val writesDemographics: OWrites[Demographics] =
-    Json.writes[Demographics]
 
 }
