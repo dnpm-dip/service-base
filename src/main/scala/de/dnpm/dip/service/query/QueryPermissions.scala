@@ -60,7 +60,7 @@ abstract class QueryRoles(qp: QueryPermissions) extends Roles
       s"${useCase.toLowerCase}_privileged_query_rights",
       s"$useCase: Privilegierte Rechte Such-Modul",
       qp.permissions,
-      Some("MTB: Privilegierte Such-Rechte, d.h. Einsicht in Ergebnis-Zusammenfassungen UND in individuelle Patienten-Akten")
+      Some(s"$useCase: Privilegierte Such-Rechte, d.h. Einsicht in Ergebnis-Zusammenfassungen UND in individuelle Patienten-Akten")
     )
 
 
