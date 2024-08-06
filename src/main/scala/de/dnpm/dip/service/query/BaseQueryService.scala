@@ -262,7 +262,7 @@ with Logging
 
     def modeAndSites(
       mode: Coding[Query.Mode.Value],
-      optSites: Option[Set[Coding[Site]]]
+      sites: Option[Set[Coding[Site]]]
     ): (Coding[Query.Mode.Value],Set[Coding[Site]]) =
       mode match {
         case Query.Mode(Local) => 
@@ -270,7 +270,7 @@ with Logging
 
         case Query.Mode(Custom) => 
           //TODO: consider changing to return an error if site list is undefined on "custom" query
-          Coding(Custom) -> optSites.getOrElse(connector.otherSites + Site.local)
+          Coding(Custom) -> sites.getOrElse(connector.otherSites + Site.local)
 
         case _ => 
           Coding(Federated) -> (connector.otherSites + Site.local)
@@ -301,7 +301,8 @@ with Logging
             resultsBySite
               .values
               .map(_.toIor.toIorNel)
-              .reduce(_ combine _)
+              .reduceOption(_ combine _)
+              .getOrElse(Seq.empty.rightIor)
 
           errsOrQuery =
             errsOrResults.toEither match {
@@ -374,7 +375,8 @@ with Logging
                   resultsBySite
                     .values
                     .map(_.toIor.toIorNel)
-                    .reduce(_ combine _)
+                    .reduceOption(_ combine _)
+                    .getOrElse(Seq.empty.rightIor)
 
                 errsOrQuery =
                   errsOrResults.toEither match {
@@ -442,7 +444,6 @@ with Logging
     id: Query.Id,
     sites: Set[Coding[Site]],
     criteria: Option[Criteria]
-//    criteria: Criteria
   )(
     implicit
     env: Monad[F],
