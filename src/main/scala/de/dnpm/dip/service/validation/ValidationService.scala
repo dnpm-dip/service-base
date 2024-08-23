@@ -1,11 +1,14 @@
 package de.dnpm.dip.service.validation
 
 
+import java.time.LocalDateTime
 import scala.util.Either
 import cats.data.NonEmptyList
 import de.dnpm.dip.model.{
   Id,
+  Period,
   Patient,
+  PatientRecord
 }
 import de.dnpm.dip.service.Data.Error
 
@@ -83,4 +86,3 @@ trait ValidationService[
   ): F[Option[PatientRecord]]
 
 }
-

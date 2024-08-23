@@ -1,7 +1,10 @@
 package de.dnpm.dip.service.validation
 
 
-import java.time.Instant
+import java.time.{
+  LocalDateTime,
+  Instant
+}
 import scala.util.{
   Either,
   Left,
@@ -23,7 +26,10 @@ import de.dnpm.dip.util.Logging
 import de.dnpm.dip.model.{
   Id,
   Patient,
+  PatientRecord,
+  Site
 }
+import de.dnpm.dip.model.NGSReport.SequencingType
 import de.dnpm.dip.service.Data.{
   Error,
   FatalIssuesDetected,
@@ -32,7 +38,6 @@ import de.dnpm.dip.service.Data.{
 }
 import Issue.Severity
 import de.ekut.tbi.validation.Validator
-
 
 
 private final case class SeverityMatcher(
@@ -52,13 +57,13 @@ private object FatalIssues
 
 class BaseValidationService[
   F[+_],
-  PatientRecord <: { def patient: Patient }
+  T <: PatientRecord,
 ](
-  private val validator: Validator[Issue,PatientRecord],
-  private val repo: Repository[F,Monad[F],PatientRecord],
+  private val validator: Validator[Issue,T],
+  private val repo: Repository[F,Monad[F],T],
   private val maxSeverity: Severity.Value = Severity.Error
 )
-extends ValidationService[F,Monad[F],PatientRecord]
+extends ValidationService[F,Monad[F],T]
 with Logging
 {
 
@@ -78,12 +83,12 @@ with Logging
 
 
   override def validate(
-    data: PatientRecord
+    data: T
   )(
     implicit env: Monad[F]
-  ): F[Either[Error,Outcome[PatientRecord]]] = {
+  ): F[Either[Error,Outcome[T]]] = {
 
-    log.info("Performing simple PatientRecord validation (non-importing))")
+    log.info("Performing simple T validation (non-importing))")
 
     for {
       validationResult <- validator(data).pure
@@ -103,8 +108,8 @@ with Logging
           
             report match {
               case Acceptable()  => DataAcceptableWithIssues(data,report).asRight[Error]
-              case FatalIssues() => FatalIssuesDetected(report).asLeft[Outcome[PatientRecord]]
-              case _             => UnacceptableIssuesDetected(report).asLeft[Outcome[PatientRecord]]
+              case FatalIssues() => FatalIssuesDetected(report).asLeft[Outcome[T]]
+              case _             => UnacceptableIssuesDetected(report).asLeft[Outcome[T]]
             }
           
         }
@@ -112,47 +117,48 @@ with Logging
     } yield result
   }
 
+
   override def !(
-    cmd: Command[PatientRecord]
+    cmd: Command[T]
   )(
     implicit env: Monad[F] 
-  ): F[Either[Error,Outcome[PatientRecord]]] =
+  ): F[Either[Error,Outcome[T]]] =
     cmd match {
 
-      case Validate(data) =>
-        log.info(s"Validating PatientRecord ${data.patient.id} before import")
+      case Validate(record) =>
+        log.info(s"Validating T ${record.id} before import")
         for {
-          outcome <- validate(data)
+          outcome <- validate(record)
 
           result <- outcome match { 
             case Right(DataValid(_)) =>
               log.debug(s"Data valid: deleting previously saved validation reports")
               // In case this were a consecutive export which now turns out valid,
               // delete the patient's previously saved validationReport and record
-              repo.delete(data.patient.id)
+              repo.delete(record.patient.id)
               outcome.pure
             
             case Right(DataAcceptableWithIssues(_,report)) =>
-              log.debug(s"Data acceptable but with with issues: Saving data set and validation report")
-              repo.save(data,report)
+              log.debug(s"Data acceptable but with with issues: Saving record set and validation report")
+              repo.save(record,report)
                 .map {
                   case Right(_)  => outcome
-                  case Left(err) => GenericError(err).asLeft[Outcome[PatientRecord]]
+                  case Left(err) => GenericError(err).asLeft[Outcome[T]]
                 }
 
             case Left(UnacceptableIssuesDetected(report)) =>
-              log.debug(s"Unacceptable issues: Saving data set and validation report")
-              repo.save(data,report)
+              log.debug(s"Unacceptable issues: Saving record set and validation report")
+              repo.save(record,report)
                 .map {
                   case Right(_)  => outcome
-                  case Left(err) => GenericError(err).asLeft[Outcome[PatientRecord]]
+                  case Left(err) => GenericError(err).asLeft[Outcome[T]]
                 }
 
             case Left(_) => outcome.pure
 
             // Won't occur but required for exhaustive pattern match
             case Right(Deleted(_)) =>
-              GenericError("Unexpected validation outcome").asLeft[Outcome[PatientRecord]].pure
+              GenericError("Unexpected validation outcome").asLeft[Outcome[T]].pure
           }
 
         } yield result
@@ -162,7 +168,7 @@ with Logging
         log.info(s"Deleting all data of Patient $id")
         repo.delete(id).map {
           case Right(_)  => Deleted(id).asRight[Error]
-          case Left(err) => GenericError(err).asLeft[Outcome[PatientRecord]]
+          case Left(err) => GenericError(err).asLeft[Outcome[T]]
         }
 
     }
@@ -202,7 +208,7 @@ with Logging
     patId: Id[Patient]
   )(
     implicit env: Monad[F]
-  ): F[Option[PatientRecord]] =
+  ): F[Option[T]] =
     (repo ? patId).map(_.map(_._1))
 
 

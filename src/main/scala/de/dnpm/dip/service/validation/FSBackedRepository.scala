@@ -33,6 +33,7 @@ import de.dnpm.dip.model.{
 }
 
 
+
 class FSBackedRepository[
   F[_],
   PatientRecord <: { def patient: Patient }: Format
@@ -98,8 +99,7 @@ extends Repository[F,Monad[F],PatientRecord]
     report: ValidationReport
   )(
     implicit env: Monad[F]
-  ): F[Either[String,Unit]] = {
-
+  ): F[Either[String,Unit]] = 
     Using.resources(
       new FileWriter(file(data)),
       new FileWriter(file(report))
@@ -112,10 +112,9 @@ extends Repository[F,Monad[F],PatientRecord]
     }
     .asRight[String]
     .pure
-  }
 
 
-  def ?(
+  override def ?(
     filter: ValidationService.Filter
   )(
     implicit env: Monad[F]
@@ -123,8 +122,9 @@ extends Repository[F,Monad[F],PatientRecord]
     filter.severities match {
 
       case Some(severities) =>
-        cache.values.filter { case (_,report) => severities contains report.maxSeverity }
-         .pure
+        cache.values
+          .filter { case (_,report) => severities contains report.maxSeverity }
+          .pure
 
       case None =>
         cache.values.pure
@@ -132,16 +132,16 @@ extends Repository[F,Monad[F],PatientRecord]
     }
   
 
-  def ?(
+  override def ?(
     id: Id[Patient]
   )(
     implicit env: Monad[F]
   ): F[Option[(PatientRecord,ValidationReport)]] =
     cache.get(id)
       .pure
-  
 
-  def delete(
+
+  override def delete(
     id: Id[Patient]
   )(
     implicit env: Monad[F]

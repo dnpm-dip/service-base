@@ -27,15 +27,13 @@ class InMemRepository[F[_],PatientRecord] extends Repository[F,Monad[F],PatientR
     report: ValidationReport
   )(
     implicit env: Monad[F]
-  ): F[Either[String,Unit]] = {
-
-    db += report.patient -> (data,report)
-
-    ().asRight[String].pure
-  }
+  ): F[Either[String,Unit]] =
+    db.update(report.patient,data ->report)
+      .asRight[String]
+      .pure
 
 
-  def ?(
+  override def ?(
     filter: ValidationService.Filter
   )(
     implicit env: Monad[F]
@@ -53,16 +51,16 @@ class InMemRepository[F[_],PatientRecord] extends Repository[F,Monad[F],PatientR
     }
 
 
-  def ?(
+  override def ?(
     id: Id[Patient]
   )(
     implicit env: Monad[F]
   ): F[Option[(PatientRecord,ValidationReport)]] =
     db.get(id)
       .pure
-  
+ 
 
-  def delete(
+  override def delete(
     id: Id[Patient]
   )(
     implicit env: Monad[F]

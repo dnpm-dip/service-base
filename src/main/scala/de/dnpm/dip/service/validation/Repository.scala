@@ -6,10 +6,23 @@ import de.dnpm.dip.model.{
   Id,
   Patient
 }
+//import de.dnpm.dip.service.mvh.SubmissionReport
 
 
 trait Repository[F[_],Env,PatientRecord]
 {
+
+/*
+  import scala.language.implicitConversions
+
+  protected implicit def toPredicate(
+    filter: SubmissionReport.Filter
+  ): SubmissionReport => Boolean =
+    report =>
+      filter.creationPeriod
+        .map(_ contains report.createdAt)
+        .getOrElse(true)
+*/
 
   def save(
     data: PatientRecord,
@@ -31,7 +44,22 @@ trait Repository[F[_],Env,PatientRecord]
   )(
     implicit env: Env
   ): F[Option[(PatientRecord,ValidationReport)]]
-  
+
+/*
+  def save(
+    patient: Id[Patient],
+    sub: SubmissionReport
+  )(
+    implicit env: Env
+  ): F[Either[String,Unit]]
+
+
+  def ?(
+    filter: SubmissionReport.Filter
+  )(
+    implicit env: Env
+  ): F[Iterable[SubmissionReport]]
+*/
 
   def delete(
     id: Id[Patient]
