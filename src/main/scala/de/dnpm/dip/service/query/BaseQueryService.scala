@@ -32,7 +32,6 @@ import de.dnpm.dip.model.{
 import de.dnpm.dip.service.{
   Connector,
   ConnectionStatus,
-  Data
 }
 import play.api.libs.json.{
   Json,
@@ -225,26 +224,29 @@ with Logging
   }
 
 
+  import QueryService._
+
   override def !(
-    cmd: Data.Command[PatientRecord]
+    cmd: DataCommand[PatientRecord]
   )(
     implicit 
     env: Monad[F]
-  ): F[Either[Data.Error,Data.Outcome[PatientRecord]]] =
-    
+  ): F[Either[DataError,DataOutcome[PatientRecord]]] = {
+
     cmd match {
 
-      case Data.Save(dataSet) =>
+      case Save(dataSet) =>
         log.info(s"Saving new patient record")
         db.save(dataSet)
-          .map(_.leftMap(Data.GenericError(_)))
+          .map(_.leftMap(GenericError(_)))
 
-      case Data.Delete(patient) =>
+      case Delete(patient) =>
         log.info(s"Deleting all data for Patient $patient")
         db.delete(patient)
-          .map(_.leftMap(Data.GenericError(_)))
+          .map(_.leftMap(GenericError(_)))
 
     }
+  }
 
 
   import Query.Mode.{Local,Federated,Custom}

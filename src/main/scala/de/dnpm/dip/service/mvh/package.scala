@@ -90,7 +90,7 @@ object MVHPatientRecord
       unlift(MVHPatientRecord.unapply[T](_))
     )
 
-/*
+/*    
   import json.{
     Json => Js,
     Schema
@@ -100,9 +100,9 @@ object MVHPatientRecord
     Js.schema[Metadata]
 
   implicit def schema[T <: PatientRecord](
-    implicit schema: Schema[T]
+    implicit sch: Schema[T]
   ): Schema[MVHPatientRecord[T]] =
-    schema match {
+    sch match {
       case obj: Schema.`object`[T] =>
         obj.withField(
           "meta",
@@ -110,6 +110,7 @@ object MVHPatientRecord
           true
         )
         .asInstanceOf[Schema[MVHPatientRecord[T]]]
+
       case _ => ???
     }
 */    

@@ -36,11 +36,33 @@ import de.dnpm.dip.service.mvh.{
 }
 
 
-object Data
+final case class DataUpload[T]
+(
+  record: T,
+  meta: Option[Metadata]
+)
+object DataUpload
 {
+  import play.api.libs.json.{
+    JsPath,
+    Reads
+  }
+  import play.api.libs.functional.syntax._
 
+  implicit def reads[T: Reads]: Reads[DataUpload[T]] =
+    (
+      JsPath.read[T] and
+      (JsPath \ "metadata").readNullable[Metadata]
+    )(
+      DataUpload(_,_)
+    )
+}
+
+
+object Orchestrator
+{
   sealed trait Command[+T]
-  final case class Save[T](record: T) extends Command[T]
+  final case class Process[T <: PatientRecord](upload: DataUpload[T]) extends Command[T]
   final case class Delete(id: Id[Patient]) extends Command[Nothing]
 
   sealed trait Outcome[+T]
@@ -48,40 +70,28 @@ object Data
   final case class SavedWithIssues[T](snp: Snapshot[T], report: ValidationReport) extends Outcome[T]
   final case class Deleted(id: Id[Patient]) extends Outcome[Nothing]
 
-  sealed trait Error
-  final case class FatalIssuesDetected(report: ValidationReport) extends Error
-  final case class UnacceptableIssuesDetected(report: ValidationReport) extends Error
-  final case class GenericError(msg: String) extends Error
 
+  type Error = Either[ValidationService.Error,QueryService.DataError]
 
-  trait Ops[F[_],Env,PatientRecord]
+  object Error
   {
-    def !(cmd: Command[PatientRecord])(
-      implicit env: Env
-    ): F[Either[Error,Outcome[PatientRecord]]]
+    def apply[T](err: QueryService.DataError): Either[Error,Outcome[T]] =
+      err.asRight[ValidationService.Error].asLeft[Outcome[T]]
 
+    def apply[T](err: ValidationService.Error): Either[Error,Outcome[T]] =
+      err.asLeft[QueryService.DataError].asLeft[Outcome[T]]
   }
-
-}
-
-
-object Orchestrator
-{
-  sealed trait Command[+T]
-  final case class Process[T <: PatientRecord](record: T,meta: Option[Metadata] = None) extends Command[T]
-  final case class Delete(id: Id[Patient]) extends Command[Nothing]
 }
 
 final class Orchestrator[F[_],T <: PatientRecord: Completer]
 (
   validationService: ValidationService[F,Monad[F],T],
   mvhService: MVHService[F,Monad[F],T],
-  queryService: Data.Ops[F,Monad[F],T]
+  queryService: QueryService.DataOps[F,Monad[F],T]
 )
 {
 
-  import Data._
-  import Orchestrator.Process
+  import Orchestrator._
   import ValidationService.{
     Validate,
     DataValid,
@@ -94,11 +104,11 @@ final class Orchestrator[F[_],T <: PatientRecord: Completer]
     cmd: Orchestrator.Command[T]
   )(
     implicit env: Monad[F]
-  ): F[Either[Error,Data.Outcome[T]]] =
+  ): F[Either[Error,Orchestrator.Outcome[T]]] =
     cmd match {
-      case Process(rawRecord,mvhMetadata) =>
+      case Process(DataUpload(rawRecord,mvhMetadata)) =>
         for { 
-          record <- rawRecord.complete.pure  // Load completed record into Monad
+          record <- rawRecord.pure.map(_.complete)  // Load record into Monad
 
           validationOutcome <- (validationService ! Validate(record))
 
@@ -116,25 +126,33 @@ final class Orchestrator[F[_],T <: PatientRecord: Completer]
 
           result <- validationOutcome match {
             case Right(DataValid(_)) =>
-              queryService ! Save(record)
+              (queryService ! QueryService.Save(record)).map {
+                case Right(QueryService.Saved(snp)) => Saved(snp).asRight[Error]
+
+                // Can't occur but required for exhaustive pattern match
+                case Right(_)  => Error[T](QueryService.GenericError("Unexpected save outcome"))
+                 
+                case Left(err) => Error[T](err)
+              }
 
             case Right(DataAcceptableWithIssues(_,report)) =>
-              (queryService ! Save(record)).map(
-                _.flatMap {
-                  case Saved(snp) => SavedWithIssues(snp,report).asRight[Error]
+              (queryService ! QueryService.Save(record)).map {
+                case Right(QueryService.Saved(snp)) => SavedWithIssues(snp,report).asRight[Error]
 
-                  // Can't occur but required for exhaustive pattern match
-                  case _          => GenericError("Unexpected save outcome").asLeft[Outcome[T]]
-                }
-              )
-             
-            // Can't occur but required for exhaustive pattern match
-            case Right(ValidationService.Deleted(_))  =>
-              GenericError("Unexpected validation outcome").asLeft[Outcome[T]].pure
+                // Can't occur but required for exhaustive pattern match
+                case Right(_)  => Error[T](QueryService.GenericError("Unexpected save outcome"))
+                 
+                case Left(err) => Error[T](err)
+              }
 
             case Left(err)  =>
-              err.asLeft[Outcome[T]].pure
-            }
+              Error[T](err).pure
+
+            // Can't occur but required for exhaustive pattern match
+            case Right(del: ValidationService.Deleted)  =>
+              Error[T](ValidationService.GenericError("Unexpected validation outcome")).pure
+
+          }
 
         } yield result
 
@@ -142,87 +160,15 @@ final class Orchestrator[F[_],T <: PatientRecord: Completer]
       case Orchestrator.Delete(id) =>
         (
           validationService ! ValidationService.Delete(id),
-          queryService ! Delete(id)
+          queryService ! QueryService.Delete(id)
         )
         .mapN(
           (out,_) =>
-            out.bimap(
-              err => GenericError(err.toString),
-              _   => Deleted(id)
-            )
-        )
-    }
-
-}
-
-/*
-final class Orchestrator[F[_],PatientRecord: Completer]
-(
-  validationService: ValidationService[F,Monad[F],PatientRecord],
-  queryService: Data.Ops[F,Monad[F],PatientRecord],
-)
-extends Data.Ops[F,Monad[F],PatientRecord]
-{
-
-  import Data._ 
-  import ValidationService.{
-    Validate,
-    DataValid,
-    DataAcceptableWithIssues
-  }
-  import Completer.syntax._
-
-  
-  override def !(
-    cmd: Data.Command[PatientRecord]
-  )(
-    implicit env: Monad[F]
-  ): F[Either[Error,Data.Outcome[PatientRecord]]] =
-    cmd match {
-      case Save(rawRecord,meta) =>
-        for { 
-          record <- rawRecord.complete.pure  // Load completed record into Monad
-
-          validationOutcome <- (validationService ! Validate(record))
-
-          result <- validationOutcome match {
-            case Right(DataValid(_)) =>
-              queryService ! Save(record)
-
-            case Right(DataAcceptableWithIssues(_,report)) =>
-              (queryService ! Save(record)).map(
-                _.flatMap {
-                  case Saved(snp) => SavedWithIssues(snp,report).asRight[Error]
-
-                  // Can't occur but required for exhaustive pattern match
-                  case _          => GenericError("Unexpected save outcome").asLeft[Outcome[PatientRecord]]
-                }
-              )
-             
-            // Can't occur but required for exhaustive pattern match
-            case Right(ValidationService.Deleted(_))  =>
-              GenericError("Unexpected validation outcome").asLeft[Outcome[PatientRecord]].pure
-
-            case Left(err)  =>
-              err.asLeft[Outcome[PatientRecord]].pure
+            out match {
+              case Right(_)  => Deleted(id).asRight[Error]
+              case Left(err) => Error[T](err)
             }
-
-        } yield result
-
-
-      case Delete(id) =>
-        (
-          validationService ! ValidationService.Delete(id),
-          queryService ! Delete(id)
-        )
-        .mapN(
-          (out,_) =>
-            out.bimap(
-              err => GenericError(err.toString),
-              _   => Deleted(id)
-            )
         )
     }
 
 }
-*/

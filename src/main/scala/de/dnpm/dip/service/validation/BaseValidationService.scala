@@ -30,12 +30,15 @@ import de.dnpm.dip.model.{
   Site
 }
 import de.dnpm.dip.model.NGSReport.SequencingType
+/*
 import de.dnpm.dip.service.Data.{
   Error,
   FatalIssuesDetected,
   UnacceptableIssuesDetected,
   GenericError
 }
+*/
+import ValidationService._
 import Issue.Severity
 import de.ekut.tbi.validation.Validator
 

@@ -1,7 +1,6 @@
 package de.dnpm.dip.service.mvh
 
 
-//import scala.util.chaining._
 import scala.collection.concurrent.{
   Map,
   TrieMap
@@ -23,8 +22,7 @@ import de.dnpm.dip.model.{
 
 
 
-class InMemRepository[F[_],T <: PatientRecord]
-extends Repository[F,Monad[F],T]
+class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
 {
   type Env = Monad[F]
 

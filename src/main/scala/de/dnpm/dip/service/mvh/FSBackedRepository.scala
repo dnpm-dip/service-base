@@ -73,6 +73,7 @@ extends Repository[F,Monad[F],T]
   )(
     implicit env: Env
   ): F[Either[String,Unit]] = {
+
     val patId = mvhRecord.record.id
 
     Using.resources(

@@ -8,7 +8,7 @@ import de.dnpm.dip.model.{
   Snapshot,
   Site
 }
-import de.dnpm.dip.service.Data.{
+import QueryService.{
   Saved,
   Deleted
 }

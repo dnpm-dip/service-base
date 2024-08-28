@@ -10,7 +10,6 @@ import de.dnpm.dip.model.{
   Patient,
   PatientRecord
 }
-import de.dnpm.dip.service.Data.Error
 
 
 object ValidationService
@@ -20,11 +19,15 @@ object ValidationService
   final case class Validate[T](data: T) extends Command[T]
   final case class Delete(patient: Id[Patient]) extends Command[Nothing]
 
-
   sealed abstract class Outcome[+T]
   final case class DataValid[T](data: T) extends Outcome[T]
   final case class DataAcceptableWithIssues[T](data: T, report: ValidationReport) extends Outcome[T]
   final case class Deleted(patient: Id[Patient]) extends Outcome[Nothing]
+
+  sealed trait Error
+  final case class FatalIssuesDetected(report: ValidationReport) extends Error
+  final case class UnacceptableIssuesDetected(report: ValidationReport) extends Error
+  final case class GenericError(msg: String) extends Error
 
 
   final case class Filter

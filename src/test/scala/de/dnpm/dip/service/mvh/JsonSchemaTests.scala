@@ -58,7 +58,7 @@ class JsonSchemaTests extends AnyFlatSpec with Schemas
       useCase,
       Id(ttan),
       submissionType,
-      seqType,
+      Some(seqType),
       true
     )
 

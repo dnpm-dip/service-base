@@ -1,13 +1,13 @@
 package de.dnpm.dip.service.query
 
 
-import de.dnpm.dip.model.Patient
+import de.dnpm.dip.model.{PatientRecord => PatRec}
 
 
 trait UseCaseConfig 
 {
 
-  type PatientRecord <: { def patient: Patient }
+  type PatientRecord <: PatRec
 
   type Criteria
 
