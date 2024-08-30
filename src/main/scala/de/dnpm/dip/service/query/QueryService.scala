@@ -38,10 +38,10 @@ object QueryService
     
     import cats.syntax.functor._
     import scala.util.chaining._
-    import scala.language.implicitConversions
-    
-    
-    implicit def filterToPredicate(filter: Filter): PatientRecord => Boolean
+
+//    import scala.language.implicitConversions
+     
+//    implicit def filterToPredicate(filter: Filter): PatientRecord => Boolean
     
     
     def sites(

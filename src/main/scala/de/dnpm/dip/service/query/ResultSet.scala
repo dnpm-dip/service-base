@@ -15,6 +15,108 @@ import play.api.libs.json.{
   OWrites
 }
 
+
+trait ResultSet[
+  PatientRecord <: { def patient: Patient },
+  Criteria,
+]
+{
+
+  import scala.util.chaining._
+  import scala.language.reflectiveCalls
+
+  type Filter <: Filters[PatientRecord]
+
+
+  def id: Query.Id
+
+  def results: Seq[Query.Match[PatientRecord,Criteria]]
+
+  import scala.language.implicitConversions
+
+  protected implicit def toPredicate[F >: Filter](filter: F): PatientRecord => Boolean
+
+  
+  protected def snapshots(
+    f: PatientRecord => Boolean
+  ): Seq[Snapshot[PatientRecord]] =
+    results.collect {
+      case Query.Match(snp,_) if f(snp.data) => snp
+    }
+  
+
+  protected def patientRecords(
+    f: PatientRecord => Boolean
+  ): Seq[PatientRecord] = 
+    results.collect {
+      case Query.Match(Snapshot(patRec,_),_) if f(patRec) => patRec
+    }
+
+
+  def demographics[F >: Filter](
+    filter: F
+  ): ResultSet.Demographics = 
+    ResultSet.Demographics
+      .on(patientRecords(filter).map(_.patient))
+
+
+  def patientMatches[F >: Filter](
+    filter: F
+  ): Seq[PatientMatch[Criteria]] = {
+
+    val f: PatientRecord => Boolean = filter
+
+    results.collect {
+      case Query.Match(Snapshot(patRec,_),matchingCriteria) if f(patRec) =>
+        PatientMatch.of(
+          patRec.patient,
+          matchingCriteria
+        )
+     }
+
+  }
+
+
+  def patientRecord(
+    patId: Id[Patient]
+  ): Option[PatientRecord] =
+    results
+      .collectFirst {
+        case Query.Match(Snapshot(patRec,_),_) if patRec.patient.id == patId => patRec
+      }
+
+}
+
+
+object ResultSet
+{
+
+  final case class Demographics
+  (
+    patientCount: Int,
+    genderDistribution: Distribution[Coding[Gender.Value]],
+    ageDistribution: Distribution[Interval[Int]],
+    siteDistribution: Distribution[Coding[Site]]
+  )
+
+  object Demographics extends ReportingOps
+  {
+    def on(patients: Seq[Patient]) =
+      ResultSet.Demographics(
+        patients.size,
+        Distribution.of(patients.map(_.gender)),
+        Distribution.ofAge(patients.map(_.age)),
+        Distribution.of(patients.flatMap(_.managingSite))
+      )
+
+    implicit val writesDemographics: OWrites[Demographics] =
+      Json.writes[Demographics]
+  }
+
+}
+
+
+/*
 trait ResultSet[
   PatientRecord <: { def patient: Patient },
   Criteria
@@ -73,66 +175,6 @@ trait ResultSet[
       .collectFirst {
         case Query.Match(Snapshot(patRec,_),_) if patRec.patient.id == patId => patRec
       }
-
-/*
-  import scala.language.implicitConversions
-
-  protected implicit def toPredicate(filter: Filter): PatientRecord => Boolean
-
-  protected def records(filter: Filter): Seq[PatientRecord] = {
-
-    val f: PatientRecord => Boolean = filter
-
-    results
-      .collect {
-        case (Snapshot(patRec,_),_) if f(patRec) => patRec
-      }
-
-  }
-
-  def summary(f: Filter): SummaryType
-
-
-  def patientMatches(filter: Filter): Seq[PatientMatch[Criteria]] = {
-
-    val f: PatientRecord => Boolean = filter
-
-    results
-      .collect {
-        case (Snapshot(patRec,_),matchingCriteria) if f(patRec) =>
-          PatientMatch.of(
-            patRec.patient,
-            matchingCriteria
-          )
-      }
-  }
+}
 */
-}
 
-
-object ResultSet
-{
-
-  final case class Demographics
-  (
-    patientCount: Int,
-    genderDistribution: Distribution[Coding[Gender.Value]],
-    ageDistribution: Distribution[Interval[Int]],
-    siteDistribution: Distribution[Coding[Site]]
-  )
-
-  object Demographics extends ReportingOps
-  {
-    def on(patients: Seq[Patient]) =
-      ResultSet.Demographics(
-        patients.size,
-        Distribution.of(patients.map(_.gender)),
-        Distribution.ofAge(patients.map(_.age)),
-        Distribution.of(patients.flatMap(_.managingSite))
-      )
-
-    implicit val writesDemographics: OWrites[Demographics] =
-      Json.writes[Demographics]
-  }
-
-}

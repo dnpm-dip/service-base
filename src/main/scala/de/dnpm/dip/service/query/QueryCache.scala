@@ -103,6 +103,21 @@ with Logging
 
       log.debug("Running clean-up task for timed out Query sessions")
 
+      cache.filterInPlace {
+        case (_,(query,_)) => MINUTES.between(query.lastUpdate,now) < timeOut
+      }
+    },
+    cleanUpPeriod, // delay  
+    cleanUpPeriod, // period
+    SECONDS
+  )
+
+/*
+  executor.scheduleAtFixedRate(
+    () => {
+
+      log.debug("Running clean-up task for timed out Query sessions")
+
       for {
         (query,_) <- cache.values
         if (query.lastUpdate isBefore now.minus(timeOut,MINUTES))
@@ -116,7 +131,7 @@ with Logging
     cleanUpPeriod, // period
     SECONDS
   )
-
+*/
 
   private val touch: Query[Criteria,Filter] => Query[Criteria,Filter] =
     _.copy(lastUpdate = now)

@@ -20,6 +20,7 @@ import de.dnpm.dip.coding.hgvs.HGVS
 import de.dnpm.dip.coding.UnregisteredMedication
 import de.dnpm.dip.model.{
   Diagnosis,
+  History,
   Id,
   Interval,
   MedicationTherapy,
@@ -197,29 +198,6 @@ trait Validators
       hVal(coding.asInstanceOf[Coding[H]])
         .map(_.asInstanceOf[Coding[H :+: CNil]])
 
-/*
-  implicit def coproductCodingValidator[H, T <: Coproduct](
-    implicit
-    csp: CodeSystemProvider[H,cats.Id,Applicative[cats.Id]],
-    tVal: NegatableValidator[Issue.Builder,Coding[T]]
-  ): NegatableValidator[Issue.Builder,Coding[H :+: T]] =
-    coding =>
-      (
-        if (coding.system == csp.uri)
-          validate(coding.asInstanceOf[Coding[H]])
-        else
-          tVal(coding.asInstanceOf[Coding[T]])
-      )
-      .map(_.asInstanceOf[Coding[H :+: T]])
-      
-  
-  implicit def terminalCoproductCodingValidator[H](
-    implicit
-    csp: CodeSystemProvider[H,cats.Id,Applicative[cats.Id]]
-  ): NegatableValidator[Issue.Builder,Coding[H :+: CNil]] =
-    coding =>
-      validate(coding.asInstanceOf[Coding[H]]) map (_.asInstanceOf[Coding[H :+: CNil]])
-*/
 
   implicit val proteinChangeValidator: Validator[Issue,Coding[HGVS.Protein]] =
     coding =>
@@ -311,7 +289,5 @@ trait Validators
     valueValidator: Validator[Issue.Builder,O#ValueType]
   ): Validator[Issue,O] =
     ObservationValidator[O](valueValidator)
-
-
 
 }
