@@ -54,20 +54,20 @@ trait ResultSet[
 
 
   def demographics[F >: Filter](
-    filter: F
+    f: F
   ): ResultSet.Demographics = 
     ResultSet.Demographics
-      .on(patientRecords(filter).map(_.patient))
+      .on(patientRecords(f).map(_.patient))
 
 
   def patientMatches[F >: Filter](
-    filter: F
+    f: F
   ): Seq[PatientMatch[Criteria]] = {
 
-    val f: PatientRecord => Boolean = filter
+    val filter: PatientRecord => Boolean = f
 
     results.collect {
-      case Query.Match(Snapshot(patRec,_),matchingCriteria) if f(patRec) =>
+      case Query.Match(Snapshot(patRec,_),matchingCriteria) if filter(patRec) =>
         PatientMatch.of(
           patRec.patient,
           matchingCriteria

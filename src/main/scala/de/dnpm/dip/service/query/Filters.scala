@@ -6,6 +6,6 @@ import de.dnpm.dip.model.Patient
 
 trait Filters[+PatientRecord <: { def patient: Patient }]
 {
-  def patientFilter: PatientFilter
+  def patient: PatientFilter
 }
 
