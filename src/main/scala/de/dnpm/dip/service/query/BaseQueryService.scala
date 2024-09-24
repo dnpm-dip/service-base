@@ -83,7 +83,10 @@ with Logging
   ): Filter
 
 
-  protected val ResultSetFrom: (Query.Id,Seq[Query.Match[PatientRecord,Criteria]]) => Results
+  protected def ResultSetFrom(
+    query: Query[Criteria,Filter],
+    results: Seq[Query.Match[PatientRecord,Criteria]]
+  ): Results
  
 
   protected implicit val siteCompleter: Completer[Coding[Site]] = {
@@ -320,7 +323,8 @@ with Logging
                   cache.timeoutSeconds,
                   Instant.now
                 )
-                .tap(q => cache += (q -> ResultSetFrom(id,results)))
+                .tap(query => cache += query -> ResultSetFrom(query,results))
+//                .tap(q => cache += (q -> ResultSetFrom(id,results)))
                 .asRight
 
               case Right(_) =>
@@ -394,7 +398,8 @@ with Logging
                         cache.timeoutSeconds,
                         Instant.now
                       )
-                      .tap(q => cache += (q -> ResultSetFrom(id,results)))
+                      .tap(query => cache += query -> ResultSetFrom(query,results))
+//                      .tap(q => cache += (q -> ResultSetFrom(id,results)))
                       .asRight
       
                     case Right(_) =>
