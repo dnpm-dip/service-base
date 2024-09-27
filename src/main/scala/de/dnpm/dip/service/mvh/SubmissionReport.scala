@@ -6,8 +6,7 @@ import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
   Id,
   Period,
-  Site,
-  TransferTAN
+  Site
 }
 import de.dnpm.dip.model.NGSReport.SequencingType
 import play.api.libs.json.{

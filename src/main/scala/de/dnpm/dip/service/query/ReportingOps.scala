@@ -26,6 +26,9 @@ trait ReportingOps
     else 
       0.0
 
+  def mean[T: Numeric](t: T, ts: T*): Double =
+    mean(t +: ts)
+
 /*
   def mean[T: Numeric]: PartialFunction[Iterable[T],Double] = {
     case ts if ts.nonEmpty => Numeric[T].toDouble(ts.sum)/ts.size

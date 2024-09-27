@@ -12,8 +12,7 @@ import de.dnpm.dip.model.{
   Id,
   Patient,
   PatientRecord,
-  Site,
-  TransferTAN
+  Site
 }
 import de.dnpm.dip.model.NGSReport.SequencingType
 

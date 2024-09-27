@@ -16,7 +16,7 @@ import de.dnpm.dip.model.{
   Patient,
   PatientRecord,
   Site,
-  TransferTAN
+//  TransferTAN
 }
 import de.dnpm.dip.model.NGSReport.SequencingType
 import play.api.libs.json.{
@@ -27,6 +27,17 @@ import play.api.libs.json.{
   Writes,
   OWrites
 }
+
+// Transfer Transaction Number (Transfer-Vorgangs-Nummer)
+sealed trait TransferTAN
+/*
+object TransferTAN
+{
+  implicit val codingSystem: Coding.System[TransferTAN] =
+    Coding.System[TransferTAN]("mvh/transfer-vorgangs-nummer")
+}
+*/
+
 
 //-----------------------------------------------------------------------------
 
@@ -77,7 +88,7 @@ object MVHPatientRecord
   implicit def reads[T <: PatientRecord: Reads]: Reads[MVHPatientRecord[T]] =
     (
       JsPath.read[T] and
-      (JsPath \ "meta").read[Metadata]
+      (JsPath \ "metadata").read[Metadata]
     )(
       MVHPatientRecord(_,_)
     )
@@ -85,35 +96,11 @@ object MVHPatientRecord
   implicit def writes[T <: PatientRecord: Writes]: OWrites[MVHPatientRecord[T]] =
     (
       JsPath.write[T] and
-      (JsPath \ "meta").write[Metadata]
+      (JsPath \ "metadata").write[Metadata]
     )(
       unlift(MVHPatientRecord.unapply[T](_))
     )
 
-/*    
-  import json.{
-    Json => Js,
-    Schema
-  }
-
-  implicit val metadataSchema: Schema[Metadata] =
-    Js.schema[Metadata]
-
-  implicit def schema[T <: PatientRecord](
-    implicit sch: Schema[T]
-  ): Schema[MVHPatientRecord[T]] =
-    sch match {
-      case obj: Schema.`object`[T] =>
-        obj.withField(
-          "meta",
-          Schema[Metadata],
-          true
-        )
-        .asInstanceOf[Schema[MVHPatientRecord[T]]]
-
-      case _ => ???
-    }
-*/    
 }
 
 //-----------------------------------------------------------------------------

@@ -30,9 +30,12 @@ import de.dnpm.dip.service.query.{
   QueryService
 }
 import de.dnpm.dip.service.mvh.{
+  Consent,
   Metadata,
   MVHPatientRecord,
-  MVHService
+  MVHService,
+  SubmissionType,
+  TransferTAN
 }
 
 
@@ -41,10 +44,14 @@ final case class DataUpload[T]
   record: T,
   meta: Option[Metadata]
 )
+
+
 object DataUpload
 {
+
   import play.api.libs.json.{
     JsPath,
+    JsObject,
     Reads
   }
   import play.api.libs.functional.syntax._
@@ -56,6 +63,50 @@ object DataUpload
     )(
       DataUpload(_,_)
     )
+
+
+  object Schemas {
+
+    import json.{
+      Json,
+      Schema
+    }
+
+    implicit val submissionTypeSchema: Schema[SubmissionType.Value] =
+      Json.schema[SubmissionType.Value]
+        .toDefinition("MVH-SubmissionType")
+
+    implicit val ttanIdSchema: Schema[Id[TransferTAN]] =
+      Schema.`string`.asInstanceOf[Schema[Id[TransferTAN]]]
+
+    implicit val consentSchema: Schema[Consent] =
+      Schema.`object`.Free[JsObject]()
+        .asInstanceOf[Schema[Consent]]
+        .toDefinition("MVH-Consent")
+    
+    implicit val metadataSchema: Schema[Metadata] =
+      Json.schema[Metadata]
+        .toDefinition("MVH-Metadata")
+    
+//    implicit def schema[T <: PatientRecord](  
+    implicit def schema[T <: Product](
+      implicit sch: Schema[T]
+    ): Schema[DataUpload[T]] =
+      (
+        sch match {
+          case obj: Schema.`object`[T] =>
+            obj.withField(
+              "metadata",
+              Schema[Metadata],
+              false
+            )
+    
+          case _ => ??? // Cannot occur due to type bound T <: Product, but required for exhaustive pattern match
+        }
+      )
+      .asInstanceOf[Schema[DataUpload[T]]]
+  }
+
 }
 
 
