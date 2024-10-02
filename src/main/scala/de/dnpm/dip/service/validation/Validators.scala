@@ -206,26 +206,24 @@ trait Validators
       ) map (_ => coding)
 
       
-  implicit def referenceValidator[T: HasId](
+  implicit def referenceValidator[T <: { def id: Id[_] }](
     implicit
     ts: Iterable[T],
     node: Path.Node[T],
   ): NegatableValidator[Issue.Builder,Reference[T]] =
-    ref =>
-      ref.resolveOn(ts) must be (defined) otherwise (
-        Fatal(s"Nicht auflösbare Referenz-ID '${ref.id.getOrElse("N/A")}' auf Objekt '${node.name}'")
-      ) map (_ => ref)
+    ref => ref.resolve must be (defined) otherwise (
+      Fatal(s"Nicht auflösbare Referenz-ID '${ref.id.getOrElse("N/A")}' auf Objekt '${node.name}'")
+    ) map (_ => ref)
 
 
-  implicit def referenceValidatorTo[T: HasId](
+  implicit def referenceValidatorTo[T <: { def id: Id[_] }](
     implicit
     t: T,
     node: Path.Node[T],
   ): NegatableValidator[Issue.Builder,Reference[T]] =
-    ref =>
-      ref.resolveOn(List(t)) must be (defined) otherwise (
-        Fatal(s"Nicht auflösbare Referenz-ID '${ref.id.getOrElse("N/A")}' auf Objekt '${node.name}'")
-      ) map (_ => ref)
+    ref => ref.resolveOn(List(t)) must be (defined) otherwise (
+      Fatal(s"Nicht auflösbare Referenz-ID '${ref.id.getOrElse("N/A")}' auf Objekt '${node.name}'")
+    ) map (_ => ref)
 
 
   implicit val patientValidator: Validator[Issue,Patient] =

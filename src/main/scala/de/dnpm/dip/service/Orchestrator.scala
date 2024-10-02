@@ -74,7 +74,7 @@ object DataUpload
 
     implicit val submissionTypeSchema: Schema[SubmissionType.Value] =
       Json.schema[SubmissionType.Value]
-        .toDefinition("MVH-SubmissionType")
+        .toDefinition("MVH_SubmissionType")
 
     implicit val ttanIdSchema: Schema[Id[TransferTAN]] =
       Schema.`string`.asInstanceOf[Schema[Id[TransferTAN]]]
@@ -82,11 +82,11 @@ object DataUpload
     implicit val consentSchema: Schema[Consent] =
       Schema.`object`.Free[JsObject]()
         .asInstanceOf[Schema[Consent]]
-        .toDefinition("MVH-Consent")
+        .toDefinition("MVH_Consent")
     
     implicit val metadataSchema: Schema[Metadata] =
       Json.schema[Metadata]
-        .toDefinition("MVH-Metadata")
+        .toDefinition("MVH_Metadata")
     
 //    implicit def schema[T <: PatientRecord](  
     implicit def schema[T <: Product](

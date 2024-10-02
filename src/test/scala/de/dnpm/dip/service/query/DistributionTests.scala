@@ -21,7 +21,7 @@ class DistributionTests extends AnyFlatSpec
         List(30,42,33,56,65)
       )
       .map(_.map(Age(_)))
-      .map(ages => ages -> Distribution.ofAge(ages))
+      .map(ages => ages -> Distribution.of(ages))
 
     forAll (dists){
       case ages -> dist =>

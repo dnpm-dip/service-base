@@ -115,40 +115,39 @@ object Distribution
     by(ts)(identity)
 
 
-
-  def ofAge(
-    values: Seq[Age],
-    step: Int = 5
+  def binned[T](
+    values: Seq[T],
+    step: Int
+  )(
+    implicit num: Numeric[T]
   ): Distribution[Interval[Int]] = {
 
     import Interval._  // for syntax "x isIn interval"
 
     values match {
-      case ages if ages.nonEmpty =>
+      case ts if ts.nonEmpty =>
 
         val counter =
-          Count.total(ages.size)
+          Count.total(ts.size)
 
-        // Get minimum age, rounded down to next multiple of step size
+        // Get minimum value, rounded down to next multiple of step size
         val min =
-          ages.min
-            .pipe(_.value)
-            .pipe(v => (v/step).floor.toInt * step)
+          ts.min
+            .pipe(v => (num.toDouble(v)/step).floor.toInt * step)
 
-        // Get maximum age, rounded up to next multiple of step size
+        // Get maximum value, rounded up to next multiple of step size
         val max =
-          ages.max
-            .pipe(_.value)
+          ts.max
             .pipe(
               v =>
-                (v/step).ceil.toInt * step match {
+                (num.toDouble(v)/step).ceil.toInt * step match {
                   case max if max == min => max + step // ensure at least 1 interval is created even in case there's only one distinct age value, i.e. min == max
                   case max => max
                 }
             )
 
         Distribution(
-          ages.size,
+          ts.size,
           LazyList
             .unfold(min)(
               l => (l + step) match {
@@ -163,7 +162,7 @@ object Distribution
               range =>
                 ConceptCount(
                   range,
-                  counter(ages count (_.value.toInt isIn range))
+                  counter(ts count (t => num.toInt(t) isIn range))
                 )
             )
         )
@@ -177,52 +176,15 @@ object Distribution
 
   }
 
-
-  def binned[T](
-    values: Seq[T],
-    binSize: T,
-  )(
-    implicit num: Numeric[T]
-  ): Distribution[Interval[T]] = {
-
-    values match {
-
-      case ts if ts.nonEmpty =>
-
-        val counter =
-          Count.total(ts.size)
-
-        val min = ts.min
-
-        val max = ts.max
-
-        Distribution(
-          ts.size,
-          LazyList
-            .unfold(min)(
-              s => num.plus(s,binSize) match {
-                case t if num.lteq(t,max) => Some(LeftClosedRightOpenInterval(s,t),t)
-                case _ => None
-              }
-            )
-            .map(
-              range =>
-                ConceptCount(
-                  range,
-                  counter(ts count (range.contains))
-                )
-            )
-        )
-
-      case _ =>
-        Distribution(
-          0,
-          Seq.empty
-        )
-
-    }
-
-  }
+  
+  def of(
+    values: Seq[Age],
+    step: Int = 5
+  ): Distribution[Interval[Int]] =
+    binned(
+      values.map(_.value),
+      step
+    )
 
 
   def byParentAndBy[T,U](

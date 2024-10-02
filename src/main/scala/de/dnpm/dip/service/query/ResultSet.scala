@@ -105,7 +105,7 @@ object ResultSet
       ResultSet.Demographics(
         patients.size,
         Distribution.of(patients.map(_.gender)),
-        Distribution.ofAge(patients.map(_.age)),
+        Distribution.of(patients.map(_.age)),
         Distribution.of(patients.flatMap(_.managingSite))
       )
 
@@ -114,4 +114,3 @@ object ResultSet
   }
 
 }
-
