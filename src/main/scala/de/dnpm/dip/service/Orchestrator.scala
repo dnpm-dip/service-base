@@ -78,6 +78,7 @@ object DataUpload
 
     implicit val ttanIdSchema: Schema[Id[TransferTAN]] =
       Schema.`string`.asInstanceOf[Schema[Id[TransferTAN]]]
+        .toDefinition("TransferTAN")
 
     implicit val consentSchema: Schema[Consent] =
       Schema.`object`.Free[JsObject]()

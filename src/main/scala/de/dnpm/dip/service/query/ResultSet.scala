@@ -36,6 +36,9 @@ trait ResultSet[
 
   protected implicit def toPredicate[F >: Filter](filter: F): PatientRecord => Boolean
 
+
+  def defaultFilter: Filter
+
   
   protected def snapshots(
     f: PatientRecord => Boolean

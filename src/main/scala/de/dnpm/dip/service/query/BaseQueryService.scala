@@ -319,12 +319,11 @@ with Logging
                   mode,
                   ConnectionStatus.from(resultsBySite),
                   criteria,
-                  DefaultFilter(results.map(_.record)),
+               DefaultFilter(results.map(_.record)),  //TODO: remove
                   cache.timeoutSeconds,
                   Instant.now
                 )
                 .tap(query => cache += query -> ResultSetFrom(query,results))
-//                .tap(q => cache += (q -> ResultSetFrom(id,results)))
                 .asRight
 
               case Right(_) =>

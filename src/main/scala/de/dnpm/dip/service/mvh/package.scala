@@ -30,13 +30,6 @@ import play.api.libs.json.{
 
 // Transfer Transaction Number (Transfer-Vorgangs-Nummer)
 sealed trait TransferTAN
-/*
-object TransferTAN
-{
-  implicit val codingSystem: Coding.System[TransferTAN] =
-    Coding.System[TransferTAN]("mvh/transfer-vorgangs-nummer")
-}
-*/
 
 
 //-----------------------------------------------------------------------------
