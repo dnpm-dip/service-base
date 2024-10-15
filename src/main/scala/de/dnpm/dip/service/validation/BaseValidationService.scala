@@ -83,7 +83,7 @@ with Logging
     implicit env: Monad[F]
   ): F[Either[Error,Outcome[T]]] = {
 
-    log.info("Performing simple T validation (non-importing))")
+    log.info("Performing PatientRecord validation")
 
     for {
       validationResult <- validator(data).pure
@@ -121,7 +121,7 @@ with Logging
     cmd match {
 
       case Validate(record) =>
-        log.info(s"Validating T ${record.id} before import")
+        log.info(s"Processing PatientRecord upload ${record.id}")
         for {
           outcome <- validate(record)
 

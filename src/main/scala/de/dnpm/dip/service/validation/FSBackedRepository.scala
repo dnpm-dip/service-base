@@ -27,6 +27,7 @@ import play.api.libs.json.{
   Reads,
   Writes
 }
+import de.dnpm.dip.util.Logging
 import de.dnpm.dip.model.{
   Id,
   Patient
@@ -44,6 +45,7 @@ class FSBackedRepository[
   implicit classTag: ClassTag[PatientRecord]
 )
 extends Repository[F,Monad[F],PatientRecord]
+with Logging
 {
 
   import scala.language.reflectiveCalls
@@ -69,30 +71,37 @@ extends Repository[F,Monad[F],PatientRecord]
     Json.toJson(t) pipe Json.prettyPrint
 
 
-  private def readAsJson[T: Reads]: InputStream => T =
-    Json.parse(_)
+  private def readJson[T: Reads](file: File): T =
+    Json.parse(new FileInputStream(file))
       .pipe(Json.fromJson[T](_)) 
+      .tap(
+        _.fold(
+          errs => log.error(s"Error(s) occurred parsing file $file: \n${errs.toString}"),
+          _ => ()
+        )
+      )
       .pipe(_.get)
 
 
-  private val cache: Map[Id[Patient],(PatientRecord,ValidationReport)] =
+  private val cache: Map[Id[Patient],(PatientRecord,ValidationReport)] = {
+
+    log.debug(s"Loading persisted data from $dataDir into cache")
+
     TrieMap.from(
       dataDir.listFiles(
         (_,name) => (name startsWith prefix) && (name endsWith ".json")
       )
       .to(LazyList)
-      .map(new FileInputStream(_))
-      .map(readAsJson[PatientRecord])
+      .map(readJson[PatientRecord])
       .map {
         record =>
           val report =
-            new FileInputStream(reportFile(record.patient.id))
-              .pipe(readAsJson[ValidationReport])
+            readJson[ValidationReport](reportFile(record.patient.id))
 
           record.patient.id -> (record -> report)
       }
     )
-  
+  }
 
   override def save(
     data: PatientRecord,

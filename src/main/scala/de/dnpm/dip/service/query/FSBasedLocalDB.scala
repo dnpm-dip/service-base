@@ -31,7 +31,8 @@ import QueryService.{
 }
 import play.api.libs.json.{
   Json,
-  Format
+  Format,
+  Reads
 }
 
 
@@ -89,6 +90,17 @@ with Logging
     new File(dataDir,fileName(snp.data.patient.id,snp.timestamp))
 
 
+  private def readJson[T: Reads](file: File): T =
+    Json.parse(new FileInputStream(file))
+      .pipe(Json.fromJson[T](_))
+      .tap(
+        _.fold(
+          errs => log.error(s"Error(s) occurred parsing file $file: \n${errs.toString}"),
+          _ => ()
+        )
+      )
+      .pipe(_.get)
+
 
   private val cache: Map[Id[Patient],Snapshot[PatientRecord]] = {
 
@@ -108,26 +120,18 @@ with Logging
       (_,name) => (name startsWith prefix) && (name endsWith ".json")
     )
     .to(LazyList)
-    .map(inputStream)
-    .map(Json.parse)
-    .map(Json.fromJson[Snapshot[PatientRecord]](_))
-    .tapEach( 
-      _.fold(
-        _.map(_.toString).foreach(log.error),
-        _ => ()
-      ) 
-    )
-    .map(_.get)
+    .map(readJson[Snapshot[PatientRecord]])
     // Lazily accumulate only the latest snapshot of each patient record,
     // instead of using groupyBy(patientId) and then picking the latest snapshot,
     // which requires all to be loaded into memory, whereas with this 
-    // implementation, elements can be garbage.collected along the way
+    // implementation, elements can be garbage-collected along the way
     .foldLeft(TrieMap.empty[Id[Patient],Snapshot[PatientRecord]]){ 
       (acc,snp) =>
         acc.updateWith(snp.data.patient.id){
           case Some(s) =>
             if (snp.timestamp > s.timestamp) Some(snp)
             else Some(s)
+
           case None => Some(snp)
         }
         acc
@@ -223,27 +227,6 @@ with Logging
 
   }
 
-/*
-  override def ?(
-    criteria: Criteria
-  )(
-    implicit env: C[F]
-  ): F[Either[String,Seq[(Snapshot[PatientRecord],Criteria)]]] = {
-
-    val matcher = criteriaMatcher(criteria)
-          
-    cache.values
-      .map(snp => snp -> matcher(snp.data))
-      .collect {
-        case (snp,Some(matches)) => snp -> matches
-      }
-      .toSeq
-            
-    .pure
-    .map(_.asRight[String])
-
-  }
-*/
 
   override def ?(
     patient: Id[Patient],
@@ -262,11 +245,8 @@ with Logging
             (_,name) => name == fileName(patient,snpId)
           )
           .headOption
-          .map(inputStream)
-          .map(Json.parse)
-          .map(Json.fromJson[Snapshot[PatientRecord]](_))
-          .map(_.get)
-      
+          .map(readJson[Snapshot[PatientRecord]])
+
         case None =>
           cache.get(patient)
       

@@ -26,9 +26,7 @@ final case class PatientFilter
   vitalStatus: Option[Set[Coding[VitalStatus.Value]]],
   site: Option[Set[Coding[Site]]]
 )
-//extends (Patient => Boolean)
 {
-//  override def apply(patient: Patient): Boolean = {
   def apply(patient: Patient): Boolean = {
 
     import VitalStatus._
