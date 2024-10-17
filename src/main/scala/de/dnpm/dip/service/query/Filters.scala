@@ -8,4 +8,3 @@ trait Filters[+PatientRecord <: { def patient: Patient }]
 {
   def patient: PatientFilter
 }
-

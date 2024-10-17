@@ -26,22 +26,13 @@ final case class PatientFilter
   vitalStatus: Option[Set[Coding[VitalStatus.Value]]],
   site: Option[Set[Coding[Site]]]
 )
-{
-  def apply(patient: Patient): Boolean = {
-
-    import VitalStatus._
-
-    gender.fold(true)(_ contains patient.gender) &&
-    ageRange.fold(true)(_ contains patient.age.value.toInt) &&
-    vitalStatus.fold(true)(_ contains patient.vitalStatus) &&
-    site.fold(true)(sites => patient.managingSite exists (c => sites exists (_.code == c.code)))
-  }
-
-}
 
 
 object PatientFilter
 {
+
+  type PatientRecord = { def patient: Patient }
+
 
   def from(patients: Seq[Patient]): PatientFilter = {
 
@@ -79,8 +70,9 @@ object PatientFilter
 
   }
 
-  def on[PatientRecord <: { def patient: Patient }](
-    records: Seq[PatientRecord]
+
+  def on[T <: PatientRecord](
+    records: Seq[T]
   ): PatientFilter = {
 
     import scala.language.reflectiveCalls
@@ -115,5 +107,24 @@ object PatientFilter
 
   implicit val format: OWrites[PatientFilter] =
     Json.writes[PatientFilter]
+
+
+
+  object Extensions
+  {
+
+    implicit class PatientFilterOps(val filter: PatientFilter) extends AnyVal {
+    
+      def apply(patient: Patient): Boolean = {
+    
+        filter.gender.fold(true)(_ contains patient.gender) &&
+        filter.ageRange.fold(true)(_ contains patient.age.value.toInt) &&
+        filter.vitalStatus.fold(true)(_ contains patient.vitalStatus) &&
+        filter.site.fold(true)(sites => patient.managingSite exists (c => sites exists (_.code == c.code)))
+      }
+    
+    }
+
+  }
 
 }
