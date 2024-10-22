@@ -113,7 +113,7 @@ object PatientFilter
   object Extensions
   {
 
-    implicit class PatientFilterOps(val filter: PatientFilter) extends AnyVal {
+    implicit class PatientPredicate(val filter: PatientFilter) extends AnyVal {
     
       def apply(patient: Patient): Boolean = {
     
