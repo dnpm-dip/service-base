@@ -33,16 +33,11 @@ object QueryService
     type PatientRecord = UseCase#PatientRecord
     type Criteria      = UseCase#Criteria
     type Results       = UseCase#Results
-    type Filter        = UseCase#Filter
     
     
     import cats.syntax.functor._
     import scala.util.chaining._
 
-//    import scala.language.implicitConversions
-     
-//    implicit def filterToPredicate(filter: Filter): PatientRecord => Boolean
-    
     
     def sites(
       implicit env: Env
@@ -50,12 +45,12 @@ object QueryService
     
     
     def !(
-      cmd: Query.Command[Criteria,Filter]
+      cmd: Query.Command[Criteria]
     )(
       implicit
       env: Env,
       querier: Querier
-    ): F[Either[Query.Error,Query[Criteria,Filter]]]
+    ): F[Either[Query.Error,Query[Criteria]]]
     
     
     def get(
@@ -64,7 +59,7 @@ object QueryService
       implicit
       env: Env,
       querier: Querier
-    ): F[Option[Query[Criteria,Filter]]]
+    ): F[Option[Query[Criteria]]]
     
     
     // For Admin purposes
@@ -72,7 +67,7 @@ object QueryService
       implicit
       env: Env,
       querier: Querier
-    ): F[Seq[Query[Criteria,Filter]]]
+    ): F[Seq[Query[Criteria]]]
     
    
     def resultSet(

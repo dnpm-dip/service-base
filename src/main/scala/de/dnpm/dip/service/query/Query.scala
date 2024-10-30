@@ -38,18 +38,14 @@ object Querier
 }
 
 
-
-final case class Query[
-  Criteria,
-  Filter <: Filters[_]
-](
+final case class Query[Criteria]
+(
   id: Query.Id,
   submittedAt: LocalDateTime,
   querier: Querier,
   mode: Coding[Query.Mode.Value],
   peers: Seq[ConnectionStatus],
   criteria: Option[Criteria],
-  filters: Filter,
   expiresAfter: Int,
   lastUpdate: Instant
 )
@@ -88,7 +84,7 @@ object Query
   }
 
 
-  sealed abstract class Command[+Criteria,+Filter <: Filters[_]]
+  sealed abstract class Command[+Criteria]
 
   final case class Submit[Criteria]
   ( 
@@ -96,7 +92,7 @@ object Query
     sites: Option[Set[Coding[Site]]],
     criteria: Option[Criteria]
   )
-  extends Command[Criteria,Nothing]
+  extends Command[Criteria]
 
   final case class Update[Criteria]
   ( 
@@ -105,12 +101,12 @@ object Query
     sites: Option[Set[Coding[Site]]],
     criteria: Option[Criteria]
   )
-  extends Command[Criteria,Nothing]
+  extends Command[Criteria]
 
   final case class Delete( 
     id: Id,
   )
-  extends Command[Nothing,Nothing]
+  extends Command[Nothing]
 
 
 
@@ -140,11 +136,8 @@ object Query
   implicit val formatQueryId: Format[Id] =
     Json.valueFormat[Id]
 
-  implicit def formatQuery[
-    Criteria: Writes,
-    Filter <: Filters[_]: Writes
-  ]: OWrites[Query[Criteria,Filter]] =
-    Json.writes[Query[Criteria,Filter]]
+  implicit def formatQuery[Criteria: Writes]: OWrites[Query[Criteria]] =
+    Json.writes[Query[Criteria]]
 
   implicit def formatSubmit[Criteria: Format]: Format[Submit[Criteria]] =
     Json.format[Submit[Criteria]]

@@ -10,7 +10,6 @@ import de.dnpm.dip.model.Snapshot
 
 trait QueryCache[
   Criteria,
-  Filter <: Filters[_],
   Results,
   PatientRecord
 ]{
@@ -21,18 +20,18 @@ trait QueryCache[
   def newQueryId: Query.Id
 
   def add(
-    queryWithResults: (Query[Criteria,Filter],Results)
+    queryWithResults: (Query[Criteria],Results)
   ): Unit
 
   final def += (
-    queryWithResults: (Query[Criteria,Filter],Results)
+    queryWithResults: (Query[Criteria],Results)
   ) = add(queryWithResults)
 
-  def queries: Seq[Query[Criteria,Filter]]
+  def queries: Seq[Query[Criteria]]
 
-  def get(id: Query.Id): Option[(Query[Criteria,Filter],Results)]
+  def get(id: Query.Id): Option[(Query[Criteria],Results)]
 
-  def getQuery(id: Query.Id): Option[Query[Criteria,Filter]] =
+  def getQuery(id: Query.Id): Option[Query[Criteria]] =
     self.get(id).map(_._1)
 
   def getResults(id: Query.Id): Option[Results] =
@@ -49,13 +48,11 @@ trait QueryCache[
 
 class BaseQueryCache[
   Criteria,
-  Filter <: Filters[_],
   Results,
   PatientRecord
 ]
 extends QueryCache[
   Criteria,
-  Filter,
   Results,
   PatientRecord
 ]
@@ -70,7 +67,7 @@ with Logging
   import scala.collection.concurrent._
 
 
-  private val cache: Map[Query.Id,(Query[Criteria,Filter],Results)] =
+  private val cache: Map[Query.Id,(Query[Criteria],Results)] =
     TrieMap.empty
 
 
@@ -112,28 +109,8 @@ with Logging
     SECONDS
   )
 
-/*
-  executor.scheduleAtFixedRate(
-    () => {
 
-      log.debug("Running clean-up task for timed out Query sessions")
-
-      for {
-        (query,_) <- cache.values
-        if (query.lastUpdate isBefore now.minus(timeOut,MINUTES))
-      }{
-        log.info(s"Removing timed out Query ${query.id.value}")
-        remove(query.id)
-      }
-
-    },
-    cleanUpPeriod, // delay  
-    cleanUpPeriod, // period
-    SECONDS
-  )
-*/
-
-  private val touch: Query[Criteria,Filter] => Query[Criteria,Filter] =
+  private val touch: Query[Criteria] => Query[Criteria] =
     _.copy(lastUpdate = now)
 
 
@@ -142,18 +119,18 @@ with Logging
   
 
   override def add(
-    queryWithResults: (Query[Criteria,Filter],Results)
+    queryWithResults: (Query[Criteria],Results)
   ): Unit =
     cache += (queryWithResults._1.id -> queryWithResults)
   
 
-  override def queries: Seq[Query[Criteria,Filter]] =
+  override def queries: Seq[Query[Criteria]] =
     cache.values
       .map(_._1)
       .toSeq
 
 
-  override def get(id: Query.Id): Option[(Query[Criteria,Filter],Results)] = 
+  override def get(id: Query.Id): Option[(Query[Criteria],Results)] = 
     cache.updateWith(id){
       case Some(query -> results) => Some(touch(query) -> results)
       case _          => None

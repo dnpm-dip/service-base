@@ -67,7 +67,7 @@ with Logging
   protected val preparedQueryDB: PreparedQueryDB[F,Monad[F],Criteria,String]
   protected val db: LocalDB[F,Monad[F],Criteria,PatientRecord]
   protected val connector: Connector[F,Monad[F]]
-  protected val cache: QueryCache[Criteria,Filter,Results,PatientRecord] 
+  protected val cache: QueryCache[Criteria,Results,PatientRecord] 
 
 
   protected implicit val criteriaCompleter: Completer[Criteria]
@@ -78,13 +78,9 @@ with Logging
   protected val CriteriaExpander: Completer[Criteria]
 
 
-  protected def DefaultFilter(
-    rs: Seq[Snapshot[PatientRecord]]
-  ): Filter
-
 
   protected def ResultSetFrom(
-    query: Query[Criteria,Filter],
+    query: Query[Criteria],
     results: Seq[Query.Match[PatientRecord,Criteria]]
   ): Results
  
@@ -255,12 +251,12 @@ with Logging
   import Query.Mode.{Local,Federated,Custom}
 
   override def !(
-    cmd: Query.Command[Criteria,Filter]
+    cmd: Query.Command[Criteria]
   )(
     implicit
     env: Monad[F],
     querier: Querier
-  ): F[Either[Query.Error,Query[Criteria,Filter]]] = {
+  ): F[Either[Query.Error,Query[Criteria]]] = {
 
     import cats.syntax.apply._
     import cats.instances.list._
@@ -312,14 +308,13 @@ with Logging
           errsOrQuery =
             errsOrResults.toEither match {
               case Right(results) if (results.nonEmpty) =>
-                Query[Criteria,Filter](
+                Query[Criteria](
                   id,
                   LocalDateTime.now,
                   querier,
                   mode,
                   ConnectionStatus.from(resultsBySite),
                   criteria,
-               DefaultFilter(results.map(_.record)),  //TODO: remove
                   cache.timeoutSeconds,
                   Instant.now
                 )
@@ -386,19 +381,17 @@ with Logging
                 errsOrQuery =
                   errsOrResults.toEither match {
                     case Right(results) if (results.nonEmpty) =>
-                      Query[Criteria,Filter](
+                      Query[Criteria](
                         id,
                         LocalDateTime.now,
                         querier,
                         mode,
                         ConnectionStatus.from(resultsBySite),
                         criteria,
-                        DefaultFilter(results.map(_.record)),
                         cache.timeoutSeconds,
                         Instant.now
                       )
                       .tap(query => cache += query -> ResultSetFrom(query,results))
-//                      .tap(q => cache += (q -> ResultSetFrom(id,results)))
                       .asRight
       
                     case Right(_) =>
@@ -502,7 +495,7 @@ with Logging
     implicit
     env: Monad[F],
     querier: Querier
-  ): F[Seq[Query[Criteria,Filter]]] = {
+  ): F[Seq[Query[Criteria]]] = {
 
     log.info(s"Getting current Queries for $querier")
 
@@ -517,7 +510,7 @@ with Logging
     implicit
     env: Monad[F],
     querier: Querier
-  ): F[Option[Query[Criteria,Filter]]] = {
+  ): F[Option[Query[Criteria]]] = {
 
     log.info(s"Getting Query $id for $querier")
 

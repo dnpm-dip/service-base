@@ -18,7 +18,7 @@ import play.api.libs.json.{
 
 trait ResultSet[
   PatientRecord <: { def patient: Patient },
-  Criteria,
+  Criteria
 ]
 {
 
@@ -31,6 +31,7 @@ trait ResultSet[
   def id: Query.Id
 
   def results: Seq[Query.Match[PatientRecord,Criteria]]
+
 
   import scala.language.implicitConversions
 
