@@ -9,7 +9,6 @@ import play.api.libs.json.{
 }
 import de.dnpm.dip.model.{
   Age,
-  Site,
   Interval,
   ClosedInterval,
   LeftClosedRightOpenInterval
@@ -61,14 +60,7 @@ object Distribution
       .sorted
   }
 
-  implicit def semigroup[T]: Semigroup[Distribution[T]] = {
-
-    implicit def conceptCountSemigroup(
-      implicit counter: Int => Count
-    ): Semigroup[ConceptCount[T]] =
-      Semigroup.instance { combine(_,_) }
-
-
+  implicit def semigroup[T]: Semigroup[Distribution[T]] =
     Semigroup.instance { 
       (d1,d2) =>
         implicit val counter =
@@ -79,7 +71,6 @@ object Distribution
           combineAll(d1.elements,d2.elements)
         )
     }
-  }
 
 
   def by[T,U](
@@ -151,9 +142,9 @@ object Distribution
           LazyList
             .unfold(min)(
               l => (l + step) match {
-                case r if r < max  => Some(LeftClosedRightOpenInterval(l,r),r)
+                case r if r < max  => Some(LeftClosedRightOpenInterval(l,r) -> r)
 
-                case r if r == max => Some(ClosedInterval(l,r),r)
+                case r if r == max => Some(ClosedInterval(l,r) -> r)
 
                 case _             => None
               }

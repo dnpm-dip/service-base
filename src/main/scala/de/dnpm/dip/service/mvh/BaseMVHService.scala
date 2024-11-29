@@ -2,15 +2,9 @@ package de.dnpm.dip.service.mvh
 
 
 import java.time.LocalDateTime
-import scala.util.{
-  Left,
-  Right
-}
 import cats.Monad
 import de.dnpm.dip.util.Logging
 import de.dnpm.dip.model.{
-  Id,
-  Patient,
   PatientRecord,
   Site
 }

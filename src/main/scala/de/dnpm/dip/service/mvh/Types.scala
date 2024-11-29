@@ -1,27 +1,12 @@
-package de.dnpm.dip.service
+package de.dnpm.dip.service.mvh
 
-package object mvh {
 
-import java.time.LocalDateTime
-import scala.util.{
-  Left,
-  Right
-}
-import cats.Monad
-import de.dnpm.dip.util.Logging
-import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
   Id,
-  Period,
-  Patient,
-  PatientRecord,
-  Site,
-//  TransferTAN
+  PatientRecord
 }
-import de.dnpm.dip.model.NGSReport.SequencingType
 import play.api.libs.json.{
   Json,
-  JsObject,
   Format,
   Reads,
   Writes,
@@ -106,5 +91,3 @@ object UseCase extends Enumeration
     Json.formatEnum(this)
 }
 
-
-}

@@ -1,11 +1,7 @@
 package de.dnpm.dip.service.query
 
 
-import scala.util.{
-  Either,
-  Try,
-  Failure,
-}
+import scala.util.Either
 import scala.collection.concurrent.{
   Map,
   TrieMap
@@ -15,8 +11,7 @@ import de.dnpm.dip.util.Logging
 import de.dnpm.dip.model.{
   Id,
   Patient,
-  Snapshot,
-  Site
+  Snapshot
 }
 import QueryService.{
   Saved,
@@ -79,9 +74,6 @@ with Logging
   )(
     implicit env: C[F]
   ): F[Either[String,Deleted]] = {
-
-    import java.nio.file.Files
-    import cats.syntax.traverse._
 
     log.info(s"Deleting all patient record snapshots for Patient ${patId.value}")
 

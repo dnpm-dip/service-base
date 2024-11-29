@@ -15,10 +15,10 @@ class DistributionTests extends AnyFlatSpec
 
     val dists =
       List(
-        List(40),
-        List(42),
-        List(34,42,56,63),
-        List(30,42,33,56,65)
+        List(40d),
+        List(42d),
+        List(34d,42d,56d,63d),
+        List(30d,42d,33d,56d,65d)
       )
       .map(_.map(Age(_)))
       .map(ages => ages -> Distribution.of(ages))

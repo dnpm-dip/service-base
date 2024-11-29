@@ -3,8 +3,6 @@ package de.dnpm.dip.service.validation
 
 
 import de.dnpm.dip.service.auth.{
-  Permission,
-  Permissions,
   PermissionEnumeration,
   Role,
   Roles
@@ -53,24 +51,3 @@ abstract class ValidationRoles(basePermissions: ValidationPermissions) extends R
     Set(Documentarist)
 
 }
-
-
-/*
-abstract class ValidationRoles(basePermissions: ValidationPermissions) extends Roles
-{
-
-  private val useCase = basePermissions.useCase
-
-  val Documentarist =
-    Role(
-      s"${useCase.toLowerCase}_documentarist",
-      s"${useCase}-Documentar:in",
-      basePermissions.permissions,
-      Some(s"$useCase: Dokumentar:in zur Behebung von Daten-Qualitätsproblemen")
-    )
-
-  override val roles: Set[Role] =
-    Set(Documentarist)
-
-}
-*/

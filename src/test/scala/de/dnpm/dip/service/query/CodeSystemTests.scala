@@ -2,9 +2,6 @@ package de.dnpm.dip.service.query
 
 
 import org.scalatest.flatspec.AnyFlatSpec
-
-
-import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers._
 import de.dnpm.dip.coding.{
   Coding,

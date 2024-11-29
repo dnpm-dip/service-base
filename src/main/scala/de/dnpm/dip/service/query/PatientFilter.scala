@@ -1,11 +1,8 @@
 package de.dnpm.dip.service.query
 
 
-import java.time.LocalDate.{now => today}
-import java.time.temporal.ChronoUnit.YEARS 
 import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
-  Age,
   Interval,
   ClosedInterval,
   Gender,

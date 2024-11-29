@@ -1,24 +1,11 @@
 package de.dnpm.dip.service.query
 
 
-import java.time.LocalDateTime
-import de.dnpm.dip.coding.{
-  Coding,
-  CodeSystemProvider
-}
-import de.dnpm.dip.model.{
-  Age,
-  Interval,
-  LeftClosedRightOpenInterval
-}
-
+import scala.util.chaining._
 
 
 trait ReportingOps
 {
-
-  import scala.util.chaining._
-
 
   def mean[T: Numeric](ts: Iterable[T]): Option[Double] =
     if (ts.nonEmpty)
@@ -30,7 +17,8 @@ trait ReportingOps
     mean(t +: ts).get
 
 
-  private def even(n: Int) = n % 2 == 0
+  private def even(n: Int) =
+    n % 2 == 0
 
   def median[T: Numeric](ts: Seq[T]): Option[Double] =
     if (ts.nonEmpty)

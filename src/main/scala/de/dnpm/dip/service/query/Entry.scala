@@ -3,13 +3,10 @@ package de.dnpm.dip.service.query
 
 
 import play.api.libs.json.{
-  Json,
   JsPath,
   Reads,
   OWrites,
-  Writes,
-  Format,
-  OFormat
+  Writes
 }
 
 

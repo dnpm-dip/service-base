@@ -5,8 +5,7 @@ import scala.util.Either
 import de.dnpm.dip.model.{
   Id,
   Patient,
-  Snapshot,
-  Site
+  Snapshot
 }
 import QueryService.{
   Saved,

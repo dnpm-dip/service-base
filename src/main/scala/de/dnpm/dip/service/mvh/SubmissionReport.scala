@@ -11,7 +11,6 @@ import de.dnpm.dip.model.{
 import de.dnpm.dip.model.NGSReport.SequencingType
 import play.api.libs.json.{
   Json,
-  JsObject,
   Format,
   Reads,
   OWrites

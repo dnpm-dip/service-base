@@ -57,12 +57,12 @@ extends Repository[F,Monad[F],T]
     new File(dataDir,s"SubmissionReport_${id.value}.json")
 
 
-  private def toPrettyJson[T: Writes](t: T): String =
-    Json.toJson(t) pipe Json.prettyPrint
+  private def toPrettyJson[A: Writes](a: A): String =
+    Json.toJson(a) pipe Json.prettyPrint
 
-  private def readAsJson[T: Reads]: InputStream => T =
+  private def readAsJson[A: Reads]: InputStream => A =
     Json.parse(_)
-      .pipe(Json.fromJson[T](_))
+      .pipe(Json.fromJson[A](_))
       .pipe(_.get)
 
 

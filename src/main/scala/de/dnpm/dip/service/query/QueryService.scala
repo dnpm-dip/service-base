@@ -1,14 +1,7 @@
 package de.dnpm.dip.service.query
 
 
-import java.net.URI
 import scala.util.Either
-import cats.Functor
-import cats.data.{
-  Ior,
-  IorNel,
-  NonEmptyList
-}
 import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
   Id,
@@ -25,7 +18,7 @@ object QueryService
     F[+_],
     Env,
     UseCase <: UseCaseConfig,
-    Error
+    Err
   ]
   {
     self =>
@@ -34,10 +27,6 @@ object QueryService
     type Criteria      = UseCase#Criteria
     type Results       = UseCase#Results
     
-    
-    import cats.syntax.functor._
-    import scala.util.chaining._
-
     
     def sites(
       implicit env: Env
@@ -96,7 +85,7 @@ object QueryService
       implicit
       env: Env,
       querier: Querier
-    ): F[Either[Error,Snapshot[PatientRecord]]]
+    ): F[Either[Err,Snapshot[PatientRecord]]]
     
     
     // Peer-to-peer Ops
@@ -105,7 +94,7 @@ object QueryService
     )(
       implicit
       env: Env
-    ): F[Either[Error,Seq[Query.Match[PatientRecord,Criteria]]]]
+    ): F[Either[Err,Seq[Query.Match[PatientRecord,Criteria]]]]
     
     
     def !(

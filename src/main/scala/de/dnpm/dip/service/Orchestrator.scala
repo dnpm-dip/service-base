@@ -11,10 +11,7 @@ import cats.syntax.apply._
 import cats.syntax.applicative._
 import cats.syntax.functor._
 import cats.syntax.flatMap._
-import de.dnpm.dip.util.{
-  Completer,
-  Logging
-}
+import de.dnpm.dip.util.Completer
 import de.dnpm.dip.model.{
   Id,
   Patient,
@@ -25,10 +22,7 @@ import de.dnpm.dip.service.validation.{
   ValidationService,
   ValidationReport
 }
-import de.dnpm.dip.service.query.{
-  UseCaseConfig,
-  QueryService
-}
+import de.dnpm.dip.service.query.QueryService
 import de.dnpm.dip.service.mvh.{
   Consent,
   Metadata,
@@ -201,7 +195,7 @@ final class Orchestrator[F[_],T <: PatientRecord: Completer]
               Error[T](err).pure
 
             // Can't occur but required for exhaustive pattern match
-            case Right(del: ValidationService.Deleted)  =>
+            case Right(_: ValidationService.Deleted)  =>
               Error[T](ValidationService.GenericError("Unexpected validation outcome")).pure
 
           }

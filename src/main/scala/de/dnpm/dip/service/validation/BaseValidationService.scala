@@ -1,36 +1,22 @@
 package de.dnpm.dip.service.validation
 
 
-import java.time.{
-  LocalDateTime,
-  Instant
-}
+import java.time.Instant
 import scala.util.{
   Either,
   Left,
   Right
 }
-import scala.concurrent.{
-  ExecutionContext,
-  Future
-}
 import cats.data.{
   Validated,
-  ValidatedNel
 }
-import cats.{
-  Applicative,
-  Monad
-}
+import cats.Monad
 import de.dnpm.dip.util.Logging
 import de.dnpm.dip.model.{
   Id,
   Patient,
   PatientRecord,
-  Site
 }
-import de.dnpm.dip.model.NGSReport.SequencingType
-import ValidationService._
 import Issue.Severity
 import de.ekut.tbi.validation.Validator
 
@@ -65,12 +51,10 @@ with Logging
 
   import ValidationService._
 
-  import cats.syntax.apply._
   import cats.syntax.either._
   import cats.syntax.functor._
   import cats.syntax.applicative._
   import cats.syntax.flatMap._
-  import scala.language.reflectiveCalls
 
 
   private val Acceptable =
@@ -90,7 +74,7 @@ with Logging
 
       result =
         validationResult match { 
-          case Validated.Valid(patientRecord) =>
+          case Validated.Valid(_) =>
             DataValid(data).asRight[Error]
           
           case Validated.Invalid(issues) =>

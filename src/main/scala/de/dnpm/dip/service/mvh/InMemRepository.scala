@@ -8,12 +8,6 @@ import scala.collection.concurrent.{
 import cats.Monad
 import cats.syntax.applicative._
 import cats.syntax.either._
-import play.api.libs.json.{
-  Json,
-  Format,
-  Reads,
-  Writes
-}
 import de.dnpm.dip.model.{
   Id,
   Patient,

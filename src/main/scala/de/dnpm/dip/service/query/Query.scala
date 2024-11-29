@@ -16,12 +16,10 @@ import play.api.libs.json.{
 }
 import de.dnpm.dip.coding.{
   Coding,
-  CodeSystem,
   CodedEnum,
   DefaultCodeSystem,
   CodeSystemProvider,
-  CodeSystemProviderSPI,
-  SingleCodeSystemProvider
+  CodeSystemProviderSPI
 }
 import de.dnpm.dip.model.{
   Site,

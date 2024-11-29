@@ -4,8 +4,7 @@ package de.dnpm.dip.service.validation
 import java.io.{
   File,
   FileInputStream,
-  FileWriter,
-  InputStream
+  FileWriter
 }
 import scala.util.{
   Either,

@@ -22,7 +22,6 @@ trait ResultSet[
 ]
 {
 
-  import scala.util.chaining._
   import scala.language.reflectiveCalls
 
   type Filter <: Filters[PatientRecord]
@@ -32,8 +31,6 @@ trait ResultSet[
 
   def results: Seq[Query.Match[PatientRecord,Criteria]]
 
-
-  import scala.language.implicitConversions
 
   protected implicit def toPredicate[F >: Filter](filter: F): PatientRecord => Boolean
 

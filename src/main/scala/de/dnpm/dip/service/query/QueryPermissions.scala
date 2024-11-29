@@ -3,8 +3,6 @@ package de.dnpm.dip.service.query
 
 
 import de.dnpm.dip.service.auth.{
-  Permission,
-  Permissions,
   PermissionEnumeration,
   Role,
   Roles

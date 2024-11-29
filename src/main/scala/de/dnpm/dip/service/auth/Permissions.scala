@@ -35,8 +35,6 @@ object Permissions extends SPILoader[PermissionsSPI]
 trait PermissionEnumeration extends Enumeration with Permissions
 {
 
-  import scala.language.implicitConversions
-
   val display: Value => String
 
   val description: Value => String

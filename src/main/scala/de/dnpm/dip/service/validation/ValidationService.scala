@@ -1,14 +1,10 @@
 package de.dnpm.dip.service.validation
 
 
-import java.time.LocalDateTime
 import scala.util.Either
-import cats.data.NonEmptyList
 import de.dnpm.dip.model.{
   Id,
-  Period,
-  Patient,
-  PatientRecord
+  Patient
 }
 
 

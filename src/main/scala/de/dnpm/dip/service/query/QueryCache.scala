@@ -1,11 +1,7 @@
 package de.dnpm.dip.service.query
 
 
-import scala.util.Either
-import cats.data.IorNel
 import de.dnpm.dip.util.Logging
-import de.dnpm.dip.model.Snapshot
-
 
 
 trait QueryCache[
@@ -92,7 +88,7 @@ with Logging
       "dnpm.dip.query.cache.cleanup.period.seconds",
       60.toString
     )
-    .toInt
+    .toLong
 
 
   executor.scheduleAtFixedRate(

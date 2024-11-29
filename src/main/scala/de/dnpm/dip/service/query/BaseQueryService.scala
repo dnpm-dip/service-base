@@ -11,17 +11,11 @@ import scala.util.{
   Right
 }
 import cats.Monad
-import cats.data.{
-  EitherNel,
-  Ior,
-  IorNel,
-  IorT
-}
+import cats.data.EitherNel
 import de.dnpm.dip.util.{
   Logging,
   Completer
 }
-import de.dnpm.dip.coding.Code
 import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
   Id,
@@ -36,8 +30,6 @@ import de.dnpm.dip.service.{
 import play.api.libs.json.{
   Json,
   Format,
-  Reads,
-  Writes
 }
 
 
@@ -258,9 +250,6 @@ with Logging
     querier: Querier
   ): F[Either[Query.Error,Query[Criteria]]] = {
 
-    import cats.syntax.apply._
-    import cats.instances.list._
-
     def modeAndSites(
       mode: Coding[Query.Mode.Value],
       sites: Option[Set[Coding[Site]]]
@@ -450,7 +439,6 @@ with Logging
   ): F[Map[Coding[Site],Either[String,Seq[Query.Match[PatientRecord,Criteria]]]]] = {
 
     import cats.syntax.apply._
-    import cats.instances.list._
 
     //TODO: Logging
 

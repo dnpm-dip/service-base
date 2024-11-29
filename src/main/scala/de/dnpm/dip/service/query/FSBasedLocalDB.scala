@@ -4,7 +4,6 @@ package de.dnpm.dip.service.query
 import java.io.{
   File,
   FileWriter,
-  InputStream,
   FileInputStream
 }
 import scala.reflect.ClassTag
@@ -22,8 +21,7 @@ import de.dnpm.dip.util.Logging
 import de.dnpm.dip.model.{
   Id,
   Patient,
-  Snapshot,
-  Site
+  Snapshot
 }
 import QueryService.{
   Saved,
@@ -67,11 +65,6 @@ with Logging
   private val prefix =
     classTag.runtimeClass.getSimpleName
 
-
-  private def inputStream(
-    f: File
-  ): InputStream =
-    new FileInputStream(f)
 
   private def fileStart(
     patId: Id[Patient]

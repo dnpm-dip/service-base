@@ -10,8 +10,7 @@ import play.api.libs.json.{
   Json,
   Format,
   OFormat,
-  Reads,
-  OWrites
+  Reads
 }
 
 
@@ -83,7 +82,7 @@ trait PreparedQueryOps[
   F[+_],
   Env,
   Criteria,
-  Error
+  Err
 ]
 {
 
@@ -93,7 +92,7 @@ trait PreparedQueryOps[
     implicit
     env: Env,
     querier: Querier
-  ): F[Error EitherNel PreparedQuery[Criteria]] 
+  ): F[Err EitherNel PreparedQuery[Criteria]] 
 
 
   def ?(
@@ -120,7 +119,7 @@ trait PreparedQueryDB[
   F[+_],
   Env,
   Criteria,
-  Error
+  Err
 ]
 {
 
@@ -133,7 +132,7 @@ trait PreparedQueryDB[
     pq: PreparedQuery[Criteria]
   )(
     implicit env: Env
-  ): F[Either[Error,PreparedQuery[Criteria]]]
+  ): F[Either[Err,PreparedQuery[Criteria]]]
 
 
   def delete(

@@ -6,10 +6,7 @@ import cats.data.NonEmptyList
 import cats.Semigroup
 import play.api.libs.json.{
   Json,
-  JsObject,
-  JsValue,
   Format,
-  OFormat,
   Writes,
   OWrites,
   Reads

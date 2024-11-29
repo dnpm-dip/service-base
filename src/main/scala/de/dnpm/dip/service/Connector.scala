@@ -3,11 +3,8 @@ package de.dnpm.dip.service
 
 import scala.util.Either
 import cats.Functor
-import cats.data.IorNel
-import de.dnpm.dip.coding.{
-  Code,
-  Coding
-}
+import cats.syntax.functor._
+import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.Site
 import play.api.libs.json.{
   Reads,
@@ -41,15 +38,10 @@ trait Connector[
     env: Env,
     app: Functor[F],
     fr: Reads[req.ResultType] 
-  ): F[Either[String,req.ResultType]] = {
-
-    import cats.syntax.functor._
-    import cats.syntax.either._
-
+  ): F[Either[String,req.ResultType]] =
     (self submit (req,Set(site)))
       .map(_.head._2)
 
-  }
 
 
   final def ![T <: PeerToPeerRequest: Writes](

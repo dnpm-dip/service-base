@@ -11,8 +11,6 @@ import de.dnpm.dip.model.{
 trait Repository[F[_],Env,T <: PatientRecord]
 {
 
-  import scala.language.implicitConversions
-
   protected implicit def toPredicate(
     filter: SubmissionReport.Filter
   ): SubmissionReport => Boolean =

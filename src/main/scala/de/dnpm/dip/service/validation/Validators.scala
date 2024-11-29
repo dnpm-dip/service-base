@@ -20,15 +20,12 @@ import de.dnpm.dip.coding.hgvs.HGVS
 import de.dnpm.dip.coding.UnregisteredMedication
 import de.dnpm.dip.model.{
   Diagnosis,
-  History,
   Id,
   Interval,
   MedicationTherapy,
   Obs,
-  Observation,
   Patient,
   Procedure,
-  Recommendation,
   Reference,
   Therapy,
   TherapyRecommendation
@@ -36,16 +33,13 @@ import de.dnpm.dip.model.{
 import Issue.{
   Error,
   Fatal,
-  Info,
   Path,
-  Warning
 }
 import shapeless.{
   Coproduct,
   :+:,
   CNil
 }
-import Path.syntax._
 
 
 trait Validators

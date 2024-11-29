@@ -12,7 +12,6 @@ import de.dnpm.dip.model.{
 import de.dnpm.dip.service.PeerToPeerRequest
 import play.api.libs.json.{
   Json,
-  Format,
   Writes,
   Reads
 }

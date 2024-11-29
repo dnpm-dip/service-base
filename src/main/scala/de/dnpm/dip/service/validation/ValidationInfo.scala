@@ -1,7 +1,6 @@
 package de.dnpm.dip.service.validation
 
 
-import java.time.YearMonth
 import de.dnpm.dip.model.{
   Id,
   Patient
