@@ -91,7 +91,12 @@ object Issue
     val root: Path = Path(Nil)
 
     def from(str: String): Path =
-      Path(str.split("/").toList)
+      Path(
+        str.split("/")
+          .toList
+          .filter(_.isBlank)  // To avoid artifact empty "nodes": paths have format /path/to/node/...
+                              // so that splitting at / results in an empty string at the beginning otherwise
+      )
 
     implicit val reads: Reads[Path] =
       Reads(js => js.validate[String].map(Path.from))

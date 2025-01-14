@@ -73,7 +73,7 @@ class JsonSchemaTests extends AnyFlatSpec with Schemas
           _ write js
         }
       }
-      .tap(println(_))
+//      .tap(println(_))
 
     succeed
   }
@@ -84,7 +84,7 @@ class JsonSchemaTests extends AnyFlatSpec with Schemas
     Gen.of[SubmissionReport].next
       .pipe(toJson(_))
       .pipe(prettyPrint)
-      .tap(println)
+//      .tap(println)
 
     succeed
   }
