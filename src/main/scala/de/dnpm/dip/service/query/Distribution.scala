@@ -230,37 +230,31 @@ object Distribution
 
 
   def associatedOn[A,C,T](
-    records: Seq[A]
+    as: Seq[A]
   )(
     csOn: A => Seq[C],
     tsOn: A => Seq[T]
   ): DistributionsBy[C,T] =
-    records.foldLeft(
+    as.foldLeft(
       Map.empty[C,Seq[T]]
     ){
-      (acc,record) =>
-
-      val cs =
-        csOn(record)
+      (acc,a) =>
 
       val ts =
-        tsOn(record)
+        tsOn(a)
 
-      cs.foldLeft(acc){
+      csOn(a).foldLeft(acc){
         (accPr,c) =>
-          accPr.updatedWith(c)(
-            _.map(_ :++ ts)
-             .orElse(Some(ts))
-          )
+          accPr.updatedWith(c){
+            case Some(accTs) => Some(ts ++: accTs)
+            case None        => Some(ts)
+          }
       }
 
     }
     .map {
       case (c,ts) =>
-        Entry(
-          c,
-          Distribution.of(ts)
-        )
+        Entry(c,Distribution.of(ts))
     }
     .toSeq
 

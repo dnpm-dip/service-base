@@ -22,9 +22,9 @@ sealed trait TransferTAN
 object SubmissionType extends Enumeration
 {
   val Initial    = Value("initial")
+  val FollowUp   = Value("follow-up")
   val Addition   = Value("addition")
   val Correction = Value("correction")
-  val Other      = Value("other")
   
   implicit val format: Format[Value] =
     Json.formatEnum(this)

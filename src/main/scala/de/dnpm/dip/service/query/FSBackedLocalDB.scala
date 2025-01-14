@@ -46,12 +46,7 @@ class FSBackedLocalDB[
 )(
   implicit classTag: ClassTag[PatientRecord]
 )
-extends LocalDB[
-  F,
-  C[F],
-  Criteria,
-  PatientRecord
-]
+extends LocalDB[F,C[F],Criteria,PatientRecord]
 with Logging
 {
 

@@ -168,10 +168,12 @@ with Logging
               .groupBy(_.severity)
               .map {
                 case (severity,issues) => severity.toString -> issues.size
-              }
+              },
+            validationReport.createdAt
           )
       }
       .toSeq
+      .sorted(Ordering[ValidationInfo].reverse) // Reverse ordering to have "greater" entries (i.e. having more errors) at the beginning
     )
 
 
