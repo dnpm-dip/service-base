@@ -18,9 +18,8 @@ class Tests extends AnyFlatSpec
          .pipe(Path.from)
          .pipe(_.toString)
 
-     path must not include ("//") 
+     path must not be (empty)
+     path must not include ("//")
   }
-
-
 
 }
