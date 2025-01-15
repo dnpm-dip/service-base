@@ -94,8 +94,8 @@ object Issue
       Path(
         str.split("/")
           .toList
-          .filter(_.isBlank)  // To avoid artifact empty "nodes": paths have format /path/to/node/...
-                              // so that splitting at / results in an empty string at the beginning otherwise
+          .filterNot(_.isBlank) // To avoid artifact empty "nodes": Paths have format /path/to/node/...
+                                // so that splitting at / results in an empty leading string ("", "path", "to", "node")
       )
 
     implicit val reads: Reads[Path] =
