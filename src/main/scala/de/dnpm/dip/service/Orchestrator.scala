@@ -24,7 +24,7 @@ import de.dnpm.dip.service.validation.{
 }
 import de.dnpm.dip.service.query.QueryService
 import de.dnpm.dip.service.mvh.{
-  Consent,
+  ResearchConsent,
   Metadata,
   MVHPatientRecord,
   MVHService,
@@ -36,7 +36,7 @@ import de.dnpm.dip.service.mvh.{
 final case class DataUpload[T]
 (
   record: T,
-  meta: Option[Metadata]
+  metadata: Option[Metadata]
 )
 
 
@@ -74,10 +74,11 @@ object DataUpload
       Schema.`string`.asInstanceOf[Schema[Id[TransferTAN]]]
         .toDefinition("TransferTAN")
 
-    implicit val consentSchema: Schema[Consent] =
+    implicit val researchConsentSchema: Schema[ResearchConsent] =
       Schema.`object`.Free[JsObject]()
-        .asInstanceOf[Schema[Consent]]
-        .toDefinition("MVH_Consent")
+        .asInstanceOf[Schema[ResearchConsent]]
+        .toDefinition("ResearchConsent")
+
     
     implicit val metadataSchema: Schema[Metadata] =
       Json.schema[Metadata]

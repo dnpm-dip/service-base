@@ -35,9 +35,10 @@ object SubmissionType extends Enumeration
 
 final case class Metadata
 (
-  transferTAN: Id[TransferTAN],
   submissionType: SubmissionType.Value,
-  consent: Consent
+  transferTAN: Id[TransferTAN],
+  modelProjectConsent: ModelProjectConsent,
+  researchConsents: Option[List[ResearchConsent]]
 )
 
 object Metadata
@@ -50,6 +51,7 @@ object Metadata
 }
 
 //-----------------------------------------------------------------------------
+
 
 final case class MVHPatientRecord[T <: PatientRecord]
 (
