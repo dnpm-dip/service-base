@@ -4,11 +4,7 @@ package de.dnpm.dip.service.mvh
 import java.time.LocalDateTime
 import cats.Monad
 import de.dnpm.dip.util.Logging
-import de.dnpm.dip.model.{
-  PatientRecord,
-  Site
-}
-import de.dnpm.dip.model.NGSReport.SequencingType
+import de.dnpm.dip.model.PatientRecord
 
 
 class BaseMVHService[F[_],T <: PatientRecord](
@@ -25,37 +21,15 @@ with Logging
   type Env = Monad[F]
 
 
-  private def submissionReport(
-    record: T,
-    meta: Metadata,
-    qcPassed: Boolean
-  ): SubmissionReport =
-    SubmissionReport(
-      LocalDateTime.now,
-      Site.local,
-      useCase,
-      meta.transferTAN,
-      meta.submissionType,
-      record
-        .ngsReports
-        .getOrElse(List.empty)
-        .map(_.sequencingType)
-        .collect { case SequencingType(st) => st }
-        .maxOption,
-      qcPassed
-    )
-
-
   override def !(cmd: Command[T])(
     implicit env: Env
   ): F[Either[Error,Outcome]] =
     cmd match {
 
-      case Process(mvhRecord @ MVHPatientRecord(record,metadata),qcPassed) =>
+      case Process(record,metadata) =>
         log.info(s"Processing MVH submission for Patient record ${record.id}")
         repo.save(
-          mvhRecord,
-          submissionReport(record,metadata,qcPassed)
+          MVHPatientRecord(record,metadata,LocalDateTime.now)
         )
         .map(
           _.bimap(
@@ -75,10 +49,9 @@ with Logging
           )
     }
 
-
-  override def ?(filter: SubmissionReport.Filter)(
+  override def ?(filter: MVHPatientRecord.Filter)(
     implicit env: Env
-  ): F[Iterable[SubmissionReport]] =
+  ): F[Iterable[MVHPatientRecord[T]]] =
     repo ? filter
 
 }

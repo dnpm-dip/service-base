@@ -16,11 +16,20 @@ import play.api.libs.json.{
 object Consent
 {
 
+/*
+  final case class Provision[T <: Enumeration]
+  (
+    date: LocalDate,
+    purpose: T#Value,
+    `type`: Provision.Type.Value
+  )
+*/
+
   final case class Provision[T]
   (
-    `type`: Provision.Type.Value,
     date: LocalDate,
-    purpose: T
+    purpose: T,
+    `type`: Provision.Type.Value
   )
 
   object Provision
@@ -37,6 +46,7 @@ object Consent
 
     implicit def format[T: Format]: OFormat[Provision[T]] =
       Json.format[Provision[T]]
+
   }
 
 }
@@ -51,6 +61,7 @@ final case class ModelProjectConsent
 
 object ModelProjectConsent
 {
+
   object Purpose extends Enumeration
   {
     val Sequencing         = Value("sequencing")
@@ -63,6 +74,7 @@ object ModelProjectConsent
 
   implicit val format: OFormat[ModelProjectConsent] =
     Json.format[ModelProjectConsent]
+
 }
 
 

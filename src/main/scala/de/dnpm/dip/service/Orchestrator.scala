@@ -26,9 +26,7 @@ import de.dnpm.dip.service.query.QueryService
 import de.dnpm.dip.service.mvh.{
   ResearchConsent,
   Metadata,
-  MVHPatientRecord,
   MVHService,
-  SubmissionType,
   TransferTAN
 }
 
@@ -66,9 +64,9 @@ object DataUpload
       Schema
     }
 
-    implicit val submissionTypeSchema: Schema[SubmissionType.Value] =
-      Json.schema[SubmissionType.Value]
-        .toDefinition("MVH_SubmissionType")
+//    implicit val submissionTypeSchema: Schema[DataUploadType.Value] =
+//      Json.schema[DataUploadType.Value]
+//        .toDefinition("MVH_DataUploadType")
 
     implicit val ttanIdSchema: Schema[Id[TransferTAN]] =
       Schema.`string`.asInstanceOf[Schema[Id[TransferTAN]]]
@@ -79,7 +77,6 @@ object DataUpload
         .asInstanceOf[Schema[ResearchConsent]]
         .toDefinition("ResearchConsent")
 
-    
     implicit val metadataSchema: Schema[Metadata] =
       Json.schema[Metadata]
         .toDefinition("MVH_Metadata")
@@ -161,14 +158,8 @@ final class Orchestrator[F[_],T <: PatientRecord: Completer]
 
           _ =
             mvhMetadata.foreach {
-              meta =>
-                mvhService ! MVHService.Process(
-                  MVHPatientRecord(record,meta),
-                  validationOutcome match {
-                    case Right(_) => true
-                    case Left(_)  => false
-                  }
-                )
+              metadata =>
+                mvhService ! MVHService.Process(record,metadata)
             }
 
           result <- validationOutcome match {

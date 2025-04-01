@@ -15,7 +15,6 @@ import cats.syntax.applicative._
 import cats.syntax.either._
 import play.api.libs.json.{
   Json,
-  Format,
   Reads,
   Writes
 }
@@ -25,19 +24,19 @@ import de.dnpm.dip.model.{
   PatientRecord,
 }
 
-
-private[mvh] final case class SubmissionReportWithId
+/*
+private[mvh] final case class MVHPatientRecordWithId
 (
   patient: Id[Patient],
-  report: SubmissionReport
+  report: MVHPatientRecord
 )
 
-object SubmissionReportWithId
+object MVHPatientRecordWithId
 {
-  private[mvh] implicit val format: Format[SubmissionReportWithId] =
-    Json.format[SubmissionReportWithId]
+  private[mvh] implicit val format: Format[MVHPatientRecordWithId] =
+    Json.format[MVHPatientRecordWithId]
 }
-
+*/
 
 class FSBackedRepository[F[_],T <: PatientRecord: Reads: Writes](
   dataDir: File
@@ -53,8 +52,8 @@ extends Repository[F,Monad[F],T]
   private def mvhRecordFile(id: Id[Patient]): File =
     new File(dataDir,s"MVH_${classTag.runtimeClass.getSimpleName}_${id.value}.json")
 
-  private def reportFile(id: Id[Patient]): File =
-    new File(dataDir,s"SubmissionReport_${id.value}.json")
+//  private def reportFile(id: Id[Patient]): File =
+//    new File(dataDir,s"MVHPatientRecord_${id.value}.json")
 
 
   private def toPrettyJson[A: Writes](a: A): String =
@@ -68,14 +67,13 @@ extends Repository[F,Monad[F],T]
 
 
   override def save(
-    mvhRecord: MVHPatientRecord[T],
-    report: SubmissionReport
+    mvhRecord: MVHPatientRecord[T]
   )(
     implicit env: Env
   ): F[Either[String,Unit]] = {
 
     val patId = mvhRecord.record.id
-
+/*
     Using.resources(
       new FileWriter(mvhRecordFile(patId)),
       new FileWriter(reportFile(patId))
@@ -84,24 +82,35 @@ extends Repository[F,Monad[F],T]
         recordWriter.write(toPrettyJson(mvhRecord))
         reportWriter.write(
           toPrettyJson(
-            SubmissionReportWithId(patId,report)
+            MVHPatientRecordWithId(patId,report)
           )
         )
     }
     .asRight[String]
     .pure
+*/    
+    Using(
+      new FileWriter(mvhRecordFile(patId))
+    ){
+      _.write(toPrettyJson(mvhRecord))
+    }
+    .fold(
+      t => t.getMessage.asLeft,
+      _ => ().asRight
+    )
+    .pure
   }
 
 
-  override def ?(fltr: SubmissionReport.Filter)(
+  override def ?(fltr: MVHPatientRecord.Filter)(
     implicit env: Env
-  ): F[Iterable[SubmissionReport]] =
+  ): F[Iterable[MVHPatientRecord[T]]] =
     dataDir.listFiles(
-      (_,name) => (name startsWith "SubmissionReport") && (name endsWith ".json")
+      (_,name) => (name startsWith "MVH_") && (name endsWith ".json")
     )
     .to(Iterable)
     .map(new FileInputStream(_))
-    .map(readAsJson[SubmissionReport])
+    .map(readAsJson[MVHPatientRecord[T]])
     .filter(fltr)
     .pure
 
@@ -109,12 +118,10 @@ extends Repository[F,Monad[F],T]
   override def delete(id: Id[Patient])(
     implicit env: Env
   ): F[Either[String,Unit]] = 
-    (mvhRecordFile(id).delete && reportFile(id).delete) match {
-      case true  =>
-        ().asRight[String].pure
+    mvhRecordFile(id).delete match {
+      case true  => ().asRight[String].pure
 
-      case false =>
-        s"Failed to delete PatientRecord and/or SubmissionReport for Patient $id".asLeft[Unit].pure
+      case false => s"Failed to delete MVHPatientRecord for Patient $id".asLeft[Unit].pure
     }
 
 }

@@ -22,7 +22,8 @@ import de.dnpm.dip.model.{
   Diagnosis,
   Id,
   Interval,
-  MedicationTherapy,
+//  SystemicTherapy,
+  SystemicTherapy,
   Obs,
   Patient,
   Procedure,
@@ -94,10 +95,10 @@ trait Validators
   implicit def therapyRecommendationNode[R <: TherapyRecommendation]: Path.Node[R] =
     Path.Node("Therapie-Empfehlung")
 
-  implicit def medTherapyNode[T <: MedicationTherapy[_]]: Path.Node[T] =
+  implicit def medTherapyNode[T <: SystemicTherapy[_]]: Path.Node[T] =
     Path.Node("Systemische-Therapie")
 
-  implicit def procedureNode[P <: Procedure[_]]: Path.Node[P] =
+  implicit def procedureNode[P <: Procedure]: Path.Node[P] =
     Path.Node("Prozedur")
 
 
@@ -206,7 +207,7 @@ trait Validators
     node: Path.Node[T],
   ): NegatableValidator[Issue.Builder,Reference[T]] =
     ref => ref.resolve must be (defined) otherwise (
-      Fatal(s"Nicht auflösbare Referenz-ID '${ref.id.getOrElse("N/A")}' auf Objekt '${node.name}'")
+      Fatal(s"Nicht auflösbare Referenz-ID '${ref.id}' auf Objekt '${node.name}'")
     ) map (_ => ref)
 
 
@@ -216,14 +217,14 @@ trait Validators
     node: Path.Node[T],
   ): NegatableValidator[Issue.Builder,Reference[T]] =
     ref => ref.resolveOn(List(t)) must be (defined) otherwise (
-      Fatal(s"Nicht auflösbare Referenz-ID '${ref.id.getOrElse("N/A")}' auf Objekt '${node.name}'")
+      Fatal(s"Nicht auflösbare Referenz-ID '${ref.id}' auf Objekt '${node.name}'")
     ) map (_ => ref)
 
 
   implicit val patientValidator: Validator[Issue,Patient] =
     patient =>
       (
-        patient.healthInsurance must be (defined) otherwise (MissingValue("Krankenkasse")),
+        patient.healthInsurance.reference must be (defined) otherwise (MissingValue("Krankenkassen-IK")),
         patient.dateOfDeath must be (defined) otherwise (MissingOptValue("Todesdatum"))
       )
       .errorsOr(patient) on patient
@@ -240,7 +241,7 @@ trait Validators
     therapy =>
       (
         validate(therapy.patient) at "Patient",
-        validateOpt(therapy.indication) at "Indikation",
+        validateOpt(therapy.reason) at "Indikation",
         therapy.therapyLine must be (defined) otherwise (MissingValue("Therapie-Linie")),
         therapy.period must be (defined) otherwise (MissingValue("Zeitraum")),
         validateOpt(therapy.basedOn) at "Therapie-Empfehlung",

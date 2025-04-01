@@ -1,8 +1,10 @@
 package de.dnpm.dip.service.mvh
 
 
+import java.time.LocalDateTime
 import de.dnpm.dip.model.{
   Id,
+  Period,
   PatientRecord
 }
 import play.api.libs.json.{
@@ -30,7 +32,6 @@ object SubmissionType extends Enumeration
     Json.formatEnum(this)
 }
 
-
 //-----------------------------------------------------------------------------
 
 final case class Metadata
@@ -56,11 +57,16 @@ object Metadata
 final case class MVHPatientRecord[T <: PatientRecord]
 (
   record: T,
-  meta: Metadata
+  metadata: Metadata,
+  submittedAt: LocalDateTime
 )
 
 object MVHPatientRecord
 {
+
+  final case class Filter(
+    submissionPeriod: Option[Period[LocalDateTime]] = None
+  )
 
   import play.api.libs.json.JsPath
   import play.api.libs.functional.syntax._
@@ -68,15 +74,17 @@ object MVHPatientRecord
   implicit def reads[T <: PatientRecord: Reads]: Reads[MVHPatientRecord[T]] =
     (
       JsPath.read[T] and
-      (JsPath \ "metadata").read[Metadata]
+      (JsPath \ "metadata").read[Metadata] and
+      (JsPath \ "submittedAt").read[LocalDateTime]
     )(
-      MVHPatientRecord(_,_)
+      MVHPatientRecord(_,_,_)
     )
 
   implicit def writes[T <: PatientRecord: Writes]: OWrites[MVHPatientRecord[T]] =
     (
       JsPath.write[T] and
-      (JsPath \ "metadata").write[Metadata]
+      (JsPath \ "metadata").write[Metadata] and
+      (JsPath \ "submittedAt").write[LocalDateTime]
     )(
       unlift(MVHPatientRecord.unapply[T](_))
     )
