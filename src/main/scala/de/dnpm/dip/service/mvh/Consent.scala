@@ -16,15 +16,6 @@ import play.api.libs.json.{
 object Consent
 {
 
-/*
-  final case class Provision[T <: Enumeration]
-  (
-    date: LocalDate,
-    purpose: T#Value,
-    `type`: Provision.Type.Value
-  )
-*/
-
   final case class Provision[T]
   (
     date: LocalDate,
@@ -37,8 +28,8 @@ object Consent
 
     object Type extends Enumeration
     { 
-      val Deny   = Value("deny")
       val Permit = Value("permit")
+      val Deny   = Value("deny")
 
       implicit val format: Format[Value] =
         Json.formatEnum(this)
@@ -109,8 +100,9 @@ final case class ResearchConsent(value: JsObject) extends AnyVal
 object ResearchConsent
 {
 
-//  val MDAT_SAVE         = "2.16.840.1.113883.3.1937.777.24.5.3.7"
-  val MDAT_RESEARCH_USE = "2.16.840.1.113883.3.1937.777.24.5.3.8"
+  val MDAT_STORE_AND_PROCESS = "2.16.840.1.113883.3.1937.777.24.5.3.7"
+  val MDAT_RESEARCH_USE      = "2.16.840.1.113883.3.1937.777.24.5.3.8"
+  val PATDAT_STORE_AND_USE   = "2.16.840.1.113883.3.1937.777.24.5.3.1"
 
   implicit val format: Format[ResearchConsent] =
     Json.valueFormat[ResearchConsent]

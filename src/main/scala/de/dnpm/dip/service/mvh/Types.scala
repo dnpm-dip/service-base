@@ -24,9 +24,9 @@ sealed trait TransferTAN
 object SubmissionType extends Enumeration
 {
   val Initial    = Value("initial")
-  val FollowUp   = Value("follow-up")
   val Addition   = Value("addition")
   val Correction = Value("correction")
+  val FollowUp   = Value("followup")
   
   implicit val format: Format[Value] =
     Json.formatEnum(this)
@@ -42,6 +42,17 @@ final case class Metadata
   researchConsents: Option[List[ResearchConsent]]
 )
 
+
+//-----------------------------------------------------------------------------
+
+object UseCase extends Enumeration
+{
+  val MTB,RD = Value
+
+  implicit val format: Format[Value] =
+    Json.formatEnum(this)
+}
+
 object Metadata
 {
   implicit val readsMetadata: Reads[Metadata] =
@@ -50,6 +61,7 @@ object Metadata
   implicit val writesMetadata: Writes[Metadata] =
     Json.writes[Metadata]
 }
+
 
 //-----------------------------------------------------------------------------
 
@@ -90,14 +102,3 @@ object MVHPatientRecord
     )
 
 }
-
-//-----------------------------------------------------------------------------
-
-object UseCase extends Enumeration
-{
-  val MTB,RD = Value
-
-  implicit val format: Format[Value] =
-    Json.formatEnum(this)
-}
-

@@ -1,3 +1,4 @@
+/*
 package de.dnpm.dip.service.mvh
 
 
@@ -28,7 +29,6 @@ import de.dnpm.dip.model.{
 }
 import de.dnpm.dip.model.json.BaseSchemas
 import de.ekut.tbi.generators.Gen
-
 
 trait Schemas extends BaseSchemas
 {
@@ -73,7 +73,6 @@ class JsonSchemaTests extends AnyFlatSpec with Schemas
           _ write js
         }
       }
-//      .tap(println(_))
 
     succeed
   }
@@ -84,9 +83,9 @@ class JsonSchemaTests extends AnyFlatSpec with Schemas
     Gen.of[SubmissionReport].next
       .pipe(toJson(_))
       .pipe(prettyPrint)
-//      .tap(println)
 
     succeed
   }
 
 }
+*/

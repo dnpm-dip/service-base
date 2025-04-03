@@ -225,7 +225,8 @@ trait Validators
     patient =>
       (
         patient.healthInsurance.reference must be (defined) otherwise (MissingValue("Krankenkassen-IK")),
-        patient.dateOfDeath must be (defined) otherwise (MissingOptValue("Todesdatum"))
+//        patient.dateOfDeath must be (defined) otherwise (MissingOptValue("Todesdatum")),
+        patient.address.municipalityCode must matchRegex ("^\\d{5}$".r) otherwise (Error("Fehlerhaftes Format: erste 5 Ziffern erwartet")) at "Amtlicher Gemeindeschlüssel"
       )
       .errorsOr(patient) on patient
 

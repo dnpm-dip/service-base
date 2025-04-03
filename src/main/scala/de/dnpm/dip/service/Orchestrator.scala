@@ -24,9 +24,10 @@ import de.dnpm.dip.service.validation.{
 }
 import de.dnpm.dip.service.query.QueryService
 import de.dnpm.dip.service.mvh.{
-  ResearchConsent,
   Metadata,
   MVHService,
+  ResearchConsent,
+  SubmissionType,
   TransferTAN
 }
 
@@ -64,9 +65,9 @@ object DataUpload
       Schema
     }
 
-//    implicit val submissionTypeSchema: Schema[DataUploadType.Value] =
-//      Json.schema[DataUploadType.Value]
-//        .toDefinition("MVH_DataUploadType")
+    implicit val submissionTypeSchema: Schema[SubmissionType.Value] =
+      Json.schema[SubmissionType.Value]
+        .toDefinition("MVH_SubmissionType")
 
     implicit val ttanIdSchema: Schema[Id[TransferTAN]] =
       Schema.`string`.asInstanceOf[Schema[Id[TransferTAN]]]
@@ -81,7 +82,6 @@ object DataUpload
       Json.schema[Metadata]
         .toDefinition("MVH_Metadata")
     
-//    implicit def schema[T <: PatientRecord](  
     implicit def schema[T <: Product](
       implicit sch: Schema[T]
     ): Schema[DataUpload[T]] =
