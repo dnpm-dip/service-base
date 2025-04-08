@@ -21,12 +21,12 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
   type Env = Monad[F]
 
 
-  private val cache: Map[Id[Patient],MVHPatientRecord[T]] =
+  private val cache: Map[Id[Patient],Submission[T]] =
     TrieMap.empty
 
 
   override def save(
-    mvhRecord: MVHPatientRecord[T]
+    mvhRecord: Submission[T]
   )(
     implicit env: Env
   ): F[Either[String,Unit]] = {
@@ -37,9 +37,9 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
   }
 
 
-  override def ?(fltr: MVHPatientRecord.Filter)(
+  override def ?(fltr: Submission.Filter)(
     implicit env: Env
-  ): F[Iterable[MVHPatientRecord[T]]] =
+  ): F[Iterable[Submission[T]]] =
     cache.values
 //    .map(_._2)
     .filter(fltr)

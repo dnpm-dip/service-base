@@ -91,7 +91,7 @@ final case class ResearchConsent(value: JsObject) extends AnyVal
             .getOrElse(Deny)
       }
 
-  def permitsProvision(code: String): Boolean =
+  def permits(code: String): Boolean =
     provisionType(code).exists(_ == Permit)
 
 }

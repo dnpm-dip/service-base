@@ -24,7 +24,7 @@ class ConsentTests extends AnyFlatSpec with Matchers
 
     consent.date mustBe defined
 
-    assert(consent.permitsProvision(ResearchConsent.MDAT_RESEARCH_USE))
+    assert(consent.permits(ResearchConsent.MDAT_RESEARCH_USE))
 
   }
 

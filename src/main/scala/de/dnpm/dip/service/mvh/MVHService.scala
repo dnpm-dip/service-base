@@ -19,9 +19,9 @@ trait MVHService[F[_],Env,T <: PatientRecord]
   ): F[Either[Error,Outcome]]
 
 
-  def ?(filter: MVHPatientRecord.Filter)(
+  def ?(filter: Submission.Filter)(
     implicit env: Env
-  ): F[Iterable[MVHPatientRecord[T]]]
+  ): F[Iterable[Submission[T]]]
 
 }
 
@@ -30,10 +30,9 @@ object MVHService
 {
   sealed trait Command[+T]
 
-//  final case class Process[T <: PatientRecord](record: MVHPatientRecord[T]) extends Command[T]
   final case class Process[T <: PatientRecord](
     record: T,
-    metadata: Metadata
+    metadata: Submission.Metadata
   )
   extends Command[T]
 

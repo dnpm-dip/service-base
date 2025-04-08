@@ -29,7 +29,7 @@ with Logging
       case Process(record,metadata) =>
         log.info(s"Processing MVH submission for Patient record ${record.id}")
         repo.save(
-          MVHPatientRecord(record,metadata,LocalDateTime.now)
+          Submission(record,metadata,LocalDateTime.now)
         )
         .map(
           _.bimap(
@@ -49,9 +49,9 @@ with Logging
           )
     }
 
-  override def ?(filter: MVHPatientRecord.Filter)(
+  override def ?(filter: Submission.Filter)(
     implicit env: Env
-  ): F[Iterable[MVHPatientRecord[T]]] =
+  ): F[Iterable[Submission[T]]] =
     repo ? filter
 
 }

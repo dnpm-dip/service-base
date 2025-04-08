@@ -16,7 +16,7 @@ import de.dnpm.dip.model.{
   Id,
   Patient,
   PatientRecord,
-  Snapshot
+//  Snapshot
 }
 import de.dnpm.dip.service.validation.{
   ValidationService,
@@ -24,83 +24,10 @@ import de.dnpm.dip.service.validation.{
 }
 import de.dnpm.dip.service.query.QueryService
 import de.dnpm.dip.service.mvh.{
-  Metadata,
   MVHService,
-  ResearchConsent,
-  SubmissionType,
-  TransferTAN
+  ResearchConsent
 }
 
-
-final case class DataUpload[T]
-(
-  record: T,
-  metadata: Option[Metadata]
-)
-
-
-object DataUpload
-{
-
-  import play.api.libs.json.{
-    JsPath,
-    JsObject,
-    Reads
-  }
-  import play.api.libs.functional.syntax._
-
-  implicit def reads[T: Reads]: Reads[DataUpload[T]] =
-    (
-      JsPath.read[T] and
-      (JsPath \ "metadata").readNullable[Metadata]
-    )(
-      DataUpload(_,_)
-    )
-
-
-  object Schemas {
-
-    import json.{
-      Json,
-      Schema
-    }
-
-    implicit val submissionTypeSchema: Schema[SubmissionType.Value] =
-      Json.schema[SubmissionType.Value]
-        .toDefinition("MVH_SubmissionType")
-
-    implicit val ttanIdSchema: Schema[Id[TransferTAN]] =
-      Schema.`string`.asInstanceOf[Schema[Id[TransferTAN]]]
-        .toDefinition("TransferTAN")
-
-    implicit val researchConsentSchema: Schema[ResearchConsent] =
-      Schema.`object`.Free[JsObject]()
-        .asInstanceOf[Schema[ResearchConsent]]
-        .toDefinition("ResearchConsent")
-
-    implicit val metadataSchema: Schema[Metadata] =
-      Json.schema[Metadata]
-        .toDefinition("MVH_Metadata")
-    
-    implicit def schema[T <: Product](
-      implicit sch: Schema[T]
-    ): Schema[DataUpload[T]] =
-      (
-        sch match {
-          case obj: Schema.`object`[T] =>
-            obj.withField(
-              "metadata",
-              Schema[Metadata],
-              false
-            )
-    
-          case _ => ??? // Cannot occur due to type bound T <: Product, but required for exhaustive pattern match
-        }
-      )
-      .asInstanceOf[Schema[DataUpload[T]]]
-  }
-
-}
 
 
 object Orchestrator
@@ -110,22 +37,47 @@ object Orchestrator
   final case class Delete(id: Id[Patient]) extends Command[Nothing]
 
   sealed trait Outcome[+T]
-  final case class Saved[T](snp: Snapshot[T]) extends Outcome[T]
-  final case class SavedWithIssues[T](snp: Snapshot[T], report: ValidationReport) extends Outcome[T]
+//  final case class Saved[T](snp: Snapshot[T]) extends Outcome[T]
+//  final case class SavedWithIssues[T](snp: Snapshot[T], report: ValidationReport) extends Outcome[T]
+  final case class Saved[T](data: T) extends Outcome[T]
+  final case class SavedWithIssues[T](data: T, report: ValidationReport) extends Outcome[T]
   final case class Deleted(id: Id[Patient]) extends Outcome[Nothing]
 
-
+/*
   type Error = Either[ValidationService.Error,QueryService.DataError]
 
   object Error
   {
     def apply[T](err: QueryService.DataError): Either[Error,Outcome[T]] =
-      err.asRight[ValidationService.Error].asLeft[Outcome[T]]
+      err.asRight[ValidationService.Error]
+        .asLeft//[Outcome[T]]
 
     def apply[T](err: ValidationService.Error): Either[Error,Outcome[T]] =
-      err.asLeft[QueryService.DataError].asLeft[Outcome[T]]
+      err.asLeft[QueryService.DataError]
+        .asLeft//[Outcome[T]]
+  }
+*/
+
+  type Error = Either[ValidationService.Error,Either[MVHService.Error,QueryService.DataError]]
+
+  object Error
+  {
+    def apply[T](err: QueryService.DataError): Either[Error,Outcome[T]] =
+      err.asRight[MVHService.Error]
+        .asRight[ValidationService.Error]
+        .asLeft
+
+    def apply[T](err: MVHService.Error): Either[Error,Outcome[T]] =
+      err.asLeft[QueryService.DataError]
+        .asRight[ValidationService.Error]
+        .asLeft
+
+    def apply[T](err: ValidationService.Error): Either[Error,Outcome[T]] =
+      err.asLeft[Either[MVHService.Error,QueryService.DataError]]
+        .asLeft
   }
 }
+
 
 final class Orchestrator[F[_],T <: PatientRecord: Completer]
 (
@@ -142,7 +94,11 @@ final class Orchestrator[F[_],T <: PatientRecord: Completer]
     DataAcceptableWithIssues
   }
   import Completer.syntax._
-
+  import ResearchConsent.{ 
+    MDAT_STORE_AND_PROCESS,
+    MDAT_RESEARCH_USE,
+    PATDAT_STORE_AND_USE
+  }
   
   def !(
     cmd: Orchestrator.Command[T]
@@ -150,58 +106,77 @@ final class Orchestrator[F[_],T <: PatientRecord: Completer]
     implicit env: Monad[F]
   ): F[Either[Error,Orchestrator.Outcome[T]]] =
     cmd match {
-      case Process(DataUpload(rawRecord,mvhMetadata)) =>
+
+      case Process(DataUpload(rawRecord,optMetadata)) =>
         for { 
           record <- rawRecord.pure.map(_.complete)  // Load record into Monad
 
-          validationOutcome <- (validationService ! Validate(record))
+          validationResult <- (validationService ! Validate(record))
 
-          _ =
-            mvhMetadata.foreach {
-              metadata =>
-                mvhService ! MVHService.Process(record,metadata)
-            }
+          result <- validationResult match {
 
-          result <- validationOutcome match {
-            case Right(DataValid(_)) =>
-              (queryService ! QueryService.Save(record)).map {
-                case Right(QueryService.Saved(snp)) => Saved(snp).asRight[Error]
+            // Validation (partially) passed
+            case Right(outcome) =>
+
+              for {
+                saveResult <- optMetadata match {
+
+                  case Some(metadata) =>
+
+                    val hasQueryBroadConsent =
+                      metadata.researchConsents
+                        .exists(
+                          _.forall(
+                            consent => consent.permits(PATDAT_STORE_AND_USE) || (consent.permits(MDAT_STORE_AND_PROCESS) && consent.permits(MDAT_RESEARCH_USE)) 
+                          )
+                        )
+
+                    if (hasQueryBroadConsent)
+                      // MVH and DNPM upload
+                      for {
+                        _ <- mvhService ! MVHService.Process(record,metadata)
+                        res <- queryService ! QueryService.Save(record)
+                      } yield res
+
+                    else // MVH-only upload
+                      mvhService ! MVHService.Process(record,metadata)
+                
+                  // DNPM-only upload
+                  case None =>
+                    queryService ! QueryService.Save(record)
+                
+                }
+
+              } yield saveResult match {
+
+                case MVHService.Saved | QueryService.Saved => 
+                  outcome match {
+                    case DataValid(data)                       => Saved(data).asRight[Error]
+                    case DataAcceptableWithIssues(data,report) => SavedWithIssues(data,report).asRight[Error]
+
+                    // Can't occur but required for exhaustive pattern match
+                    case ValidationService.Deleted(_) => Error[T](ValidationService.GenericError("Unexpected validation outcome"))
+                  }
 
                 // Can't occur but required for exhaustive pattern match
-                case Right(_)  => Error[T](QueryService.GenericError("Unexpected save outcome"))
-                 
-                case Left(err) => Error[T](err)
+                case _  => Error[T](QueryService.GenericError("Unexpected save outcome"))
               }
 
-            case Right(DataAcceptableWithIssues(_,report)) =>
-              (queryService ! QueryService.Save(record)).map {
-                case Right(QueryService.Saved(snp)) => SavedWithIssues(snp,report).asRight[Error]
-
-                // Can't occur but required for exhaustive pattern match
-                case Right(_)  => Error[T](QueryService.GenericError("Unexpected save outcome"))
-                 
-                case Left(err) => Error[T](err)
-              }
-
-            case Left(err)  =>
-              Error[T](err).pure
-
-            // Can't occur but required for exhaustive pattern match
-            case Right(_: ValidationService.Deleted)  =>
-              Error[T](ValidationService.GenericError("Unexpected validation outcome")).pure
-
+            // Validation failed
+            case Left(err) => Error[T](err).pure
           }
-
+              
         } yield result
 
 
       case Orchestrator.Delete(id) =>
         (
           validationService ! ValidationService.Delete(id),
+          mvhService ! MVHService.Delete(id),
           queryService ! QueryService.Delete(id)
         )
         .mapN(
-          (out,_) =>
+          (out,_,_) =>
             out match {
               case Right(_)  => Deleted(id).asRight[Error]
               case Left(err) => Error[T](err)

@@ -12,22 +12,22 @@ trait Repository[F[_],Env,T <: PatientRecord]
 {
 
   protected implicit def toPredicate(
-    filter: MVHPatientRecord.Filter
-  ): MVHPatientRecord[T] => Boolean =
+    filter: Submission.Filter
+  ): Submission[T] => Boolean =
     record =>
       filter.submissionPeriod
         .map(_ contains record.submittedAt)
         .getOrElse(true)
 
   def save(
-    record: MVHPatientRecord[T]
+    record: Submission[T]
   )(
     implicit env: Env
   ): F[Either[String,Unit]]
 
-  def ?(filter: MVHPatientRecord.Filter)(
+  def ?(filter: Submission.Filter)(
     implicit env: Env
-  ): F[Iterable[MVHPatientRecord[T]]]
+  ): F[Iterable[Submission[T]]]
 
   def delete(id: Id[Patient])(
     implicit env: Env
