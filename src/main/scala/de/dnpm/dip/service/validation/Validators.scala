@@ -12,20 +12,25 @@ import de.ekut.tbi.validation.{
 }
 import de.ekut.tbi.validation.dsl._
 import de.dnpm.dip.coding.{
+  Code,
   Coding,
   CodeSystem,
   CodeSystemProvider
 }
 import de.dnpm.dip.coding.hgvs.HGVS
+import de.dnpm.dip.coding.hgnc.HGNC
 import de.dnpm.dip.coding.UnregisteredMedication
 import de.dnpm.dip.model.{
+  BaseVariant,
+  ClosedInterval,
   Diagnosis,
+  GeneAlterationReference,
   Id,
   Interval,
-//  SystemicTherapy,
   SystemicTherapy,
   Obs,
   Patient,
+  PatientRecord,
   Procedure,
   Reference,
   Therapy,
@@ -194,11 +199,11 @@ trait Validators
         .map(_.asInstanceOf[Coding[H :+: CNil]])
 
 
-  implicit val proteinChangeValidator: Validator[Issue,Coding[HGVS.Protein]] =
-    coding =>
-      coding.code.value must (matchRegex (HGVS.Protein.threeLetterCode) or contain ("?")) otherwise (
-        Error(s"Ungültiger Code '${coding.code}', erwarte 3-Buchstaben-Format") at "Amino-Säure-Austausch"
-      ) map (_ => coding)
+  implicit val proteinChangeValidator: Validator[Issue,Code[HGVS.Protein]] =
+    code =>
+      code.value must (matchRegex (HGVS.Protein.threeLetterCode) or contain ("?")) otherwise (
+        Error(s"Ungültiger Code '${code}', erwarte 3-Buchstaben-Format") at "Amino-Säure-Austausch"
+      ) map (_ => code)
 
       
   implicit def referenceValidator[T <: { def id: Id[_] }](
@@ -221,12 +226,32 @@ trait Validators
     ) map (_ => ref)
 
 
+  implicit def geneAlterationReferenceValidator[T <: BaseVariant](
+    implicit
+    variants: Iterable[T],
+    node: Path.Node[T],
+    geneValidator: Validator[Issue.Builder,Coding[HGNC]]
+  ): NegatableValidator[Issue.Builder,GeneAlterationReference[T]] =
+    ref => 
+      (
+        validate(ref.variant),
+        validateOpt(ref.gene)
+      )
+      .errorsOr(ref)
+
+
+  protected val ageRange = ClosedInterval(0 -> 130)
+
   implicit val patientValidator: Validator[Issue,Patient] =
     patient =>
       (
+        patient.age.value.toInt must be (in (ageRange)) otherwise (
+          Error(s"Patienten-Alter nicht im realistisch möglichen Bereich $ageRange")
+        ) at "Alter",
         patient.healthInsurance.reference must be (defined) otherwise (MissingValue("Krankenkassen-IK")),
-//        patient.dateOfDeath must be (defined) otherwise (MissingOptValue("Todesdatum")),
-        patient.address.municipalityCode must matchRegex ("^\\d{5}$".r) otherwise (Error("Fehlerhaftes Format: erste 5 Ziffern erwartet")) at "Amtlicher Gemeindeschlüssel"
+        patient.address.municipalityCode must matchRegex ("^\\d{5}$".r) otherwise (
+          Error("Fehlerhaftes Format: erste 5 Ziffern erwartet")
+        ) at "Amtlicher Gemeindeschlüssel"
       )
       .errorsOr(patient) on patient
 
@@ -242,7 +267,7 @@ trait Validators
     therapy =>
       (
         validate(therapy.patient) at "Patient",
-        validateOpt(therapy.reason) at "Indikation",
+        validateOpt(therapy.reason) at "Therapie-Grund (Diagnose)",
         therapy.therapyLine must be (defined) otherwise (MissingValue("Therapie-Linie")),
         therapy.period must be (defined) otherwise (MissingValue("Zeitraum")),
         validateOpt(therapy.basedOn) at "Therapie-Empfehlung",
@@ -283,5 +308,18 @@ trait Validators
     valueValidator: Validator[Issue.Builder,O#ValueType]
   ): Validator[Issue,O] =
     ObservationValidator[O](valueValidator)
+
+
+  def PatientRecordValidator[T <: PatientRecord]: Validator[Issue,T] = 
+    record =>
+      (
+        validate(record.patient),
+        (record.ngsReports.exists(_.nonEmpty) must be (true)) orElse (
+          record.carePlans.exists(_.exists(_.statusReason.isDefined)) must be (true) 
+        ) otherwise (
+          Error("Es sind keine(e) Sequenzierung-Bericht(e) vorhanden, aber auch kein Board-Beschluss mit Begründung, warum keine Sequenzierung beantragt worden ist")
+        ) at "Sequenzier-Berichte/Board-Beschlüsse"
+      )
+      .errorsOr(record)
 
 }
