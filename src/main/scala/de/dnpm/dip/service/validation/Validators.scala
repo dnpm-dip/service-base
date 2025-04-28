@@ -33,6 +33,8 @@ import de.dnpm.dip.model.{
   PatientRecord,
   Procedure,
   Reference,
+  ExternalReference,
+  Study,
   Therapy,
   TherapyRecommendation
 }
@@ -273,6 +275,23 @@ trait Validators
         validateOpt(therapy.basedOn) at "Therapie-Empfehlung",
       )
       .errorsOr(therapy) on therapy
+
+
+  implicit val studyRefValidator: Validator[Issue.Builder,ExternalReference[Study,Study.Registries]] = {
+    import Study.Registries._
+
+    val patterns =
+      Map(
+        Coding.System[NCT].uri     -> "NCT\\d{8}".r,
+        Coding.System[DRKS].uri    -> "DRKS000\\d{5}".r,
+        Coding.System[EudraCT].uri -> "(\\d{4})-)?\\d{6}-\\d{2}".r,
+        Coding.System[EUDAMED].uri -> ".+".r,
+      )
+
+    ref => ref.id.value must matchRegex (patterns(ref.system)) otherwise (
+      Error(s"Studien-ID ${ref.id.value} passt nicht zum erwarteten ID-Muster für ${ref.system}-Studien")
+    ) map (_ => ref)
+  }
 
 
   def RangeValidator[T](range: Interval[T]): Validator[Issue.Builder,T] =

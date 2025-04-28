@@ -37,8 +37,6 @@ object Orchestrator
   final case class Delete(id: Id[Patient]) extends Command[Nothing]
 
   sealed trait Outcome[+T]
-//  final case class Saved[T](snp: Snapshot[T]) extends Outcome[T]
-//  final case class SavedWithIssues[T](snp: Snapshot[T], report: ValidationReport) extends Outcome[T]
   final case class Saved[T](data: T) extends Outcome[T]
   final case class SavedWithIssues[T](data: T, report: ValidationReport) extends Outcome[T]
   final case class Deleted(id: Id[Patient]) extends Outcome[Nothing]
@@ -113,60 +111,61 @@ final class Orchestrator[F[_],T <: PatientRecord: Completer]
 
           validationResult <- (validationService ! Validate(record))
 
-          result <- validationResult match {
+          qcPassed = validationResult.isRight
 
-            // Validation (partially) passed
-            case Right(outcome) =>
+          mvhResult <-
+            optMetadata match {
+              case Some(metadata) =>
+                (mvhService ! MVHService.Process(record,metadata,qcPassed))
+            
+              case None =>
+                ().asRight.pure
+            }
+            
+          dnpmAllowed =
+            optMetadata.map(
+              _.researchConsents.exists(
+                _.forall(consent => consent.permits(PATDAT_STORE_AND_USE) || (consent.permits(MDAT_STORE_AND_PROCESS) && consent.permits(MDAT_RESEARCH_USE)))
+              )
+            )
+            .getOrElse(true)
 
-              for {
-                saveResult <- optMetadata match {
+          saveResult <-  
+            mvhResult match {
+              case Right(_) =>
+                if (qcPassed && dnpmAllowed) (queryService ! QueryService.Save(record))
+                else ().asRight.pure
 
-                  case Some(metadata) =>
+              case err => err.pure
+            }
 
-                    val hasQueryBroadConsent =
-                      metadata.researchConsents
-                        .exists(
-                          _.forall(
-                            consent => consent.permits(PATDAT_STORE_AND_USE) || (consent.permits(MDAT_STORE_AND_PROCESS) && consent.permits(MDAT_RESEARCH_USE)) 
-                          )
-                        )
+        } yield saveResult match {
 
-                    if (hasQueryBroadConsent)
-                      // MVH and DNPM upload
-                      for {
-                        _ <- mvhService ! MVHService.Process(record,metadata)
-                        res <- queryService ! QueryService.Save(record)
-                      } yield res
+          case Right(_) =>
 
-                    else // MVH-only upload
-                      mvhService ! MVHService.Process(record,metadata)
-                
-                  // DNPM-only upload
-                  case None =>
-                    queryService ! QueryService.Save(record)
-                
-                }
-
-              } yield saveResult match {
-
-                case MVHService.Saved | QueryService.Saved => 
-                  outcome match {
-                    case DataValid(data)                       => Saved(data).asRight[Error]
-                    case DataAcceptableWithIssues(data,report) => SavedWithIssues(data,report).asRight[Error]
-
-                    // Can't occur but required for exhaustive pattern match
-                    case ValidationService.Deleted(_) => Error[T](ValidationService.GenericError("Unexpected validation outcome"))
-                  }
-
-                // Can't occur but required for exhaustive pattern match
-                case _  => Error[T](QueryService.GenericError("Unexpected save outcome"))
-              }
-
-            // Validation failed
-            case Left(err) => Error[T](err).pure
-          }
+            validationResult match {
+            
+              // Validation (partially) passed
+              case Right(outcome) =>
+                outcome match {
+                  case DataValid(data)                       => Saved(data).asRight[Error]
+                  case DataAcceptableWithIssues(data,report) => SavedWithIssues(data,report).asRight[Error]
               
-        } yield result
+                  // Can't occur but required for exhaustive pattern match
+                  case ValidationService.Deleted(_) => Error[T](ValidationService.GenericError("Unexpected validation outcome"))
+                }
+            
+              // Validation failed
+              case Left(err) => Error[T](err)
+            }
+
+          case Left(err: MVHService.Error) =>
+            Error[T](err)
+
+          case Left(err: QueryService.DataError) =>
+            Error[T](err)
+
+        }
 
 
       case Orchestrator.Delete(id) =>

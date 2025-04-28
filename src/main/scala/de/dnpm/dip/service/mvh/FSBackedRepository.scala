@@ -37,7 +37,10 @@ extends Repository[F,Monad[F],T]
   type Env = Monad[F]
 
 
-  private def mvhRecordFile(id: Id[Patient]): File =
+  private def submissionReportFile(id: Id[Patient]): File =
+    new File(dataDir,s"SubmissionReport_${id.value}.json")
+
+  private def submissionFile(id: Id[Patient]): File =
     new File(dataDir,s"MVH_${classTag.runtimeClass.getSimpleName}_${id.value}.json")
 
 
@@ -52,21 +55,34 @@ extends Repository[F,Monad[F],T]
 
 
   override def save(
-    mvhRecord: Submission[T]
+    report: Submission.Report,
+    submission: Submission[T]
   )(
     implicit env: Env
-  ): F[Either[String,Unit]] = {
-    Using(
-      new FileWriter(mvhRecordFile(mvhRecord.record.id))
+  ): F[Either[String,Unit]] =
+    Using.resources(
+      new FileWriter(submissionReportFile(submission.record.id)),
+      new FileWriter(submissionFile(submission.record.id))
     ){
-      _.write(toPrettyJson(mvhRecord))
+      (rep,sub) =>
+        rep.write(toPrettyJson(report))
+        sub.write(toPrettyJson(submission))
+        ().asRight[String]
     }
-    .fold(
-      t => t.getMessage.asLeft,
-      _ => ().asRight
-    )
     .pure
-  }
+
+
+  override def ?(fltr: Submission.Report.Filter)(
+    implicit env: Env
+  ): F[Iterable[Submission.Report]] =
+    dataDir.listFiles(
+      (_,name) => (name startsWith "SubmissionReport_") && (name endsWith ".json")
+    )
+    .to(Iterable)
+    .map(new FileInputStream(_))
+    .map(readAsJson[Submission.Report])
+    .filter(fltr)
+    .pure
 
 
   override def ?(fltr: Submission.Filter)(
@@ -85,7 +101,7 @@ extends Repository[F,Monad[F],T]
   override def delete(id: Id[Patient])(
     implicit env: Env
   ): F[Either[String,Unit]] = 
-    mvhRecordFile(id).delete match {
+    (submissionFile(id).delete && submissionReportFile(id).delete) match {
       case true  => ().asRight[String].pure
 
       case false => s"Failed to delete Submission for Patient $id".asLeft[Unit].pure

@@ -4,19 +4,22 @@ package de.dnpm.dip.service.mvh
 import java.time.LocalDateTime
 import de.dnpm.dip.model.{
   Id,
+//  MolecularDiagnostics,
   Period,
-  PatientRecord,
+  PatientRecord
 }
 import play.api.libs.json.{
   Json,
   Format,
+  OFormat,
   Reads,
   OWrites
 }
 
 
 
-sealed trait TransferTAN  // Transfer Transaction Number (Transfer-Vorgangs-Nummer)
+// Transfer Transaction Number (Transfer-Vorgangs-Nummer)
+sealed trait TransferTAN
 
 
 final case class Submission[T <: PatientRecord]
@@ -42,9 +45,31 @@ object Submission
   }
 
 
+  final case class Report
+  (
+    submittedAt: LocalDateTime,
+    useCase: UseCase.Value,
+    `type`: Type.Value,
+    transferTAN: Id[TransferTAN],
+//    sequencingType: Option[MolecularDiagnostics.Type.Value],
+    qcPassed: Boolean
+  )
+
+  object Report
+  {
+
+    final case class Filter(
+      period: Option[Period[LocalDateTime]] = None
+    )
+
+    implicit val format: OFormat[Report] =
+      Json.format[Report]
+  }
+
+
   final case class Metadata
   (
-    submissionType: Type.Value,
+    `type`: Type.Value,
     transferTAN: Id[TransferTAN],
     modelProjectConsent: ModelProjectConsent,
     researchConsents: Option[List[ResearchConsent]]
@@ -62,7 +87,8 @@ object Submission
 
 
   final case class Filter(
-    submissionPeriod: Option[Period[LocalDateTime]] = None
+    transferTANs: Option[Set[Id[TransferTAN]]] = None,
+    period: Option[Period[LocalDateTime]] = None
   )
 
   import play.api.libs.json.JsPath
@@ -87,80 +113,4 @@ object Submission
     )
 
 }
-
-
-/*
-final case class Submission[T <: PatientRecord]
-(
-  record: T,
-  metadata: Metadata,
-  submittedAt: LocalDateTime
-)
-
-
-object Submission
-{
-
-  import play.api.libs.json.{
-    JsPath,
-    JsObject,
-    Reads
-  }
-  import play.api.libs.functional.syntax._
-
-  implicit def reads[T: Reads]: Reads[Submission[T]] =
-    (
-      JsPath.read[T] and
-      (JsPath \ "metadata").readNullable[Metadata]
-    )(
-      Submission(_,_)
-    )
-
-
- object Schemas {
-
-    import json.{
-      Json,
-      Schema
-    }
-
-    implicit val submissionTypeSchema: Schema[SubmissionType.Value] =
-      Json.schema[SubmissionType.Value]
-        .toDefinition("MVH_SubmissionType")
-
-    implicit val ttanIdSchema: Schema[Id[TransferTAN]] =
-      Schema.`string`.asInstanceOf[Schema[Id[TransferTAN]]]
-        .toDefinition("TransferTAN")
-
-    implicit val researchConsentSchema: Schema[ResearchConsent] =
-      Schema.`object`.Free[JsObject]()
-        .asInstanceOf[Schema[ResearchConsent]]
-        .toDefinition("ResearchConsent")
-
-
-    implicit val metadataSchema: Schema[Metadata] =
-      Json.schema[Metadata]
-        .toDefinition("MVH_Metadata")
-
-    implicit def schema[T <: Product with PatientRecord](  
-//    implicit def schema[T <: Product](
-      implicit sch: Schema[T]
-    ): Schema[Submission[T]] =
-      (
-        sch match {
-          case obj: Schema.`object`[T] =>
-            obj.withField(
-              "metadata",
-              Schema[Metadata],
-              false
-            )
-
-          case _ => ??? // Cannot occur due to type bound T <: Product, but required for exhaustive pattern match
-        }
-      )
-      .asInstanceOf[Schema[Submission[T]]]
-  }
-
-}
-*/
 

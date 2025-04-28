@@ -26,6 +26,29 @@ with Logging
   ): F[Either[Error,Outcome]] =
     cmd match {
 
+      case Process(record,metadata,qcPassed) =>
+        log.info(s"Processing MVH submission for Patient record ${record.id}")
+
+        val datetime = LocalDateTime.now
+
+        repo.save(
+          Submission.Report(
+            datetime,
+            useCase,
+            metadata.`type`,
+            metadata.transferTAN,
+            qcPassed
+          ),
+          Submission(record,metadata,datetime)
+        )
+        .map(
+          _.bimap(
+            GenericError(_),
+            _ => Saved
+          )
+        )
+
+/*
       case Process(record,metadata) =>
         log.info(s"Processing MVH submission for Patient record ${record.id}")
         repo.save(
@@ -37,7 +60,7 @@ with Logging
             _ => Saved
           )
         )
-
+*/
       case Delete(id) =>
         log.info(s"Deleting MVH data for Patient $id")
         repo.delete(id)
