@@ -1,91 +1,36 @@
-/*
 package de.dnpm.dip.service.mvh
 
 
-import java.io.{
-  File,
-  FileWriter
-}
-import java.time.LocalDateTime
-import scala.util.Random
 import scala.util.chaining._
-import scala.util.Using
 import org.scalatest.flatspec.AnyFlatSpec
-import json.{
-  Json,
-  Schema
-}
+import org.scalatest.Inspectors
+import json.Schema
 import org.scalatest.matchers.must.Matchers._
 import json.schema.Version._
 import com.github.andyglow.jsonschema.AsPlay._
-import play.api.libs.json.Json.{
-  prettyPrint,
-  toJson
-}
-import de.dnpm.dip.model.{
-  Id,
-  NGSReport,
-  Site
-}
-import de.dnpm.dip.model.json.BaseSchemas
-import de.ekut.tbi.generators.Gen
-
-trait Schemas extends BaseSchemas
-{
-  implicit val submissionReportSchema: Schema[SubmissionReport] =
-    Json.schema[SubmissionReport]
-}
+import play.api.libs.json.Json.prettyPrint
+import de.dnpm.dip.service.DataUpload.Schemas
 
 
-class JsonSchemaTests extends AnyFlatSpec with Schemas 
+class JsonSchemaTests
+extends AnyFlatSpec
+with Inspectors
+with Schemas 
 {
 
-  import SubmissionReport._
+  "JSON Schema derivation for Submission.Type" must "have worked" in {
 
-  System.setProperty("dnpm.dip.site","UKT:Tübingen")
+    val schema =
+      Schema[Submission.Type.Value].asPlay(Draft12("SubmissionType"))
+        .pipe(prettyPrint(_))
 
-  implicit val rnd: Random = new Random
+    val capitalizedSubmissionTypes =
+      Submission.Type
+        .values.map(_.toString)
+        .map(v => v.substring(0,1).toUpperCase + v.substring(1))
 
-  implicit val genDataSubmissionReport: Gen[SubmissionReport] =
-    for { 
-      ttan <- Gen.uuidStrings
-      useCase <- Gen.`enum`(UseCase)
-      submissionType <- Gen.`enum`(SubmissionType)
-      seqType <- Gen.`enum`(NGSReport.SequencingType)
-    } yield SubmissionReport(
-      LocalDateTime.now,
-      Site.local,      
-      useCase,
-      Id(ttan),
-      submissionType,
-      Some(seqType),
-      true
-    )
+    forAll(capitalizedSubmissionTypes){t => schema must not include (t)}
 
-
-
-  "JSON Schema derivation for DataSubmissionReport" must "have worked" in {
-
-    Schema[SubmissionReport].asPlay(Draft12("DataSubmissionReport"))
-      .pipe(prettyPrint(_))
-      .tap { js =>
-        Using(new FileWriter(new File("/home/lucien/MVH-DataSubmissionReport-Schema.json"))){
-          _ write js
-        }
-      }
-
-    succeed
-  }
-
-
-  "JSON example generation for DataSubmissionReport" must "have worked" in {
-
-    Gen.of[SubmissionReport].next
-      .pipe(toJson(_))
-      .pipe(prettyPrint)
-
-    succeed
   }
 
 }
-*/

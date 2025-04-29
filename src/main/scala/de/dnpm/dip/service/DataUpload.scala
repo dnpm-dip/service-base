@@ -10,6 +10,7 @@ import de.dnpm.dip.service.mvh.{
   ResearchConsent,
   Submission
 }
+import de.dnpm.dip.model.json.BaseSchemas
 
 
 final case class DataUpload[T]
@@ -32,9 +33,8 @@ object DataUpload
       DataUpload(_,_)
     )
 
-  import de.dnpm.dip.model.json.BaseSchemas
 
-  object Schemas extends BaseSchemas
+  trait Schemas extends BaseSchemas
   {
 
     import json.{
@@ -43,7 +43,7 @@ object DataUpload
     }
 
     implicit val submissionTypeSchema: Schema[Submission.Type.Value] =
-      Json.schema[Submission.Type.Value]
+      enumValueSchema[Submission.Type.type]
         .toDefinition("MVH_SubmissionType")
 
     implicit val researchConsentSchema: Schema[ResearchConsent] =
@@ -65,5 +65,6 @@ object DataUpload
       .asInstanceOf[Schema[DataUpload[T]]]
 
   }
+  object Schemas extends Schemas
 
 }
