@@ -33,7 +33,7 @@ object MVHService
   final case class Process[T <: PatientRecord](
     record: T,
     metadata: Submission.Metadata,
-    qcPassed: Boolean
+//    qcPassed: Boolean
   )
   extends Command[T]
 

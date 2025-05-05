@@ -4,7 +4,10 @@ package de.dnpm.dip.service.mvh
 import java.time.LocalDateTime
 import cats.Monad
 import de.dnpm.dip.util.Logging
-import de.dnpm.dip.model.PatientRecord
+import de.dnpm.dip.model.{
+  PatientRecord,
+  Site
+}
 
 
 class BaseMVHService[F[_],T <: PatientRecord](
@@ -26,7 +29,7 @@ with Logging
   ): F[Either[Error,Outcome]] =
     cmd match {
 
-      case Process(record,metadata,qcPassed) =>
+      case Process(record,metadata) =>
         log.info(s"Processing MVH submission for Patient record ${record.id}")
 
         val datetime = LocalDateTime.now
@@ -34,10 +37,11 @@ with Logging
         repo.save(
           Submission.Report(
             datetime,
+            Site.local,
             useCase,
             metadata.`type`,
             metadata.transferTAN,
-            qcPassed
+            record.patient.healthInsurance.`type`
           ),
           Submission(record,metadata,datetime)
         )
@@ -48,19 +52,6 @@ with Logging
           )
         )
 
-/*
-      case Process(record,metadata) =>
-        log.info(s"Processing MVH submission for Patient record ${record.id}")
-        repo.save(
-          Submission(record,metadata,LocalDateTime.now)
-        )
-        .map(
-          _.bimap(
-            GenericError(_),
-            _ => Saved
-          )
-        )
-*/
       case Delete(id) =>
         log.info(s"Deleting MVH data for Patient $id")
         repo.delete(id)

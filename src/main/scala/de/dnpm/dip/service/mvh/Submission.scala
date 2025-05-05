@@ -2,11 +2,14 @@ package de.dnpm.dip.service.mvh
 
 
 import java.time.LocalDateTime
+import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
+  HealthInsurance,
   Id,
 //  MolecularDiagnostics,
   Period,
-  PatientRecord
+  PatientRecord,
+  Site
 }
 import play.api.libs.json.{
   Json,
@@ -48,11 +51,12 @@ object Submission
   final case class Report
   (
     submittedAt: LocalDateTime,
+    site: Coding[Site],
     useCase: UseCase.Value,
     `type`: Type.Value,
     transferTAN: Id[TransferTAN],
+    healthInsuranceType: Coding[HealthInsurance.Type.Value]
 //    sequencingType: Option[MolecularDiagnostics.Type.Value],
-    qcPassed: Boolean
   )
 
   object Report

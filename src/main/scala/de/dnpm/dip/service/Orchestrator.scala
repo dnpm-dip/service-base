@@ -16,7 +16,6 @@ import de.dnpm.dip.model.{
   Id,
   Patient,
   PatientRecord,
-//  Snapshot
 }
 import de.dnpm.dip.service.validation.{
   ValidationService,
@@ -41,20 +40,6 @@ object Orchestrator
   final case class SavedWithIssues[T](data: T, report: ValidationReport) extends Outcome[T]
   final case class Deleted(id: Id[Patient]) extends Outcome[Nothing]
 
-/*
-  type Error = Either[ValidationService.Error,QueryService.DataError]
-
-  object Error
-  {
-    def apply[T](err: QueryService.DataError): Either[Error,Outcome[T]] =
-      err.asRight[ValidationService.Error]
-        .asLeft//[Outcome[T]]
-
-    def apply[T](err: ValidationService.Error): Either[Error,Outcome[T]] =
-      err.asLeft[QueryService.DataError]
-        .asLeft//[Outcome[T]]
-  }
-*/
 
   type Error = Either[ValidationService.Error,Either[MVHService.Error,QueryService.DataError]]
 
@@ -107,65 +92,62 @@ final class Orchestrator[F[_],T <: PatientRecord: Completer]
 
       case Process(DataUpload(rawRecord,optMetadata)) =>
         for { 
-          record <- rawRecord.pure.map(_.complete)  // Load record into Monad
+          record <- env.pure(rawRecord.complete)  // Load completed record into Monad
 
           validationResult <- (validationService ! Validate(record))
 
-          qcPassed = validationResult.isRight
-
-          mvhResult <-
-            optMetadata match {
-              case Some(metadata) =>
-                (mvhService ! MVHService.Process(record,metadata,qcPassed))
+          result <- validationResult match {
             
-              case None =>
-                ().asRight.pure
-            }
-            
-          dnpmAllowed =
-            optMetadata.map(
-              _.researchConsents.exists(
-                _.forall(consent => consent.permits(PATDAT_STORE_AND_USE) || (consent.permits(MDAT_STORE_AND_PROCESS) && consent.permits(MDAT_RESEARCH_USE)))
-              )
-            )
-            .getOrElse(true)
+            // Validation (partially) passed
+            case Right(outcome) =>
 
-          saveResult <-  
-            mvhResult match {
-              case Right(_) =>
-                if (qcPassed && dnpmAllowed) (queryService ! QueryService.Save(record))
-                else ().asRight.pure
+              for {
+                saveResult <- optMetadata match {
+                  case Some(metadata) =>
+                    for {
+                      mvhResult <- mvhService ! MVHService.Process(record,metadata)
 
-              case err => err.pure
-            }
-
-        } yield saveResult match {
-
-          case Right(_) =>
-
-            validationResult match {
-            
-              // Validation (partially) passed
-              case Right(outcome) =>
-                outcome match {
-                  case DataValid(data)                       => Saved(data).asRight[Error]
-                  case DataAcceptableWithIssues(data,report) => SavedWithIssues(data,report).asRight[Error]
-              
-                  // Can't occur but required for exhaustive pattern match
-                  case ValidationService.Deleted(_) => Error[T](ValidationService.GenericError("Unexpected validation outcome"))
+                      dnpmPermitted =
+                        metadata.researchConsents.exists(
+                          _.forall(consent => consent.permits(PATDAT_STORE_AND_USE) || (consent.permits(MDAT_STORE_AND_PROCESS) && consent.permits(MDAT_RESEARCH_USE)))
+                        )
+                
+                     } yield mvhResult match {
+                       case Right(_) =>
+                         if (dnpmPermitted) queryService ! QueryService.Save(record)
+                         else ().asRight.pure
+                
+                       case err => err.pure
+                     }
+                 
+                  case None => queryService ! QueryService.Save(record)
                 }
+                  
+              } yield saveResult match {
+
+                case Right(MVHService.Saved | QueryService.Saved) => 
+
+                  outcome match {
+                    case DataValid(data)                       => Saved(data).asRight[Error]
+
+                    case DataAcceptableWithIssues(data,report) => SavedWithIssues(data,report).asRight[Error]
+                
+                    // Can't occur but required for exhaustive pattern match
+                    case ValidationService.Deleted(_) => Error[T](ValidationService.GenericError("Unexpected validation outcome"))
+                  }
             
-              // Validation failed
-              case Left(err) => Error[T](err)
-            }
+                case Left(err: MVHService.Error) => Error[T](err)
 
-          case Left(err: MVHService.Error) =>
-            Error[T](err)
+                case Left(err: QueryService.DataError) => Error[T](err)
+            
+              }
 
-          case Left(err: QueryService.DataError) =>
-            Error[T](err)
+            // Validation failed
+            case Left(err) => Error[T](err).pure 
 
-        }
+          }
+
+        } yield result
 
 
       case Orchestrator.Delete(id) =>
