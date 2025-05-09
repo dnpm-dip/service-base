@@ -35,6 +35,7 @@ import de.dnpm.dip.model.{
   Reference,
   ExternalReference,
   Study,
+  StudyEnrollmentRecommendation,
   Therapy,
   TherapyRecommendation
 }
@@ -101,6 +102,9 @@ trait Validators
 
   implicit def therapyRecommendationNode[R <: TherapyRecommendation]: Path.Node[R] =
     Path.Node("Therapie-Empfehlung")
+
+  implicit def studyRecommendationNode[T <: StudyEnrollmentRecommendation]: Path.Node[T] =
+    Path.Node("Studien-Einschluss-Empfehlung")
 
   implicit def medTherapyNode[T <: SystemicTherapy[_]]: Path.Node[T] =
     Path.Node("Systemische-Therapie")
@@ -284,7 +288,7 @@ trait Validators
       Map(
         Coding.System[NCT].uri     -> "NCT\\d{8}".r,
         Coding.System[DRKS].uri    -> "DRKS000\\d{5}".r,
-        Coding.System[EudraCT].uri -> "(\\d{4})-)?\\d{6}-\\d{2}".r,
+        Coding.System[EudraCT].uri -> "\\d{4}-\\d{6}-\\d{2}(-\\d{2})?".r,
         Coding.System[EUDAMED].uri -> ".+".r,
       )
 
@@ -292,6 +296,17 @@ trait Validators
       Error(s"Studien-ID ${ref.id.value} passt nicht zum erwarteten ID-Muster für ${ref.system}-Studien")
     ) map (_ => ref)
   }
+
+
+  implicit def StudyRecommendationValidator[T <: StudyEnrollmentRecommendation: HasId: Path.Node](
+    implicit patient: Patient
+  ): Validator[Issue, T] =
+    rec => 
+      (
+        validate(rec.patient) at "Patient",
+        validateEach(rec.study) at "Studien-Referenz"
+      )
+      .errorsOr(rec) on rec
 
 
   def RangeValidator[T](range: Interval[T]): Validator[Issue.Builder,T] =

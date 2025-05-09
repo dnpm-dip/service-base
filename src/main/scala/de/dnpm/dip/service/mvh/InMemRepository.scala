@@ -42,6 +42,29 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
   }
 
 
+  override def ?(
+    id: Id[TransferTAN]
+  )(
+    implicit env: Env
+  ): F[Option[Submission.Report]] =
+    reports.collectFirst {
+      case (_,r) if r.id == id => r 
+    }
+    .pure
+
+
+  override def update(
+    report: Submission.Report,
+  )(
+    implicit env: Env
+  ): F[Either[String,Unit]] =
+    env.pure(
+      reports.collectFirst { case (patId,r) if r.id == report.id => patId } match {
+        case Some(patId) => reports.update(patId,report).asRight
+        case None        => s"Update failed: Report with TAN ${report.id} doesn't exist".asLeft
+      }
+   )
+
   override def ?(fltr: Submission.Report.Filter)(
     implicit env: Env
   ): F[Iterable[Submission.Report]] =

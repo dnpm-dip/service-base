@@ -15,9 +15,9 @@ trait Repository[F[_],Env,T <: PatientRecord]
     filter: Submission.Report.Filter
   ): Submission.Report => Boolean =
     report =>
-      filter.period
-        .map(_ contains report.submittedAt)
-        .getOrElse(true)
+      filter.period.map(_ contains report.submittedAt).getOrElse(true) &&
+      filter.status.map(_ contains report.status.latestBy(_.datetime).value).getOrElse(true)
+
 
   protected implicit def toPredicate(
     filter: Submission.Filter
@@ -35,13 +35,29 @@ trait Repository[F[_],Env,T <: PatientRecord]
     implicit env: Env
   ): F[Either[String,Unit]]
 
+
+  def update(
+    report: Submission.Report,
+  )(
+    implicit env: Env
+  ): F[Either[String,Unit]]
+
+
   def ?(filter: Submission.Report.Filter)(
     implicit env: Env
   ): F[Iterable[Submission.Report]]
 
+  def ?(
+    id: Id[TransferTAN]
+  )(
+    implicit env: Env
+  ): F[Option[Submission.Report]]
+
+
   def ?(filter: Submission.Filter)(
     implicit env: Env
   ): F[Iterable[Submission[T]]]
+
 
   def delete(id: Id[Patient])(
     implicit env: Env

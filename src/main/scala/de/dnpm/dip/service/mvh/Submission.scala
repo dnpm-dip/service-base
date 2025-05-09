@@ -5,9 +5,10 @@ import java.time.LocalDateTime
 import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
   HealthInsurance,
+  History,
   Id,
-//  MolecularDiagnostics,
   Period,
+  Patient,
   PatientRecord,
   Site
 }
@@ -50,20 +51,42 @@ object Submission
 
   final case class Report
   (
+    id: Id[TransferTAN],
     submittedAt: LocalDateTime,
+    patient: Id[Patient],
+    status: History[Report.Status],
     site: Coding[Site],
     useCase: UseCase.Value,
     `type`: Type.Value,
-    transferTAN: Id[TransferTAN],
     healthInsuranceType: Coding[HealthInsurance.Type.Value]
-//    sequencingType: Option[MolecularDiagnostics.Type.Value],
   )
 
   object Report
   {
 
+    final case class Status
+    (
+      value: Status.Value,
+      datetime: LocalDateTime
+    )
+
+    object Status extends Enumeration
+    { 
+      val Unsubmitted            = Value("unsubmitted")
+//      val RequestedForProcessing = Value("requested-for-processing")
+      val Submitted              = Value("submitted")
+
+      implicit val formatValue: Format[Value] =
+        Json.formatEnum(this)
+
+      implicit val format: OFormat[Status] =
+        Json.format[Status]
+    }
+
+
     final case class Filter(
-      period: Option[Period[LocalDateTime]] = None
+      period: Option[Period[LocalDateTime]] = None,
+      status: Option[Set[Status.Value]] = None 
     )
 
     implicit val format: OFormat[Report] =
@@ -91,7 +114,7 @@ object Submission
 
 
   final case class Filter(
-    transferTANs: Option[Set[Id[TransferTAN]]] = None,
+    transferTAN: Option[Set[Id[TransferTAN]]] = None,
     period: Option[Period[LocalDateTime]] = None
   )
 

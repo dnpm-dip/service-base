@@ -5,6 +5,7 @@ import java.time.LocalDateTime
 import cats.Monad
 import de.dnpm.dip.util.Logging
 import de.dnpm.dip.model.{
+  History,
   PatientRecord,
   Site
 }
@@ -20,6 +21,9 @@ with Logging
   import MVHService._
   import cats.syntax.either._
   import cats.syntax.functor._
+  import cats.syntax.flatMap._
+  import Submission.Report.Status._
+
 
   type Env = Monad[F]
 
@@ -36,14 +40,25 @@ with Logging
 
         repo.save(
           Submission.Report(
+            metadata.transferTAN,
             datetime,
+            record.patient.id,
+            History(
+              Submission.Report.Status(
+                Unsubmitted,
+                datetime
+              )
+            ),
             Site.local,
             useCase,
             metadata.`type`,
-            metadata.transferTAN,
             record.patient.healthInsurance.`type`
           ),
-          Submission(record,metadata,datetime)
+          Submission(
+            record,
+            metadata,
+            datetime
+          )
         )
         .map(
           _.bimap(
@@ -51,6 +66,34 @@ with Logging
             _ => Saved
           )
         )
+
+      case ConfirmSubmitted(id) =>
+        for {
+          optReport <- repo ? id
+
+          result <- 
+            optReport match {
+              case Some(report) =>
+                repo.update(
+                  report.copy(
+                    status = report.status :+ Submission.Report.Status(Submitted, LocalDateTime.now)
+                  )
+                )
+                .map(
+                  _.bimap(
+                    GenericError(_),
+                    _ => Updated(id)
+                  )
+                )
+
+              case None =>
+                env.pure(
+                  GenericError(s"Invalid TTAN $id").asLeft
+                )
+            }
+
+        } yield result
+
 
       case Delete(id) =>
         log.info(s"Deleting MVH data for Patient $id")
@@ -62,6 +105,26 @@ with Logging
             )
           )
     }
+
+
+  override def ?(filter: Submission.Report.Filter)(
+    implicit env: Env
+  ): F[Iterable[Submission.Report]] =
+    repo ? filter
+/*
+   (repo ? filter).map(
+     _.tapEach(
+       r => repo.update(
+         r.copy(
+           status = r.status :+ Submission.Report.Status(
+              RequestedForProcessing,
+              LocalDateTime.now
+           )
+         )
+       )
+     )
+   )
+*/
 
   override def ?(filter: Submission.Filter)(
     implicit env: Env

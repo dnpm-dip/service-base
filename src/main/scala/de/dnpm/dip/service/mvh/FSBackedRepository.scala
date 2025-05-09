@@ -10,7 +10,12 @@ import java.io.{
 import scala.reflect.ClassTag
 import scala.util.chaining._
 import scala.util.Using
+import scala.collection.concurrent.{
+  Map,
+  TrieMap
+}
 import cats.Monad
+import cats.syntax.functor._
 import cats.syntax.applicative._
 import cats.syntax.either._
 import play.api.libs.json.{
@@ -36,12 +41,28 @@ extends Repository[F,Monad[F],T]
 
   type Env = Monad[F]
 
+  private val REPORT_PREFIX = "SubmissionReport_"
 
-  private def submissionReportFile(id: Id[Patient]): File =
-    new File(dataDir,s"SubmissionReport_${id.value}.json")
+  private val SUBMISSION_PREFIX = s"MVH_${classTag.runtimeClass.getSimpleName}_"
+
+
+  private val cachedReports: Map[Id[TransferTAN],Submission.Report] =
+    TrieMap.from(
+      dataDir.listFiles(
+        (_,name) => (name startsWith REPORT_PREFIX) && (name endsWith ".json")
+      )
+      .to(Iterable)
+      .map(new FileInputStream(_))
+      .map(readAsJson[Submission.Report])
+      .map(r => r.id -> r)
+    )
+
+
+  private def reportFile(id: Id[Patient]): File =
+    new File(dataDir,s"$REPORT_PREFIX${id.value}.json")
 
   private def submissionFile(id: Id[Patient]): File =
-    new File(dataDir,s"MVH_${classTag.runtimeClass.getSimpleName}_${id.value}.json")
+    new File(dataDir,s"$SUBMISSION_PREFIX${id.value}.json")
 
 
   private def toPrettyJson[A: Writes](a: A): String =
@@ -61,35 +82,61 @@ extends Repository[F,Monad[F],T]
     implicit env: Env
   ): F[Either[String,Unit]] =
     Using.resources(
-      new FileWriter(submissionReportFile(submission.record.id)),
+      new FileWriter(reportFile(submission.record.id)),
       new FileWriter(submissionFile(submission.record.id))
     ){
-      (rep,sub) =>
-        rep.write(toPrettyJson(report))
-        sub.write(toPrettyJson(submission))
+      (repWriter,subWriter) =>
+        repWriter.write(toPrettyJson(report))
+        subWriter.write(toPrettyJson(submission))
+
+        cachedReports += report.id -> report
+
         ().asRight[String]
     }
+    .pure
+
+
+  override def ?(
+    id: Id[TransferTAN]
+  )(
+    implicit env: Env
+  ): F[Option[Submission.Report]] =
+    cachedReports
+      .get(id)
+      .pure
+
+
+  override def update(
+    report: Submission.Report,
+  )(
+    implicit env: Env
+  ): F[Either[String,Unit]] =
+    Using(new FileWriter(reportFile(report.patient))){
+      w =>
+        w.write(toPrettyJson(report))
+        cachedReports.update(report.id,report)
+    }
+    .fold(
+      _ => s"Update failed on Submission.Report ${report.id}".asLeft,
+      _ => ().asRight
+    )
     .pure
 
 
   override def ?(fltr: Submission.Report.Filter)(
     implicit env: Env
   ): F[Iterable[Submission.Report]] =
-    dataDir.listFiles(
-      (_,name) => (name startsWith "SubmissionReport_") && (name endsWith ".json")
-    )
-    .to(Iterable)
-    .map(new FileInputStream(_))
-    .map(readAsJson[Submission.Report])
-    .filter(fltr)
-    .pure
+    cachedReports
+      .values
+      .filter(fltr)
+      .pure
 
 
   override def ?(fltr: Submission.Filter)(
     implicit env: Env
   ): F[Iterable[Submission[T]]] =
     dataDir.listFiles(
-      (_,name) => (name startsWith "MVH_") && (name endsWith ".json")
+      (_,name) => (name startsWith SUBMISSION_PREFIX) && (name endsWith ".json")
     )
     .to(Iterable)
     .map(new FileInputStream(_))
@@ -100,11 +147,20 @@ extends Repository[F,Monad[F],T]
 
   override def delete(id: Id[Patient])(
     implicit env: Env
-  ): F[Either[String,Unit]] = 
-    (submissionFile(id).delete && submissionReportFile(id).delete) match {
-      case true  => ().asRight[String].pure
+  ): F[Either[String,Unit]] =
+    for {
 
-      case false => s"Failed to delete Submission for Patient $id".asLeft[Unit].pure
+      repFile <- reportFile(id).pure
+
+      report = readAsJson[Submission.Report].apply(new FileInputStream(repFile))
+
+    } yield {
+      if (submissionFile(id).delete && repFile.delete){
+        cachedReports -= report.id
+        ().asRight[String]
+      }
+      else
+        s"Failed to delete Submission for Patient $id".asLeft[Unit]
     }
 
 }

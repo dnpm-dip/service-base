@@ -19,6 +19,11 @@ trait MVHService[F[_],Env,T <: PatientRecord]
   ): F[Either[Error,Outcome]]
 
 
+  def ?(filter: Submission.Report.Filter)(
+    implicit env: Env
+  ): F[Iterable[Submission.Report]]
+
+
   def ?(filter: Submission.Filter)(
     implicit env: Env
   ): F[Iterable[Submission[T]]]
@@ -32,15 +37,17 @@ object MVHService
 
   final case class Process[T <: PatientRecord](
     record: T,
-    metadata: Submission.Metadata,
-//    qcPassed: Boolean
+    metadata: Submission.Metadata
   )
   extends Command[T]
+
+  final case class ConfirmSubmitted(id: Id[TransferTAN]) extends Command[Nothing]
 
   final case class Delete(id: Id[Patient]) extends Command[Nothing]
 
   sealed trait Outcome
   final case object Saved extends Outcome
+  final case class Updated(id: Id[TransferTAN]) extends Outcome
   final case object Deleted extends Outcome
 
   sealed trait Error
