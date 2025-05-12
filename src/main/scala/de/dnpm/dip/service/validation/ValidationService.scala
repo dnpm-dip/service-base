@@ -6,7 +6,10 @@ import de.dnpm.dip.model.{
   Id,
   Patient
 }
-
+import play.api.libs.json.{
+  Json,
+  Writes
+}
 
 object ValidationService
 {
@@ -28,12 +31,23 @@ object ValidationService
 
   final case class Filter
   (
-    severities: Option[Set[Issue.Severity.Value]]
+    severities: Option[Set[Issue.Severity.Value]] = None
   )
 
   object Filter
   {
     val empty = Filter(None)
+  }
+
+  final case class StatusInfo
+  (
+    total: Int
+  )
+
+  object StatusInfo
+  {
+    implicit val format: Writes[StatusInfo] =
+      Json.writes[StatusInfo]
   }
 
 }
@@ -83,5 +97,10 @@ trait ValidationService[
   )(
     implicit env: Env
   ): F[Option[PatientRecord]]
+
+
+  def statusInfo(
+    implicit env: Env
+  ): F[StatusInfo]
 
 }

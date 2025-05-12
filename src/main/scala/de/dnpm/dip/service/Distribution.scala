@@ -1,9 +1,10 @@
-package de.dnpm.dip.service.query
+package de.dnpm.dip.service
 
 
 import cats.Semigroup
 import play.api.libs.json.{
   Json,
+  Reads,
   Writes,
   OWrites
 }
@@ -258,6 +259,9 @@ object Distribution
     }
     .toSeq
 
+
+  implicit def reads[T: Reads]: Reads[Distribution[T]] =
+    Json.reads[Distribution[T]]
 
   implicit def writes[T: Writes]: OWrites[Distribution[T]] =
     Json.writes[Distribution[T]]

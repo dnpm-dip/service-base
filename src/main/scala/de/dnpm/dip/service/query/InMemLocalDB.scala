@@ -114,38 +114,13 @@ with Logging
 
   }
 
-/*
-  override def ?(
-    criteria: Criteria
-  )(
-    implicit env: C[F]
-  ): F[Either[String,Seq[(Snapshot[PatientRecord],Criteria)]]] = {
-
-    val matcher = criteriaMatcher(criteria)
-          
-    cache.values
-      .collect { 
-        case snp :: _ => snp -> matcher(snp.data)
-      }
-      .collect {
-        case (snp,Some(matches)) => snp -> matches
-      }
-      .toSeq
-      .pure
-      .map(_.asRight[String])
-
-  }
-*/
 
   override def ?(
     patient: Id[Patient],
     timestamp: Option[Long] = None
   )(
     implicit env: C[F]
-  ): F[Option[Snapshot[PatientRecord]]] = {
-
-    //TODO: Logging
-
+  ): F[Option[Snapshot[PatientRecord]]] = 
     cache.get(patient)
       .flatMap {
         snps =>
@@ -156,8 +131,10 @@ with Logging
       }
       .pure
 
-  }
+
+   def totalRecords(
+    implicit env: C[F]
+  ): F[Int] =
+    cache.size.pure
 
 }
-
-

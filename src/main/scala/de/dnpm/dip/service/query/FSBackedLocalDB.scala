@@ -244,6 +244,9 @@ with Logging
 
   }
 
+  override def totalRecords(
+    implicit env: C[F]
+  ): F[Int] =
+    cache.size.pure
+
 }
-
-

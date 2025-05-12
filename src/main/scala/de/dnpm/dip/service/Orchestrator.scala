@@ -165,4 +165,18 @@ final class Orchestrator[F[_],T <: PatientRecord: Completer]
         )
     }
 
+
+  def statusInfo(
+    implicit env: Monad[F]
+  ): F[StatusInfo] =
+    for {
+      validation <- validationService.statusInfo
+      mvh <- mvhService.statusInfo
+      query <- queryService.statusInfo
+    } yield StatusInfo(
+      validation,
+      mvh,
+      query
+    )
+
 }

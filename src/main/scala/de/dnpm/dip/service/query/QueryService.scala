@@ -9,6 +9,10 @@ import de.dnpm.dip.model.{
   Snapshot,
   Site
 }
+import play.api.libs.json.{
+  Json,
+  Writes
+}
 
 
 object QueryService
@@ -26,8 +30,8 @@ object QueryService
     type PatientRecord = UseCase#PatientRecord
     type Criteria      = UseCase#Criteria
     type Results       = UseCase#Results
-    
-    
+   
+
     def sites(
       implicit env: Env
     ): F[Sites]
@@ -104,7 +108,6 @@ object QueryService
       env: Env
     ): F[Option[req.ResultType]]
 
-
   }
 
 
@@ -122,9 +125,26 @@ object QueryService
 
   trait DataOps[F[_],Env,T]
   {
+    
     def !(cmd: DataCommand[T])(
       implicit env: Env
     ): F[Either[DataError,DataOutcome[T]]]
+    
+    def statusInfo(
+      implicit env: Env
+    ): F[StatusInfo]
+
+  }
+
+  final case class StatusInfo
+  (
+    total: Int
+  )
+
+  object StatusInfo
+  {
+    implicit val format: Writes[StatusInfo] =
+      Json.writes[StatusInfo]
   }
 
 }

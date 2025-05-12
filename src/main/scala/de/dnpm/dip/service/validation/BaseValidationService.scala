@@ -48,13 +48,11 @@ extends ValidationService[F,Monad[F],T]
 with Logging
 {
 
-
-  import ValidationService._
-
   import cats.syntax.either._
   import cats.syntax.functor._
   import cats.syntax.applicative._
   import cats.syntax.flatMap._
+  import ValidationService._
 
 
   private val Acceptable =
@@ -192,5 +190,11 @@ with Logging
   ): F[Option[T]] =
     (repo ? patId).map(_.map(_._1))
 
+  override def statusInfo(
+    implicit env: Monad[F]
+  ): F[StatusInfo] =
+    (repo ? Filter())
+      .map(_.size)
+      .map(StatusInfo(_))
 
 }

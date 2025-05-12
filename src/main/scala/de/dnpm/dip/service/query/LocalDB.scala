@@ -48,6 +48,9 @@ trait LocalDB[
     implicit env: Env
   ): F[Option[Snapshot[PatientRecord]]]
 
+
+  def totalRecords(
+    implicit env: Env
+  ): F[Int]
+
 }
-
-

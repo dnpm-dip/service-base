@@ -1,11 +1,9 @@
-package de.dnpm.dip.service
+package de.dnpm.dip
 
-package object query
+package object service
 {
 
-
 type ConceptCount[+T] = Entry[T,Count]
-
 
 type DistributionsBy[K,T] = Seq[Entry[K,Distribution[T]]]
 

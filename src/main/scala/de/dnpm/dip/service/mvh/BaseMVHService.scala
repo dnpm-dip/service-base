@@ -4,6 +4,7 @@ package de.dnpm.dip.service.mvh
 import java.time.LocalDateTime
 import cats.Monad
 import de.dnpm.dip.util.Logging
+import de.dnpm.dip.service.Distribution
 import de.dnpm.dip.model.{
   History,
   PatientRecord,
@@ -82,7 +83,7 @@ with Logging
                 .map(
                   _.bimap(
                     GenericError(_),
-                    _ => Updated(id)
+                    _ => Updated
                   )
                 )
 
@@ -109,26 +110,22 @@ with Logging
 
   override def ?(filter: Submission.Report.Filter)(
     implicit env: Env
-  ): F[Iterable[Submission.Report]] =
+  ): F[Seq[Submission.Report]] =
     repo ? filter
-/*
-   (repo ? filter).map(
-     _.tapEach(
-       r => repo.update(
-         r.copy(
-           status = r.status :+ Submission.Report.Status(
-              RequestedForProcessing,
-              LocalDateTime.now
-           )
-         )
-       )
-     )
-   )
-*/
+
 
   override def ?(filter: Submission.Filter)(
     implicit env: Env
-  ): F[Iterable[Submission[T]]] =
+  ): F[Seq[Submission[T]]] =
     repo ? filter
+
+
+  override def statusInfo(
+    implicit env: Env
+  ): F[StatusInfo] =
+    (repo ? Submission.Report.Filter())
+      .map(_.map(_.status.latestBy(_.datetime).value))
+      .map(Distribution.of(_))
+      .map(MVHService.StatusInfo(_))
 
 }

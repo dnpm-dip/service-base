@@ -1,10 +1,15 @@
 package de.dnpm.dip.service.mvh
 
 
+import de.dnpm.dip.service.Distribution
 import de.dnpm.dip.model.{
   Id,
   Patient,
   PatientRecord,
+}
+import play.api.libs.json.{
+  Json,
+  Writes
 }
 
 
@@ -21,12 +26,16 @@ trait MVHService[F[_],Env,T <: PatientRecord]
 
   def ?(filter: Submission.Report.Filter)(
     implicit env: Env
-  ): F[Iterable[Submission.Report]]
+  ): F[Seq[Submission.Report]]
 
 
   def ?(filter: Submission.Filter)(
     implicit env: Env
-  ): F[Iterable[Submission[T]]]
+  ): F[Seq[Submission[T]]]
+
+  def statusInfo(
+    implicit env: Env
+  ): F[StatusInfo]
 
 }
 
@@ -42,15 +51,26 @@ object MVHService
   extends Command[T]
 
   final case class ConfirmSubmitted(id: Id[TransferTAN]) extends Command[Nothing]
-
   final case class Delete(id: Id[Patient]) extends Command[Nothing]
 
   sealed trait Outcome
   final case object Saved extends Outcome
-  final case class Updated(id: Id[TransferTAN]) extends Outcome
+  final case object Updated extends Outcome
   final case object Deleted extends Outcome
 
   sealed trait Error
   final case class GenericError(msg: String) extends Error
-}
 
+
+  final case class StatusInfo
+  (
+    submissionReports: Distribution[Submission.Report.Status.Value]
+  )
+
+  object StatusInfo
+  {
+    implicit val format: Writes[StatusInfo] =
+      Json.writes[StatusInfo]
+  }
+
+}

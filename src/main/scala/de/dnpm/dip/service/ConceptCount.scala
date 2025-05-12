@@ -1,8 +1,9 @@
-package de.dnpm.dip.service.query
+package de.dnpm.dip.service
 
 
 import play.api.libs.json.{
   Json,
+  Reads,
   OWrites
 }
 
@@ -28,7 +29,10 @@ object Count
       .on[Count](_.count)
       .reverse
 
-  implicit val formatCount: OWrites[Count] =
+  implicit val reads: Reads[Count] =
+    Json.reads[Count]
+
+  implicit val writes: OWrites[Count] =
     Json.writes[Count]
 }
 

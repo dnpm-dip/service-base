@@ -67,16 +67,18 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
 
   override def ?(fltr: Submission.Report.Filter)(
     implicit env: Env
-  ): F[Iterable[Submission.Report]] =
+  ): F[Seq[Submission.Report]] =
     reports.values
       .filter(fltr)
+      .toSeq
       .pure
 
   override def ?(fltr: Submission.Filter)(
     implicit env: Env
-  ): F[Iterable[Submission[T]]] =
+  ): F[Seq[Submission[T]]] =
     submissions.values
       .filter(fltr)
+      .toSeq
       .pure
 
 

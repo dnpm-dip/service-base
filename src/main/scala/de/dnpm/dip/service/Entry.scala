@@ -1,4 +1,4 @@
-package de.dnpm.dip.service.query
+package de.dnpm.dip.service
 
 
 

@@ -31,9 +31,9 @@ object ValidationInfo
 
 
   // For Ordering:
-  // Cpnvert ValidationInfo to tuple of (Num. Errors, Num. Warnings, Num. Infos) and compare these.
+  // Convert ValidationInfo to tuple of (Num. Errors, Num. Warnings, Num. Infos) and compare these.
   // This ensures that a ValidationInfo with even just 1 Error (1,_,_) is ordered higher
-  // than one with many more warnings but no error say (0,42,_)
+  // than one with many more warnings but no error, e.g. (0,42,_)
   implicit val ordering: Ordering[ValidationInfo] =
     Ordering[(Int,Int,Int)].on(
       info =>

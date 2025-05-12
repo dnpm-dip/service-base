@@ -89,6 +89,13 @@ with Logging
   }
 
 
+  override def statusInfo(
+    implicit env: Monad[F]
+  ): F[QueryService.StatusInfo] =
+    db.totalRecords
+      .map(QueryService.StatusInfo(_))
+
+
   override def sites(
     implicit
     env: Monad[F]

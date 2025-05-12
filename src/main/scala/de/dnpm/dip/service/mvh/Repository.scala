@@ -45,7 +45,7 @@ trait Repository[F[_],Env,T <: PatientRecord]
 
   def ?(filter: Submission.Report.Filter)(
     implicit env: Env
-  ): F[Iterable[Submission.Report]]
+  ): F[Seq[Submission.Report]]
 
   def ?(
     id: Id[TransferTAN]
@@ -56,7 +56,7 @@ trait Repository[F[_],Env,T <: PatientRecord]
 
   def ?(filter: Submission.Filter)(
     implicit env: Env
-  ): F[Iterable[Submission[T]]]
+  ): F[Seq[Submission[T]]]
 
 
   def delete(id: Id[Patient])(

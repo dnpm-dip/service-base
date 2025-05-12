@@ -125,20 +125,21 @@ extends Repository[F,Monad[F],T]
 
   override def ?(fltr: Submission.Report.Filter)(
     implicit env: Env
-  ): F[Iterable[Submission.Report]] =
+  ): F[Seq[Submission.Report]] =
     cachedReports
       .values
       .filter(fltr)
+      .toSeq
       .pure
 
 
   override def ?(fltr: Submission.Filter)(
     implicit env: Env
-  ): F[Iterable[Submission[T]]] =
+  ): F[Seq[Submission[T]]] =
     dataDir.listFiles(
       (_,name) => (name startsWith SUBMISSION_PREFIX) && (name endsWith ".json")
     )
-    .to(Iterable)
+    .to(Seq)
     .map(new FileInputStream(_))
     .map(readAsJson[Submission[T]])
     .filter(fltr)
@@ -149,11 +150,8 @@ extends Repository[F,Monad[F],T]
     implicit env: Env
   ): F[Either[String,Unit]] =
     for {
-
       repFile <- reportFile(id).pure
-
       report = readAsJson[Submission.Report].apply(new FileInputStream(repFile))
-
     } yield {
       if (submissionFile(id).delete && repFile.delete){
         cachedReports -= report.id

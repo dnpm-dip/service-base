@@ -10,6 +10,7 @@ import de.dnpm.dip.model.{
   Site,
   Snapshot
 }
+import de.dnpm.dip.service.Distribution
 import play.api.libs.json.{
   Json,
   OWrites
