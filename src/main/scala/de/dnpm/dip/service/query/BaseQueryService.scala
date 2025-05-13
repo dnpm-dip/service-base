@@ -317,11 +317,9 @@ with Logging
                 .tap(query => cache += query -> ResultSetFrom(query,results))
                 .asRight
 
-              case Right(_) =>
-                Query.NoResults.asLeft
+              case Right(_) => Query.NoResults.asLeft
                   
-              case Left(errs) =>
-                Query.ConnectionErrors(errs).asLeft
+              case Left(errs) => Query.ConnectionErrors(errs).asLeft
             }
 
         } yield errsOrQuery
@@ -390,11 +388,9 @@ with Logging
                       .tap(query => cache += query -> ResultSetFrom(query,results))
                       .asRight
       
-                    case Right(_) =>
-                      Query.NoResults.asLeft
-                        
-                    case Left(errs) =>
-                      Query.ConnectionErrors(errs).asLeft
+                    case Right(_) => Query.NoResults.asLeft
+
+                    case Left(errs) => Query.ConnectionErrors(errs).asLeft
                   }
               
               } yield errsOrQuery

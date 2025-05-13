@@ -5,6 +5,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers._
 import org.scalatest.Inspectors._
 import de.dnpm.dip.model.Age
+import de.dnpm.dip.service.Distribution
 
 
 class DistributionTests extends AnyFlatSpec

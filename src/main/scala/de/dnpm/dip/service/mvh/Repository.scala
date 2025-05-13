@@ -15,8 +15,8 @@ trait Repository[F[_],Env,T <: PatientRecord]
     filter: Submission.Report.Filter
   ): Submission.Report => Boolean =
     report =>
-      filter.period.map(_ contains report.submittedAt).getOrElse(true) &&
-      filter.status.map(_ contains report.status.latestBy(_.datetime).value).getOrElse(true)
+      filter.period.map(_ contains report.createdAt).getOrElse(true) &&
+      filter.status.map(_ contains report.status).getOrElse(true)
 
 
   protected implicit def toPredicate(

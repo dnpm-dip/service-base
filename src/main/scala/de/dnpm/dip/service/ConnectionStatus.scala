@@ -25,9 +25,8 @@ final case class ConnectionStatus
 object ConnectionStatus extends Enumeration
 {
 
-  val Online = Value("online")
+  val Online  = Value("online")
   val Offline = Value("offline")
-
 
   def from[T](
     resultsBySite: Map[Coding[Site],Either[String,T]]
@@ -35,23 +34,11 @@ object ConnectionStatus extends Enumeration
     resultsBySite.map {
       case (site,result) =>
         result match {
-          case Right(_) =>
-            ConnectionStatus(
-              site,
-              Online,
-              None
-            )
-
-          case Left(msg) =>
-            ConnectionStatus(
-              site,
-              Offline,
-              Some(msg)
-            )
+          case Right(_)  => ConnectionStatus(site,Online,None)
+          case Left(msg) => ConnectionStatus(site,Offline,Some(msg))
         }
     }
     .toSeq
-
 
   implicit val formatValue: Format[Value] =
     Json.formatEnum(this)

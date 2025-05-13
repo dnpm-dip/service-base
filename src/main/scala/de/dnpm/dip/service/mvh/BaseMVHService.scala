@@ -6,7 +6,6 @@ import cats.Monad
 import de.dnpm.dip.util.Logging
 import de.dnpm.dip.service.Distribution
 import de.dnpm.dip.model.{
-  History,
   PatientRecord,
   Site
 }
@@ -44,12 +43,7 @@ with Logging
             metadata.transferTAN,
             datetime,
             record.patient.id,
-            History(
-              Submission.Report.Status(
-                Unsubmitted,
-                datetime
-              )
-            ),
+            Unsubmitted,
             Site.local,
             useCase,
             metadata.`type`,
@@ -75,17 +69,13 @@ with Logging
           result <- 
             optReport match {
               case Some(report) =>
-                repo.update(
-                  report.copy(
-                    status = report.status :+ Submission.Report.Status(Submitted, LocalDateTime.now)
+                repo.update(report.copy(status = Submitted))
+                  .map(
+                    _.bimap(
+                      GenericError(_),
+                      _ => Updated
+                    )
                   )
-                )
-                .map(
-                  _.bimap(
-                    GenericError(_),
-                    _ => Updated
-                  )
-                )
 
               case None =>
                 env.pure(
@@ -124,7 +114,7 @@ with Logging
     implicit env: Env
   ): F[StatusInfo] =
     (repo ? Submission.Report.Filter())
-      .map(_.map(_.status.latestBy(_.datetime).value))
+      .map(_.map(_.status))
       .map(Distribution.of(_))
       .map(MVHService.StatusInfo(_))
 
