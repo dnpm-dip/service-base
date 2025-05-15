@@ -349,7 +349,7 @@ trait Validators
       (
         validate(record.patient),
         (record.ngsReports.exists(_.nonEmpty) must be (true)) orElse (
-          record.carePlans.exists(_.exists(_.statusReason.isDefined)) must be (true) 
+          record.carePlans.exists(_.exists(_.noSequencingPerformedReason.isDefined)) must be (true) 
         ) otherwise (
           Error("Es sind keine(e) Sequenzierung-Bericht(e) vorhanden, aber auch kein Board-Beschluss mit Begründung, warum keine Sequenzierung beantragt worden ist")
         ) at "Sequenzier-Berichte/Board-Beschlüsse"
