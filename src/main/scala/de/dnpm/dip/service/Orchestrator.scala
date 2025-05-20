@@ -125,12 +125,12 @@ final class Orchestrator[F[_],T <: PatientRecord: Completer]
                   
               } yield saveResult match {
 
-                case Right(MVHService.Saved | QueryService.Saved) => 
+                case Right(MVHService.Saved | QueryService.Saved(_)) => 
 
                   outcome match {
-                    case DataValid(data)                       => Saved(data).asRight[Error]
+                    case DataValid(data)                       => Saved(data).asRight
 
-                    case DataAcceptableWithIssues(data,report) => SavedWithIssues(data,report).asRight[Error]
+                    case DataAcceptableWithIssues(data,report) => SavedWithIssues(data,report).asRight
                 
                     // Can't occur but required for exhaustive pattern match
                     case ValidationService.Deleted(_) => Error[T](ValidationService.GenericError("Unexpected validation outcome"))
