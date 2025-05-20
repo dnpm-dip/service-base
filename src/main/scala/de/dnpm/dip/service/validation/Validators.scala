@@ -32,6 +32,8 @@ import de.dnpm.dip.model.{
   Patient,
   PatientRecord,
   Procedure,
+  Recommendation,
+  MedicationRecommendation,
   Reference,
   ExternalReference,
   Study,
@@ -96,6 +98,9 @@ trait Validators
 
   implicit val patientNode: Path.Node[Patient] =
     Path.Node("Patient")
+
+  implicit val baseVariantNode: Path.Node[BaseVariant] =
+    Path.Node("Variante")
 
   implicit def diagnosisNode[D <: Diagnosis]: Path.Node[D] =
     Path.Node("Diagnose")
@@ -208,7 +213,7 @@ trait Validators
   implicit val proteinChangeValidator: Validator[Issue,Code[HGVS.Protein]] =
     code =>
       code.value must (matchRegex (HGVS.Protein.threeLetterCode) or contain ("?")) otherwise (
-        Error(s"Ungültiger Code '${code}', erwarte 3-Buchstaben-Format") at "Amino-Säure-Austausch"
+        Error(s"Ungültiger Code '${code}', erwarte 3-Buchstaben-Format für Amino-Säure") at "Amino-Säure-Austausch"
       ) map (_ => code)
 
       
@@ -232,10 +237,9 @@ trait Validators
     ) map (_ => ref)
 
 
-  implicit def geneAlterationReferenceValidator[T <: BaseVariant](
+  implicit def geneAlterationReferenceValidator[T <: BaseVariant: Path.Node](
     implicit
     variants: Iterable[T],
-    node: Path.Node[T],
     geneValidator: Validator[Issue.Builder,Coding[HGNC]]
   ): NegatableValidator[Issue.Builder,GeneAlterationReference[T]] =
     ref => 
@@ -262,23 +266,34 @@ trait Validators
       .errorsOr(patient) on patient
 
 
-  def TherapyValidator[
-    T <: Therapy: HasId: Path.Node,
-  ](
+  protected def RecommendationValidator[T <: Recommendation: HasId: Path.Node](
     implicit
     patient: Patient,
-    diagnoses: Iterable[Diagnosis],
-    recommendations: Iterable[TherapyRecommendation]
+    variants: Iterable[BaseVariant],
+    geneValidator: Validator[Issue.Builder,Coding[HGNC]]
   ): Validator[Issue,T] =
-    therapy =>
+    rec =>
       (
-        validate(therapy.patient) at "Patient",
-        validateOpt(therapy.reason) at "Therapie-Grund (Diagnose)",
-        therapy.therapyLine must be (defined) otherwise (MissingValue("Therapie-Linie")),
-        therapy.period must be (defined) otherwise (MissingValue("Zeitraum")),
-        validateOpt(therapy.basedOn) at "Therapie-Empfehlung",
+        validate(rec.patient) at "Patient",
+        rec.supportingVariants.getOrElse(List.empty) must be (nonEmpty) otherwise (
+          MissingValue("Stützende molekulare Alteration(en)")
+        ) andThen (
+          validateEach(_) at "Stützende molekulare Alteration(en)"
+        )
       )
-      .errorsOr(therapy) on therapy
+      .errorsOr(rec) on rec
+
+
+  protected def MedicationRecommendationValidator[Med, T <: MedicationRecommendation[Med]: HasId: Path.Node](
+    implicit
+    patient: Patient,
+    variants: Iterable[BaseVariant],
+    geneValidator: Validator[Issue.Builder,Coding[HGNC]],
+    medicationValidator: Validator[Issue.Builder,Coding[Med]]
+  ): Validator[Issue,T] =
+    RecommendationValidator[T] combineWith { 
+      rec => (validateEach(rec.medication.toList) at "Medikation").map(_ => rec)
+    }
 
 
   implicit val studyRefValidator: Validator[Issue.Builder,ExternalReference[Study,Study.Registries]] = {
@@ -299,14 +314,43 @@ trait Validators
 
 
   implicit def StudyRecommendationValidator[T <: StudyEnrollmentRecommendation: HasId: Path.Node](
-    implicit patient: Patient
-  ): Validator[Issue, T] =
-    rec => 
+    implicit
+    patient: Patient,
+    variants: Iterable[BaseVariant],
+    geneValidator: Validator[Issue.Builder,Coding[HGNC]]
+  ): Validator[Issue,T] =
+    RecommendationValidator[T] combineWith {
+      rec => (validateEach(rec.study) at "Studien-Referenz").map( _ => rec)
+    }
+
+
+  protected def TherapyValidator[T <: Therapy: HasId: Path.Node](
+    implicit
+    patient: Patient,
+    diagnoses: Iterable[Diagnosis],
+    recommendations: Iterable[TherapyRecommendation]
+  ): Validator[Issue,T] =
+    therapy =>
       (
-        validate(rec.patient) at "Patient",
-        validateEach(rec.study) at "Studien-Referenz"
+        validate(therapy.patient) at "Patient",
+        validateOpt(therapy.reason) at "Therapie-Grund (Diagnose)",
+        therapy.therapyLine must be (defined) otherwise (MissingValue("Therapie-Linie")),
+        therapy.period must be (defined) otherwise (MissingValue("Zeitraum")),
+        validateOpt(therapy.basedOn) at "Therapie-Empfehlung",
       )
-      .errorsOr(rec) on rec
+      .errorsOr(therapy) on therapy
+
+
+  protected def SystemicTherapyValidator[Med, T <: SystemicTherapy[Med]: HasId: Path.Node](
+    implicit
+    patient: Patient,
+    diagnoses: Iterable[Diagnosis],
+    recommendations: Iterable[TherapyRecommendation],
+    medicationValidator: Validator[Issue.Builder,Coding[Med]]
+  ): Validator[Issue,T] =
+    TherapyValidator[T] combineWith {
+      therapy => 
+    }
 
 
   def RangeValidator[T](range: Interval[T]): Validator[Issue.Builder,T] =
