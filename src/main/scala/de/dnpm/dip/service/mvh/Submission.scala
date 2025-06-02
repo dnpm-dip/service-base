@@ -6,6 +6,7 @@ import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
   HealthInsurance,
   Id,
+  NGSReport,
   Period,
   Patient,
   PatientRecord,
@@ -57,7 +58,8 @@ object Submission
     site: Coding[Site],
     useCase: UseCase.Value,
     `type`: Type.Value,
-    healthInsuranceType: Coding[HealthInsurance.Type.Value]
+    sequencingType: Option[NGSReport.Type.Value],
+    healthInsuranceType: HealthInsurance.Type.Value
   )
 
   object Report
@@ -66,17 +68,24 @@ object Submission
     object Status extends Enumeration
     { 
       val Unsubmitted            = Value("unsubmitted")
-//      val RequestedForProcessing = Value("requested-for-processing")
       val Submitted              = Value("submitted")
 
       implicit val formatValue: Format[Value] =
         Json.formatEnum(this)
     }
 
-    final case class Filter(
+    final case class Filter
+    (
       period: Option[Period[LocalDateTime]] = None,
       status: Option[Set[Status.Value]] = None 
     )
+
+
+    implicit val formatInsType: Format[HealthInsurance.Type.Value] =
+      Json.formatEnum(HealthInsurance.Type)
+
+    implicit val formatNgsType: Format[NGSReport.Type.Value] =
+      Json.formatEnum(NGSReport.Type)
 
     implicit val format: OFormat[Report] =
       Json.format[Report]

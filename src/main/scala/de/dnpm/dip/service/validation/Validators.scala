@@ -341,18 +341,6 @@ trait Validators
       .errorsOr(therapy) on therapy
 
 
-  protected def SystemicTherapyValidator[Med, T <: SystemicTherapy[Med]: HasId: Path.Node](
-    implicit
-    patient: Patient,
-    diagnoses: Iterable[Diagnosis],
-    recommendations: Iterable[TherapyRecommendation],
-    medicationValidator: Validator[Issue.Builder,Coding[Med]]
-  ): Validator[Issue,T] =
-    TherapyValidator[T] combineWith {
-      therapy => 
-    }
-
-
   def RangeValidator[T](range: Interval[T]): Validator[Issue.Builder,T] =
     t => t must be (in (range)) otherwise (
       Error(s"Ungültiger Wert $t, nicht in Referenz-Bereich $range")

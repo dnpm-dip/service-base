@@ -1,6 +1,7 @@
 package de.dnpm.dip.service
 
 
+import java.time.LocalDateTime
 import scala.util.{
   Left,
   Right
@@ -16,6 +17,7 @@ import de.dnpm.dip.model.{
   Id,
   Patient,
   PatientRecord,
+  Site
 }
 import de.dnpm.dip.service.validation.{
   ValidationService,
@@ -36,8 +38,10 @@ object Orchestrator
   final case class Delete(id: Id[Patient]) extends Command[Nothing]
 
   sealed trait Outcome[+T]
-  final case class Saved[T](data: T) extends Outcome[T]
-  final case class SavedWithIssues[T](data: T, report: ValidationReport) extends Outcome[T]
+//  final case class Saved[T](data: T) extends Outcome[T]
+//  final case class SavedWithIssues[T](data: T, report: ValidationReport) extends Outcome[T]
+  final case object Saved extends Outcome[Nothing]
+  final case class SavedWithIssues(report: ValidationReport) extends Outcome[Nothing]
   final case class Deleted(id: Id[Patient]) extends Outcome[Nothing]
 
 
@@ -128,10 +132,12 @@ final class Orchestrator[F[_],T <: PatientRecord: Completer]
                 case Right(MVHService.Saved | QueryService.Saved(_)) => 
 
                   outcome match {
-                    case DataValid(data)                       => Saved(data).asRight
-
-                    case DataAcceptableWithIssues(data,report) => SavedWithIssues(data,report).asRight
+                    case DataValid(data)                       => Saved.asRight
+                    case DataAcceptableWithIssues(data,report) => SavedWithIssues(report).asRight
                 
+//                    case DataValid(data)                       => Saved(data).asRight
+//                    case DataAcceptableWithIssues(data,report) => SavedWithIssues(data,report).asRight
+
                     // Can't occur but required for exhaustive pattern match
                     case ValidationService.Deleted(_) => Error[T](ValidationService.GenericError("Unexpected validation outcome"))
                   }
@@ -174,6 +180,8 @@ final class Orchestrator[F[_],T <: PatientRecord: Completer]
       mvh <- mvhService.statusInfo
       query <- queryService.statusInfo
     } yield StatusInfo(
+      Site.local,
+      LocalDateTime.now,
       validation,
       mvh,
       query
