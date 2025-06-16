@@ -111,7 +111,8 @@ object Submission
   }
 
 
-  final case class Filter(
+  final case class Filter
+  (
     transferTAN: Option[Set[Id[TransferTAN]]] = None,
     period: Option[Period[LocalDateTime]] = None
   )

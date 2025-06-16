@@ -38,8 +38,6 @@ object Orchestrator
   final case class Delete(id: Id[Patient]) extends Command[Nothing]
 
   sealed trait Outcome[+T]
-//  final case class Saved[T](data: T) extends Outcome[T]
-//  final case class SavedWithIssues[T](data: T, report: ValidationReport) extends Outcome[T]
   final case object Saved extends Outcome[Nothing]
   final case class SavedWithIssues(report: ValidationReport) extends Outcome[Nothing]
   final case class Deleted(id: Id[Patient]) extends Outcome[Nothing]
@@ -66,7 +64,7 @@ object Orchestrator
 }
 
 
-final class Orchestrator[F[_],T <: PatientRecord: Completer]
+final class Orchestrator[F[+_],T <: PatientRecord: Completer]
 (
   validationService: ValidationService[F,Monad[F],T],
   mvhService: MVHService[F,Monad[F],T],
@@ -100,7 +98,7 @@ final class Orchestrator[F[_],T <: PatientRecord: Completer]
 
           validationResult <- (validationService ! Validate(record))
 
-          result <- validationResult match {
+          finalResult <- validationResult match {
             
             // Validation (partially) passed
             case Right(outcome) =>
@@ -112,18 +110,22 @@ final class Orchestrator[F[_],T <: PatientRecord: Completer]
                       mvhResult <- mvhService ! MVHService.Process(record,metadata)
 
                       dnpmPermitted =
-                        metadata.researchConsents.exists(
-                          _.forall(consent => consent.permits(PATDAT_STORE_AND_USE) || (consent.permits(MDAT_STORE_AND_PROCESS) && consent.permits(MDAT_RESEARCH_USE)))
-                        )
+                        metadata.researchConsents
+                          .filter(_.nonEmpty)
+                          .exists(
+                            _.forall(consent => consent.permits(PATDAT_STORE_AND_USE) || (consent.permits(MDAT_STORE_AND_PROCESS) && consent.permits(MDAT_RESEARCH_USE)))
+                          )
                 
-                     } yield mvhResult match {
-                       case Right(_) =>
-                         if (dnpmPermitted) queryService ! QueryService.Save(record)
-                         else ().asRight.pure
+                      result <- mvhResult match {
+                        case Right(_) =>
+                          if (dnpmPermitted) queryService ! QueryService.Save(record)
+                          else mvhResult.pure
                 
-                       case err => err.pure
-                     }
-                 
+                        case err => err.pure
+                      }
+
+                    } yield result
+
                   case None => queryService ! QueryService.Save(record)
                 }
                   
@@ -134,9 +136,6 @@ final class Orchestrator[F[_],T <: PatientRecord: Completer]
                   outcome match {
                     case DataValid(data)                       => Saved.asRight
                     case DataAcceptableWithIssues(data,report) => SavedWithIssues(report).asRight
-                
-//                    case DataValid(data)                       => Saved(data).asRight
-//                    case DataAcceptableWithIssues(data,report) => SavedWithIssues(data,report).asRight
 
                     // Can't occur but required for exhaustive pattern match
                     case ValidationService.Deleted(_) => Error[T](ValidationService.GenericError("Unexpected validation outcome"))
@@ -146,6 +145,10 @@ final class Orchestrator[F[_],T <: PatientRecord: Completer]
 
                 case Left(err: QueryService.DataError) => Error[T](err)
             
+                // These cases can't occur but are required for exhaustive pattern match:
+                case Right(_) => Saved.asRight   // In this case saving has worked
+                case Left(_)  => Error[T](QueryService.GenericError("Unexpected data saving outcome"))
+
               }
 
             // Validation failed
@@ -153,7 +156,7 @@ final class Orchestrator[F[_],T <: PatientRecord: Completer]
 
           }
 
-        } yield result
+        } yield finalResult
 
 
       case Orchestrator.Delete(id) =>
