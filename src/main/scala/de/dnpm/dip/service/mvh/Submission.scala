@@ -39,6 +39,7 @@ object Submission
 
   object Type extends Enumeration
   {
+//    val Test    = Value("test")
     val Initial    = Value("initial")
     val Addition   = Value("addition")
     val Correction = Value("correction")

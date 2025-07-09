@@ -84,7 +84,98 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
     MDAT_RESEARCH_USE,
     PATDAT_STORE_AND_USE
   }
-  
+
+
+  def !(
+    cmd: Orchestrator.Command[T]
+  )(
+    implicit env: Monad[F]
+  ): F[Either[Error,Orchestrator.Outcome[T]]] =
+    cmd match {
+
+      case Process(rawData) =>
+        for { 
+
+          dataUpload <- rawData.copy(record = rawData.record.complete).pure  // Load completed record into Monad
+
+          validationResult <- (validationService ! Validate(dataUpload))
+
+          finalResult <- validationResult match {
+            
+            // Validation (partially) passed
+            case Right(outcome) =>
+              for {
+                saveResult <- dataUpload.metadata match {
+                  case Some(metadata) =>
+                    for {
+                      mvhResult <- mvhService ! MVHService.Process(dataUpload.record,metadata)
+
+                      dnpmPermitted =
+                        metadata.researchConsents
+                          .filter(_.nonEmpty)
+                          .exists(
+                            _.forall(consent => consent.permits(PATDAT_STORE_AND_USE) || (consent.permits(MDAT_STORE_AND_PROCESS) && consent.permits(MDAT_RESEARCH_USE)))
+                          )
+                
+                      result <- mvhResult match {
+                        case Right(_) =>
+                          if (dnpmPermitted) queryService ! QueryService.Save(dataUpload.record)
+                          else mvhResult.pure
+                
+                        case err => err.pure
+                      }
+
+                    } yield result
+
+                  case None => queryService ! QueryService.Save(dataUpload.record)
+                }
+                  
+              } yield saveResult match {
+
+                case Right(MVHService.Saved | QueryService.Saved(_)) => 
+
+                  outcome match {
+                    case DataValid(data)                       => Saved.asRight
+                    case DataAcceptableWithIssues(data,report) => SavedWithIssues(report).asRight
+
+                    // Can't occur but required for exhaustive pattern match
+                    case ValidationService.Deleted(_) => Error[T](ValidationService.GenericError("Unexpected validation outcome"))
+                  }
+            
+                case Left(err: MVHService.Error) => Error[T](err)
+
+                case Left(err: QueryService.DataError) => Error[T](err)
+            
+                // These cases can't occur but are required for exhaustive pattern match:
+                case Right(_) => Saved.asRight   // In this case saving has worked
+                case Left(_)  => Error[T](QueryService.GenericError("Unexpected data saving outcome"))
+
+              }
+
+            // Validation failed
+            case Left(err) => Error[T](err).pure 
+
+          }
+
+        } yield finalResult
+
+
+      case Orchestrator.Delete(id) =>
+        (
+          validationService ! ValidationService.Delete(id),
+          mvhService ! MVHService.Delete(id),
+          queryService ! QueryService.Delete(id)
+        )
+        .mapN(
+          (out,_,_) =>
+            out match {
+              case Right(_)  => Deleted(id).asRight[Error]
+              case Left(err) => Error[T](err)
+            }
+        )
+    }
+
+/*
   def !(
     cmd: Orchestrator.Command[T]
   )(
@@ -173,7 +264,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
             }
         )
     }
-
+*/
 
   def statusInfo(
     implicit env: Monad[F]

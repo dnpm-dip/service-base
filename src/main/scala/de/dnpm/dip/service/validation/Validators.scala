@@ -41,6 +41,10 @@ import de.dnpm.dip.model.{
   Therapy,
   TherapyRecommendation
 }
+import de.dnpm.dip.service.DataUpload
+import de.dnpm.dip.service.mvh.Submission
+import de.dnpm.dip.service.mvh.ModelProjectConsent.Purpose._
+import de.dnpm.dip.service.mvh.Consent.Provision.Type._
 import Issue.{
   Error,
   Fatal,
@@ -256,12 +260,12 @@ trait Validators
     patient =>
       (
         patient.age.value.toInt must be (in (ageRange)) otherwise (
-          Error(s"Patienten-Alter nicht im realistisch möglichen Bereich $ageRange")
-        ) at "Alter",
+          Error(s"Patienten-Alter nicht im realistisch möglichen Intervall $ageRange Jahre") at "Alter"
+        ),
         patient.healthInsurance.reference must be (defined) otherwise (MissingValue("Krankenkassen-IK")),
         patient.address.municipalityCode must matchRegex ("^\\d{5}$".r) otherwise (
-          Error("Fehlerhaftes Format: erste 5 Ziffern erwartet")
-        ) at "Amtlicher Gemeindeschlüssel"
+          Error("Fehlerhaftes Format: erste 5 Ziffern erwartet") at "Amtlicher Gemeindeschlüssel"
+        )
       )
       .errorsOr(patient) on patient
 
@@ -388,5 +392,64 @@ trait Validators
         ) at "Sequenzier-Berichte/Board-Beschlüsse"
       )
       .errorsOr(record)
-      
+
+
+
+  implicit val metadataValidator: Validator[Issue,Submission.Metadata] =
+    metadata =>
+      (
+        metadata.modelProjectConsent
+          .provisions
+          .find(_.purpose == Sequencing)
+          .exists(_.`type` == Permit) must be (true) otherwise (Error("Fehlende Zustimmung zur Sequenzierung") at "MVH-Einwilligung"),
+        ifDefined(metadata.modelProjectConsent.date)(
+          d => 
+            (
+              all (metadata.modelProjectConsent.provisions.map(_.date)) must not (be (before (d))) otherwise (
+                Error("Einwilligungsdatum kann nicht vor dem Vorlegen der Teilnahmeerklärung liegen") at "MVH-Einwilligung"
+              )
+            )
+            .map(_ => d)
+        )       
+      )
+      .errorsOr(metadata) on "Metadaten"
+
+
+  def dataUploadValidator[T <: PatientRecord](
+    implicit recordValidator: Validator[Issue,T]
+  ): Validator[Issue,DataUpload[T]] = {
+
+    case upload @ DataUpload(record,optMetadata) => 
+      (
+        ifDefined(optMetadata)(
+          metadata =>
+            (
+              validate(metadata),
+              record.getCarePlans must be (nonEmpty) otherwise (Error("Kein Board-Beschluss zum MVH-Einschluss") at "Board-Beschlüsse") andThen {
+                carePlans =>
+                  metadata.modelProjectConsent.provisions
+                    .find(_.purpose == Sequencing)
+                    .exists(_.date isBefore carePlans.map(_.issuedOn).min) must be (true) otherwise (
+                      Error("MVH-Einschluss-Fallkonferenz darf nicht vor oder ohne Einwilligung zur Teilnahme stattgefunden haben") at "Datum der MVH-Einwilligung"
+                    )
+              }, 
+              (record.ngsReports.exists(_.nonEmpty) must be (true)) orElse (
+                record.getCarePlans.exists(_.noSequencingPerformedReason.isDefined) must be (true) 
+              ) otherwise (
+                Error("Kein Sequenzierung-Berichts vorhanden, aber auch kein Board-Beschluss mit Begründung, warum keine Sequenzierung beantragt worden ist") at "Sequenzier-Berichte/Board-Beschlüsse"
+              ),
+              if (metadata.`type` == Submission.Type.FollowUp){
+                record.followUps.exists(_.nonEmpty) must be (true) otherwise (Error("Es ist 'Follow-up' als Meldungs-Typ deklariert, aber keine Follow-Up-Objekte vorhanden") at "Meldungs-Typ")
+              }
+              else true.validNel[Issue]
+              
+           )
+           .errorsOr(metadata) on "Metadaten"
+        ),
+        validate(record)
+      )
+      .errorsOr(upload)
+
+  }
+
 }

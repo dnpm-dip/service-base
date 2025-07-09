@@ -18,6 +18,7 @@ import de.dnpm.dip.model.{
   PatientRecord,
 }
 import Issue.Severity
+import de.dnpm.dip.service.DataUpload
 import de.ekut.tbi.validation.Validator
 
 
@@ -25,9 +26,7 @@ private final case class SeverityMatcher(
   max: Severity.Value
 ){
   def unapply(report: ValidationReport): Boolean =
-    report.issues.forall(
-      issue => issue.severity < max
-    )
+    report.issues.forall(issue => issue.severity < max)
 }
 
 private object FatalIssues
@@ -40,11 +39,12 @@ class BaseValidationService[
   F[+_],
   T <: PatientRecord,
 ](
-  private val validator: Validator[Issue,T],
+  private val recordValidator: Validator[Issue,T],
   private val repo: Repository[F,Monad[F],T],
   private val maxSeverity: Severity.Value = Severity.Error
 )
 extends ValidationService[F,Monad[F],T]
+with Validators
 with Logging
 {
 
@@ -55,12 +55,16 @@ with Logging
   import ValidationService._
 
 
+  private implicit val validator: Validator[Issue,DataUpload[T]] =
+    dataUploadValidator(recordValidator)
+
+
   private val Acceptable =
     SeverityMatcher(maxSeverity)
 
 
   override def validate(
-    data: T
+    data: DataUpload[T]
   )(
     implicit env: Monad[F]
   ): F[Either[Error,Outcome[T]]] = {
@@ -78,7 +82,7 @@ with Logging
           case Validated.Invalid(issues) =>
             val report =
               ValidationReport(
-                data.patient.id,
+                data.record.patient.id,
                 issues,
                 Instant.now
               )          
@@ -102,22 +106,22 @@ with Logging
   ): F[Either[Error,Outcome[T]]] =
     cmd match {
 
-      case Validate(record) =>
-        log.info(s"Processing PatientRecord upload ${record.id}")
+      case Validate(data) =>
+        log.info(s"Processing PatientRecord upload ${data.record.id}")
         for {
-          outcome <- validate(record)
+          outcome <- validate(data)
 
           result <- outcome match { 
             case Right(DataValid(_)) =>
               log.debug(s"Data valid: deleting previously saved validation reports")
               // In case this were a consecutive export which now turns out valid,
               // delete the patient's previously saved validationReport and record
-              repo.delete(record.patient.id)
+              repo.delete(data.record.patient.id)
               outcome.pure
             
             case Right(DataAcceptableWithIssues(_,report)) =>
               log.debug(s"Data acceptable but with with issues: Saving record set and validation report")
-              repo.save(record,report)
+              repo.save(data,report)
                 .map {
                   case Right(_)  => outcome
                   case Left(err) => GenericError(err).asLeft[Outcome[T]]
@@ -125,7 +129,7 @@ with Logging
 
             case Left(UnacceptableIssuesDetected(report)) =>
               log.debug(s"Unacceptable issues: Saving record set and validation report")
-              repo.save(record,report)
+              repo.save(data,report)
                 .map {
                   case Right(_)  => outcome
                   case Left(err) => GenericError(err).asLeft[Outcome[T]]
@@ -187,7 +191,7 @@ with Logging
     patId: Id[Patient]
   )(
     implicit env: Monad[F]
-  ): F[Option[T]] =
+  ): F[Option[DataUpload[T]]] =
     (repo ? patId).map(_.map(_._1))
 
   override def statusInfo(

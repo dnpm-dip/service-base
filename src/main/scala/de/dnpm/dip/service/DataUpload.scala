@@ -4,6 +4,7 @@ package de.dnpm.dip.service
 import play.api.libs.json.{
   JsPath,
   JsObject,
+  OWrites,
   Reads
 }
 import de.dnpm.dip.service.mvh.{
@@ -31,6 +32,14 @@ object DataUpload
       (JsPath \ "metadata").readNullable[Submission.Metadata]
     )(
       DataUpload(_,_)
+    )
+
+  implicit def writes[T: OWrites]: OWrites[DataUpload[T]] =
+    (
+      JsPath.write[T] and
+      (JsPath \ "metadata").writeNullable[Submission.Metadata]
+    )(
+      unlift(DataUpload.unapply[T](_))
     )
 
 

@@ -1,7 +1,6 @@
 package de.dnpm.dip.service.validation
 
 
-import scala.util.Either
 import scala.collection.concurrent.{ 
   Map,
   TrieMap
@@ -13,22 +12,24 @@ import de.dnpm.dip.model.{
   Id,
   Patient
 }
+import de.dnpm.dip.service.DataUpload
 
 
 class InMemRepository[F[_],PatientRecord] extends Repository[F,Monad[F],PatientRecord]
 {
 
-  private val db: Map[Id[Patient],(PatientRecord,ValidationReport)] =
+  private val db: Map[Id[Patient],(DataUpload[PatientRecord],ValidationReport)] =
     TrieMap.empty
 
 
   override def save(
-    data: PatientRecord,
+    data: DataUpload[PatientRecord],
+//    data: PatientRecord,
     report: ValidationReport
   )(
     implicit env: Monad[F]
   ): F[Either[String,Unit]] =
-    db.update(report.patient,data ->report)
+    db.update(report.patient,data -> report)
       .asRight[String]
       .pure
 
@@ -37,7 +38,8 @@ class InMemRepository[F[_],PatientRecord] extends Repository[F,Monad[F],PatientR
     filter: ValidationService.Filter
   )(
     implicit env: Monad[F]
-  ): F[Iterable[(PatientRecord,ValidationReport)]] =
+  ): F[Iterable[(DataUpload[PatientRecord],ValidationReport)]] =
+//  ): F[Iterable[(PatientRecord,ValidationReport)]] =
     filter.severities match {
 
       case Some(severities) =>
@@ -55,7 +57,8 @@ class InMemRepository[F[_],PatientRecord] extends Repository[F,Monad[F],PatientR
     id: Id[Patient]
   )(
     implicit env: Monad[F]
-  ): F[Option[(PatientRecord,ValidationReport)]] =
+  ): F[Option[(DataUpload[PatientRecord],ValidationReport)]] =
+//  ): F[Option[(PatientRecord,ValidationReport)]] =
     db.get(id)
       .pure
  

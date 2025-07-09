@@ -22,21 +22,21 @@ import cats.syntax.applicative._
 import cats.syntax.either._
 import play.api.libs.json.{
   Json,
-  Format,
   Reads,
-  Writes
+  Writes,
+  OWrites
 }
 import de.dnpm.dip.util.Logging
 import de.dnpm.dip.model.{
   Id,
   Patient
 }
-
+import de.dnpm.dip.service.DataUpload
 
 
 class FSBackedRepository[
   F[_],
-  PatientRecord <: { def patient: Patient }: Format
+  PatientRecord <: { def patient: Patient }: Reads: OWrites
 ]
 (
   val dataDir: File
@@ -82,7 +82,7 @@ with Logging
       .pipe(_.get)
 
 
-  private val cache: Map[Id[Patient],(PatientRecord,ValidationReport)] = {
+  private val cache: Map[Id[Patient],(DataUpload[PatientRecord],ValidationReport)] = {
 
     log.debug(s"Loading persisted data from $dataDir into cache")
 
@@ -91,25 +91,25 @@ with Logging
         (_,name) => (name startsWith prefix) && (name endsWith ".json")
       )
       .to(LazyList)
-      .map(readJson[PatientRecord])
+      .map(readJson[DataUpload[PatientRecord]])
       .map {
-        record =>
+        data =>
           val report =
-            readJson[ValidationReport](reportFile(record.patient.id))
+            readJson[ValidationReport](reportFile(data.record.patient.id))
 
-          record.patient.id -> (record -> report)
+          data.record.patient.id -> (data -> report)
       }
     )
   }
 
   override def save(
-    data: PatientRecord,
+    data: DataUpload[PatientRecord],
     report: ValidationReport
   )(
     implicit env: Monad[F]
   ): F[Either[String,Unit]] = 
     Using.resources(
-      new FileWriter(file(data)),
+      new FileWriter(file(data.record)),
       new FileWriter(file(report))
     ){ 
       (wRecord,wReport) =>
@@ -126,7 +126,7 @@ with Logging
     filter: ValidationService.Filter
   )(
     implicit env: Monad[F]
-  ): F[Iterable[(PatientRecord,ValidationReport)]] =
+  ): F[Iterable[(DataUpload[PatientRecord],ValidationReport)]] =
     filter.severities match {
 
       case Some(severities) =>
@@ -144,7 +144,7 @@ with Logging
     id: Id[Patient]
   )(
     implicit env: Monad[F]
-  ): F[Option[(PatientRecord,ValidationReport)]] =
+  ): F[Option[(DataUpload[PatientRecord],ValidationReport)]] =
     cache.get(id)
       .pure
 
