@@ -1,6 +1,8 @@
 package de.dnpm.dip.service.validation
 
 
+import java.net.URI
+import scala.util.matching.Regex
 import scala.util.chaining._
 import cats.Applicative
 import cats.data.ValidatedNel
@@ -303,13 +305,16 @@ trait Validators
   implicit val studyRefValidator: Validator[Issue.Builder,ExternalReference[Study,Study.Registries]] = {
     import Study.Registries._
 
-    val patterns =
+    val patterns: PartialFunction[URI,Regex] =
       Map(
         Coding.System[NCT].uri     -> "NCT\\d{8}".r,
         Coding.System[DRKS].uri    -> "DRKS000\\d{5}".r,
         Coding.System[EudraCT].uri -> "\\d{4}-\\d{6}-\\d{2}(-\\d{2})?".r,
         Coding.System[EUDAMED].uri -> ".+".r,
       )
+      .orElse {
+        case _ => ".+".r
+      }
 
     ref => ref.id.value must matchRegex (patterns(ref.system)) otherwise (
       Error(s"Studien-ID ${ref.id.value} passt nicht zum erwarteten ID-Muster für ${ref.system}-Studien")
@@ -338,7 +343,6 @@ trait Validators
       (
         validate(therapy.patient) at "Patient",
         validateOpt(therapy.reason) at "Therapie-Grund (Diagnose)",
-        therapy.therapyLine must be (defined) otherwise (MissingValue("Therapie-Linie")),
         therapy.period must be (defined) otherwise (MissingValue("Zeitraum")),
         validateOpt(therapy.basedOn) at "Therapie-Empfehlung",
       )

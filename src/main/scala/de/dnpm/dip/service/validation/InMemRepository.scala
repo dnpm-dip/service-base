@@ -24,7 +24,6 @@ class InMemRepository[F[_],PatientRecord] extends Repository[F,Monad[F],PatientR
 
   override def save(
     data: DataUpload[PatientRecord],
-//    data: PatientRecord,
     report: ValidationReport
   )(
     implicit env: Monad[F]
@@ -39,7 +38,6 @@ class InMemRepository[F[_],PatientRecord] extends Repository[F,Monad[F],PatientR
   )(
     implicit env: Monad[F]
   ): F[Iterable[(DataUpload[PatientRecord],ValidationReport)]] =
-//  ): F[Iterable[(PatientRecord,ValidationReport)]] =
     filter.severities match {
 
       case Some(severities) =>
@@ -58,7 +56,6 @@ class InMemRepository[F[_],PatientRecord] extends Repository[F,Monad[F],PatientR
   )(
     implicit env: Monad[F]
   ): F[Option[(DataUpload[PatientRecord],ValidationReport)]] =
-//  ): F[Option[(PatientRecord,ValidationReport)]] =
     db.get(id)
       .pure
  
