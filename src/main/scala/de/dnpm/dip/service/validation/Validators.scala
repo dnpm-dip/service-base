@@ -265,7 +265,7 @@ trait Validators
           Error(s"Patienten-Alter nicht im realistisch möglichen Intervall $ageRange Jahre") at "Alter"
         ),
         patient.healthInsurance.reference must be (defined) otherwise (MissingValue("Krankenkassen-IK")),
-        patient.address.municipalityCode must matchRegex ("^\\d{5}$".r) otherwise (
+        option(patient.address.map(_.municipalityCode.value)) must matchRegex ("^\\d{5}$".r) otherwise (
           Error("Fehlerhaftes Format: erste 5 Ziffern erwartet") at "Amtlicher Gemeindeschlüssel"
         )
       )
