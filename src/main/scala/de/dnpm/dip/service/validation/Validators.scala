@@ -437,10 +437,11 @@ trait Validators
                       Error("MVH-Einschluss-Fallkonferenz darf nicht vor oder ohne Einwilligung zur Teilnahme stattgefunden haben") at "Datum der MVH-Einwilligung"
                     )
               }, 
-              (record.ngsReports.exists(_.nonEmpty) must be (true)) orElse (
+              (record.ngsReports.exists(_.exists(_.variants.nonEmpty)) must be (true)) orElse (
                 record.getCarePlans.exists(_.noSequencingPerformedReason.isDefined) must be (true) 
               ) otherwise (
-                Error("Kein Sequenzierung-Berichts vorhanden, aber auch kein Board-Beschluss mit Begründung, warum keine Sequenzierung beantragt worden ist") at "Sequenzier-Berichte/Board-Beschlüsse"
+                Error("Kein Sequenzierung-Bericht mit Varianten-Befunden vorhanden, aber auch kein Board-Beschluss mit Begründung, warum keine Sequenzierung beantragt worden ist")
+                  at "Sequenzier-Berichte/Board-Beschlüsse"
               ),
               if (metadata.`type` == Submission.Type.FollowUp){
                 record.followUps.exists(_.nonEmpty) must be (true) otherwise (Error("Es ist 'Follow-up' als Meldungs-Typ deklariert, aber keine Follow-Up-Objekte vorhanden") at "Meldungs-Typ")
