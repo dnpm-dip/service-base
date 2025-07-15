@@ -29,6 +29,7 @@ import de.dnpm.dip.model.{
   GeneAlterationReference,
   Id,
   Interval,
+  NGSReport,
   SystemicTherapy,
   Obs,
   Patient,
@@ -419,6 +420,15 @@ trait Validators
       .errorsOr(metadata) on "Metadaten"
 
 
+
+  import NGSReport.Type._
+
+  private val ngsTypes = Set(Array,Panel,Exome,GenomeShortRead,GenomeLongRead)
+
+  private implicit def ngsTypeToEnum(c: Coding[NGSReport.Type.Value]): NGSReport.Type.Value =
+    NGSReport.Type.withName(c.code.value)
+
+
   def dataUploadValidator[T <: PatientRecord](
     implicit recordValidator: Validator[Issue,T]
   ): Validator[Issue,DataUpload[T]] = {
@@ -429,27 +439,28 @@ trait Validators
           metadata =>
             (
               validate(metadata),
-              record.getCarePlans must be (nonEmpty) otherwise (Error("Kein Board-Beschluss zum MVH-Einschluss") at "Board-Beschlüsse") andThen {
-                carePlans =>
-                  metadata.modelProjectConsent.provisions
-                    .find(_.purpose == Sequencing)
-                    .exists(_.date isBefore carePlans.map(_.issuedOn).min) must be (true) otherwise (
-                      Error("MVH-Einschluss-Fallkonferenz darf nicht vor oder ohne Einwilligung zur Teilnahme stattgefunden haben") at "Datum der MVH-Einwilligung"
+              record.getCarePlans.minByOption(_.issuedOn) must be (defined) otherwise (Error("Kein Board-Beschluss zum MVH-Einschluss vorhanden") at "Board-Beschlüsse") map (_.get) andThen {
+                mvhCp => 
+                  (
+                    metadata.modelProjectConsent.provisions
+                      .find(_.purpose == Sequencing)
+                      .exists(_.date isBefore mvhCp.issuedOn) must be (true) otherwise (
+                        Error("MVH-Einschluss-Fallkonferenz darf nicht vor oder ohne Einwilligung zur Teilnahme stattgefunden haben") at "Datum der MVH-Einwilligung"
+                      ),
+//                    (record.ngsReports.flatMap(_ find (report => (report.issuedOn isAfter mvhCp.issuedOn) && (ngsTypes contains report.`type`))) must be (defined)) orElse (mvhCp.noSequencingPerformedReason must be (defined)) otherwise (
+                    (record.ngsReports.exists(_.exists(report => (report.issuedOn isAfter mvhCp.issuedOn) && (ngsTypes contains report.`type`))) || mvhCp.noSequencingPerformedReason.isDefined) must be (true) otherwise ( 
+                      Error("Kein MVH-Sequenzierung-Bericht vorhanden (d.h. nach der MVH-Einschluss-Fallkonferenz entstanden), obwohl laut Board-Beschluss MVH-Sequenzierung beantragt worden ist")
+                        at "Sequenzier-Berichte"
                     )
+                  )
+                  .errorsOr(mvhCp)
               }, 
-              (record.ngsReports.exists(_.exists(_.variants.nonEmpty)) must be (true)) orElse (
-                record.getCarePlans.exists(_.noSequencingPerformedReason.isDefined) must be (true) 
-              ) otherwise (
-                Error("Kein Sequenzierung-Bericht mit Varianten-Befunden vorhanden, aber auch kein Board-Beschluss mit Begründung, warum keine Sequenzierung beantragt worden ist")
-                  at "Sequenzier-Berichte/Board-Beschlüsse"
-              ),
               if (metadata.`type` == Submission.Type.FollowUp){
                 record.followUps.exists(_.nonEmpty) must be (true) otherwise (Error("Es ist 'Follow-up' als Meldungs-Typ deklariert, aber keine Follow-Up-Objekte vorhanden") at "Meldungs-Typ")
               }
-              else true.validNel[Issue]
-              
-           )
-           .errorsOr(metadata) on "Metadaten"
+              else true.validNel
+            )
+            .errorsOr(metadata)
         ),
         validate(record)
       )
