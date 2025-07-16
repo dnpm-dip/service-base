@@ -343,7 +343,6 @@ trait Validators
       (
         validate(therapy.patient) at "Patient",
         validateOpt(therapy.reason) at "Therapie-Grund (Diagnose)",
-        therapy.period must be (defined) otherwise (MissingValue("Zeitraum")),
         validateOpt(therapy.basedOn) at "Therapie-Empfehlung",
       )
       .errorsOr(therapy) on therapy
@@ -414,7 +413,8 @@ trait Validators
               )
             )
             .map(_ => d)
-        )       
+        ),
+        metadata.researchConsents.exists(_.nonEmpty) must be (true) otherwise (MissingValue("MII Forschungs-/Broad-Consent"))
       )
       .errorsOr(metadata) on "Metadaten"
 
@@ -453,10 +453,6 @@ trait Validators
 
                 case _ => true.validNel
               }
-//              if (metadata.`type` == Submission.Type.FollowUp){
-//                record.followUps.exists(_.nonEmpty) must be (true) otherwise (Error("Es ist 'Follow-up' als Meldungs-Typ deklariert, aber keine Follow-Up-Objekte vorhanden") at "Meldungs-Typ")
-//              }
-//              else true.validNel
             )
             .errorsOr(metadata)
         ),
