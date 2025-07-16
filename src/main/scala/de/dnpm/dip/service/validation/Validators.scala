@@ -29,7 +29,6 @@ import de.dnpm.dip.model.{
   GeneAlterationReference,
   Id,
   Interval,
-  NGSReport,
   SystemicTherapy,
   Obs,
   Patient,
@@ -420,10 +419,57 @@ trait Validators
       .errorsOr(metadata) on "Metadaten"
 
 
+  def dataUploadValidator[T <: PatientRecord](
+    implicit recordValidator: Validator[Issue,T]
+  ): Validator[Issue,DataUpload[T]] = {
 
+    case upload @ DataUpload(record,optMetadata) => 
+      
+      import de.dnpm.dip.service.mvh.extensions._
+
+      (
+        ifDefined(optMetadata)(
+          metadata =>
+            (
+              validate(metadata),
+              record.mvhCarePlan must be (defined) otherwise (Error("Kein Board-Beschluss zum MVH-Einschluss vorhanden") at "Board-Beschlüsse") map (_.get) andThen {
+                mvhCp => 
+                  (
+                    metadata.modelProjectConsent.provisions
+                      .find(_.purpose == Sequencing)
+                      .exists(_.date isBefore mvhCp.issuedOn) must be (true) otherwise (
+                        Error("MVH-Einschluss-Fallkonferenz darf nicht vor oder ohne Einwilligung zur Teilnahme stattgefunden haben") at "Datum der MVH-Einwilligung"
+                      ),
+                    (record.mvhSequencingReports must be (nonEmpty)) orElse (mvhCp.noSequencingPerformedReason must be (defined)) otherwise ( 
+                      Error("Kein MVH-Sequenzierung-Bericht vorhanden, obwohl im Board-Beschluss nicht begründet ist, dass/warum keine MVH-Sequenzierung beantragt worden ist")
+                        at "Sequenzier-Berichte"
+                    )
+                  )
+                  .errorsOr(mvhCp)
+              }, 
+              metadata.`type` match {
+                case Submission.Type.FollowUp =>
+                  record.followUps.exists(_.nonEmpty) must be (true) otherwise (Error("Es ist 'Follow-up' als Meldungs-Typ deklariert, aber keine Follow-Up-Objekte vorhanden") at "Meldungs-Typ")
+
+                case _ => true.validNel
+              }
+//              if (metadata.`type` == Submission.Type.FollowUp){
+//                record.followUps.exists(_.nonEmpty) must be (true) otherwise (Error("Es ist 'Follow-up' als Meldungs-Typ deklariert, aber keine Follow-Up-Objekte vorhanden") at "Meldungs-Typ")
+//              }
+//              else true.validNel
+            )
+            .errorsOr(metadata)
+        ),
+        validate(record)
+      )
+      .errorsOr(upload)
+
+  }
+
+/*
   import NGSReport.Type._
 
-  private val ngsTypes = Set(Array,Panel,Exome,GenomeShortRead,GenomeLongRead)
+  private val ngsTypes = Set(Panel,Exome,GenomeShortRead,GenomeLongRead)
 
   private implicit def ngsTypeToEnum(c: Coding[NGSReport.Type.Value]): NGSReport.Type.Value =
     NGSReport.Type.withName(c.code.value)
@@ -455,10 +501,16 @@ trait Validators
                   )
                   .errorsOr(mvhCp)
               }, 
-              if (metadata.`type` == Submission.Type.FollowUp){
-                record.followUps.exists(_.nonEmpty) must be (true) otherwise (Error("Es ist 'Follow-up' als Meldungs-Typ deklariert, aber keine Follow-Up-Objekte vorhanden") at "Meldungs-Typ")
+              metadata.`type` match {
+                case Submission.Type.FollowUp =>
+                  record.followUps.exists(_.nonEmpty) must be (true) otherwise (Error("Es ist 'Follow-up' als Meldungs-Typ deklariert, aber keine Follow-Up-Objekte vorhanden") at "Meldungs-Typ")
+
+                case _ => true.validNel
               }
-              else true.validNel
+//              if (metadata.`type` == Submission.Type.FollowUp){
+//                record.followUps.exists(_.nonEmpty) must be (true) otherwise (Error("Es ist 'Follow-up' als Meldungs-Typ deklariert, aber keine Follow-Up-Objekte vorhanden") at "Meldungs-Typ")
+//              }
+//              else true.validNel
             )
             .errorsOr(metadata)
         ),
@@ -467,5 +519,5 @@ trait Validators
       .errorsOr(upload)
 
   }
-
+*/
 }
