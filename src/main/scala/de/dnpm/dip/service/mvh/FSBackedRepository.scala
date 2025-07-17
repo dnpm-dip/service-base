@@ -74,6 +74,11 @@ extends Repository[F,Monad[F],T]
       .pipe(_.get)
 
 
+  override def alreadyUsed(id: Id[TransferTAN])(
+    implicit env: Env
+  ): F[Boolean] =
+    cachedReports.contains(id).pure
+
 
   override def save(
     report: Submission.Report,

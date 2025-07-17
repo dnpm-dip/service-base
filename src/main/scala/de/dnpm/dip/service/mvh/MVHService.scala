@@ -59,6 +59,7 @@ object MVHService
   final case object Deleted extends Outcome
 
   sealed trait Error
+  final case class InvalidTAN(msg: String) extends Error
   final case class GenericError(msg: String) extends Error
 
 

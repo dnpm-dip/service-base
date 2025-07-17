@@ -51,37 +51,49 @@ with Logging
       case Process(record,metadata) =>
         log.info(s"Processing MVH submission for Patient record ${record.id}")
 
-        val datetime = LocalDateTime.now
+        for {
+          tanAlreadyUsed <- repo.alreadyUsed(metadata.transferTAN)
 
-        repo.save(
-          Submission.Report(
-            metadata.transferTAN,
-            datetime,
-            record.patient.id,
-            Unsubmitted,
-            Site.local,
-            useCase,
-            metadata.`type`,
-            record.ngsReports.flatMap(
-              _.collect {
-                case ngs if ngs.variants.nonEmpty => NGSReport.Type.unapply(ngs.`type`).get  // .get safe here
-              }
-              .maxOption(ngsTypeOrdering)
-            ),
-            HealthInsurance.Type.unapply(record.patient.healthInsurance.`type`).get // .get safe here
-          ),
-          Submission(
-            record,
-            metadata,
-            datetime
-          )
-        )
-        .map(
-          _.bimap(
-            GenericError(_),
-            _ => Saved
-          )
-        )
+          result <- if (!tanAlreadyUsed){
+
+            val submittedAt = LocalDateTime.now
+
+            repo.save(
+              Submission.Report(
+                metadata.transferTAN,
+                submittedAt,
+                record.patient.id,
+                Unsubmitted,
+                Site.local,
+                useCase,
+                metadata.`type`,
+                record.ngsReports.flatMap(
+                  _.collect {
+                    case ngs if ngs.variants.nonEmpty => NGSReport.Type.unapply(ngs.`type`).get  // .get safe here
+                  }
+                  .maxOption(ngsTypeOrdering)
+                ),
+                HealthInsurance.Type.unapply(record.patient.healthInsurance.`type`).get // .get safe here
+              ),
+              Submission(
+                record,
+                metadata,
+                submittedAt
+              )
+            )
+            .map(
+              _.bimap(
+                GenericError(_),
+                _ => Saved
+              )
+            )
+          } else {
+            val msg = s"Invalid submission: TAN ${metadata.transferTAN} has already been used"
+            log.warn(s"$msg, refusing submission")
+            env.pure(InvalidTAN(msg).asLeft)
+          }
+
+        } yield result
 
       case ConfirmSubmitted(id) =>
         for {

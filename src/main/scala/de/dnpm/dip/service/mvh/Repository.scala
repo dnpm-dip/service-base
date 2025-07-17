@@ -27,6 +27,10 @@ trait Repository[F[_],Env,T <: PatientRecord]
         .map(_ contains record.submittedAt)
         .getOrElse(true)
 
+  
+  def alreadyUsed(id: Id[TransferTAN])(
+    implicit env: Env
+  ): F[Boolean]
 
   def save(
     report: Submission.Report,

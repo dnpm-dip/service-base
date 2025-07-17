@@ -28,6 +28,12 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
     TrieMap.empty
 
 
+  override def alreadyUsed(id: Id[TransferTAN])(
+    implicit env: Env
+  ): F[Boolean] =
+    reports.exists(_._2.id == id).pure
+
+
   override def save(
     report: Submission.Report,
     submission: Submission[T]
