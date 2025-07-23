@@ -1,14 +1,12 @@
 package de.dnpm.dip.service.mvh
 
 
-import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
   CarePlan,
   NGSReport,
   PatientRecord
 }
 import NGSReport.Type._
-
 
 
 object extensions
@@ -21,9 +19,6 @@ object extensions
       GenomeShortRead,
       GenomeLongRead
     )
-
-  private implicit def ngsTypeToEnum(c: Coding[NGSReport.Type.Value]): NGSReport.Type.Value =
-    NGSReport.Type.withName(c.code.value)
 
 
   // MVH-specific extension methods to PatientRecord
@@ -45,7 +40,7 @@ object extensions
           record.ngsReports
             .getOrElse(List.empty)
             .filter(
-              report => (report.issuedOn isAfter cp.issuedOn) && (ngsTypes contains report.`type`)
+              report => (report.issuedOn isAfter cp.issuedOn) && (ngsTypes contains report.`type`.code)
             )
 
         case _ => List.empty

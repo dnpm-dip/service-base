@@ -404,7 +404,7 @@ trait Validators
         metadata.modelProjectConsent
           .provisions
           .find(_.purpose == Sequencing)
-          .exists(_.`type` == Permit) must be (true) otherwise (Error("Fehlende Zustimmung zur Sequenzierung") at "MVH-Einwilligung"),
+          .exists(_.`type` == Permit) must be (true) otherwise (Fatal("Fehlende Zustimmung zur Sequenzierung") at "MVH-Einwilligung"),
         ifDefined(metadata.modelProjectConsent.date)(
           d => 
             (

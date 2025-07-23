@@ -6,7 +6,6 @@ import cats.Monad
 import de.dnpm.dip.util.Logging
 import de.dnpm.dip.service.Distribution
 import de.dnpm.dip.model.{
-  HealthInsurance,
   NGSReport,
   PatientRecord,
   Site
@@ -30,10 +29,11 @@ with Logging
   type Env = Monad[F]
 
 
+  import extensions._
   import NGSReport.Type._
 
 
-  private val ngsTypeOrdering: Ordering[NGSReport.Type.Value] =
+  private implicit val ngsTypeOrdering: Ordering[NGSReport.Type.Value] =
     Ordering.by {
       case GenomeLongRead  => 4
       case GenomeShortRead => 3
@@ -42,13 +42,13 @@ with Logging
       case _               => 0
     }
 
-
   override def !(cmd: Command[T])(
     implicit env: Env
   ): F[Either[Error,Outcome]] =
     cmd match {
 
       case Process(record,metadata) =>
+
         log.info(s"Processing MVH submission for Patient record ${record.id}")
 
         for {
@@ -67,13 +67,10 @@ with Logging
                 Site.local,
                 useCase,
                 metadata.`type`,
-                record.ngsReports.flatMap(
-                  _.collect {
-                    case ngs if ngs.variants.nonEmpty => NGSReport.Type.unapply(ngs.`type`).get  // .get safe here
-                  }
-                  .maxOption(ngsTypeOrdering)
-                ),
-                HealthInsurance.Type.unapply(record.patient.healthInsurance.`type`).get // .get safe here
+                record.mvhSequencingReports
+                  .map[NGSReport.Type.Value](_.`type`.code)
+                  .maxOption,
+                record.patient.healthInsurance.`type`.code
               ),
               Submission(
                 record,
