@@ -77,7 +77,7 @@ with Logging
       result =
         validationResult match { 
           case Validated.Valid(_) =>
-            DataValid(data).asRight[Error]
+            DataValid(data).asRight
           
           case Validated.Invalid(issues) =>
             val report =
@@ -88,9 +88,9 @@ with Logging
               )          
           
             report match {
-              case Acceptable()  => DataAcceptableWithIssues(data,report).asRight[Error]
-              case FatalIssues() => FatalIssuesDetected(report).asLeft[Outcome[T]]
-              case _             => UnacceptableIssuesDetected(report).asLeft[Outcome[T]]
+              case Acceptable()  => DataAcceptableWithIssues(data,report).asRight
+              case FatalIssues() => FatalIssuesDetected(report).asLeft
+              case _             => UnacceptableIssuesDetected(report).asLeft
             }
           
         }
@@ -124,7 +124,7 @@ with Logging
               repo.save(data,report)
                 .map {
                   case Right(_)  => outcome
-                  case Left(err) => GenericError(err).asLeft[Outcome[T]]
+                  case Left(err) => GenericError(err).asLeft
                 }
 
             case Left(UnacceptableIssuesDetected(report)) =>
@@ -132,14 +132,14 @@ with Logging
               repo.save(data,report)
                 .map {
                   case Right(_)  => outcome
-                  case Left(err) => GenericError(err).asLeft[Outcome[T]]
+                  case Left(err) => GenericError(err).asLeft
                 }
 
             case Left(_) => outcome.pure
 
             // Won't occur but required for exhaustive pattern match
             case Right(Deleted(_)) =>
-              GenericError("Unexpected validation outcome").asLeft[Outcome[T]].pure
+              GenericError("Unexpected validation outcome").asLeft.pure
           }
 
         } yield result
@@ -148,8 +148,8 @@ with Logging
       case Delete(id) =>
         log.info(s"Deleting all data of Patient $id")
         repo.delete(id).map {
-          case Right(_)  => Deleted(id).asRight[Error]
-          case Left(err) => GenericError(err).asLeft[Outcome[T]]
+          case Right(_)  => Deleted(id).asRight
+          case Left(err) => GenericError(err).asLeft
         }
 
     }

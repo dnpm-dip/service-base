@@ -37,30 +37,31 @@ object Orchestrator
   final case class Process[T <: PatientRecord](upload: DataUpload[T]) extends Command[T]
   final case class Delete(id: Id[Patient]) extends Command[Nothing]
 
-  sealed trait Outcome[+T]
-  final case object Saved extends Outcome[Nothing]
-  final case class SavedWithIssues(report: ValidationReport) extends Outcome[Nothing]
-  final case class Deleted(id: Id[Patient]) extends Outcome[Nothing]
+  sealed trait Outcome
+  final case object Saved extends Outcome
+  final case class SavedWithIssues(report: ValidationReport) extends Outcome
+  final case class Deleted(id: Id[Patient]) extends Outcome
 
 
   type Error = Either[ValidationService.Error,Either[MVHService.Error,QueryService.DataError]]
 
   object Error
   {
-    def apply[T](err: QueryService.DataError): Either[Error,Outcome[T]] =
+    def apply[T](err: QueryService.DataError): Either[Error,Outcome] =
       err.asRight[MVHService.Error]
         .asRight[ValidationService.Error]
         .asLeft
 
-    def apply[T](err: MVHService.Error): Either[Error,Outcome[T]] =
+    def apply[T](err: MVHService.Error): Either[Error,Outcome] =
       err.asLeft[QueryService.DataError]
         .asRight[ValidationService.Error]
         .asLeft
 
-    def apply[T](err: ValidationService.Error): Either[Error,Outcome[T]] =
+    def apply[T](err: ValidationService.Error): Either[Error,Outcome] =
       err.asLeft[Either[MVHService.Error,QueryService.DataError]]
         .asLeft
   }
+
 }
 
 
@@ -90,7 +91,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
     cmd: Orchestrator.Command[T]
   )(
     implicit env: Monad[F]
-  ): F[Either[Error,Orchestrator.Outcome[T]]] =
+  ): F[Either[Error,Orchestrator.Outcome]] =
     cmd match {
 
       case Process(rawData) =>
@@ -169,7 +170,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
         .mapN(
           (out,_,_) =>
             out match {
-              case Right(_)  => Deleted(id).asRight[Error]
+              case Right(_)  => Deleted(id).asRight
               case Left(err) => Error[T](err)
             }
         )
