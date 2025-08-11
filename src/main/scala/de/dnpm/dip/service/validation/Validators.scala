@@ -437,7 +437,7 @@ trait Validators
                   (
                     metadata.modelProjectConsent.provisions
                       .find(_.purpose == Sequencing)
-                      .exists(_.date isBefore mvhCp.issuedOn) must be (true) otherwise (
+                      .exists(provision => !(mvhCp.issuedOn isBefore provision.date)) must be (true) otherwise (
                         Error("MVH-Einschluss-Fallkonferenz darf nicht vor oder ohne Einwilligung zur Teilnahme stattgefunden haben") at "Datum der MVH-Einwilligung"
                       ),
                     (record.mvhSequencingReports must be (nonEmpty)) orElse (mvhCp.noSequencingPerformedReason must be (defined)) otherwise ( 
