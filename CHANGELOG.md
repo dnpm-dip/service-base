@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/dnpm-dip/service-base/compare/v1.0.0...v1.0.1) (2025-08-11)
+
+
+### Bug Fixes
+
+* Adapted validation rule to check that MVH inclusion conference date may not be before date of sequencing consent (but possibly on the same day) ([64b4248](https://github.com/dnpm-dip/service-base/commit/64b4248c927e8cb27c4420002bea81aa4f523ba4))
+
 ## 1.0.0 (2025-08-06)
 
 
