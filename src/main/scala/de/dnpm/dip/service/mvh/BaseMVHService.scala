@@ -67,9 +67,7 @@ with Logging
                 Site.local,
                 useCase,
                 metadata.`type`,
-                record.mvhSequencingReports
-                  .map[NGSReport.Type.Value](_.`type`.code)
-                  .maxOption,
+                record.mvhSequencingReports.map[NGSReport.Type.Value](_.`type`.code).maxOption,
                 record.patient.healthInsurance.`type`.code
               ),
               Submission(

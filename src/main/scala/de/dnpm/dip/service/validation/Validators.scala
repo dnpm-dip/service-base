@@ -398,9 +398,14 @@ trait Validators
 
 
 
+  private val hexString64 = "[a-fA-F1-9]{64}".r
+
   implicit val metadataValidator: Validator[Issue,Submission.Metadata] =
     metadata =>
       (
+        metadata.transferTAN.value must matchRegex (hexString64) otherwise (
+          Error("Transfer-TAN entspricht nicht den Vorgaben: Hex-String mit 64 Zeichen") at "TAN (TVNk)"
+        ),
         metadata.modelProjectConsent
           .provisions
           .find(_.purpose == Sequencing)
