@@ -398,7 +398,7 @@ trait Validators
 
 
 
-  private val hexString64 = "[a-fA-F1-9]{64}".r
+  private val hexString64 = "[a-fA-F0-9]{64}".r
 
   implicit val metadataValidator: Validator[Issue,Submission.Metadata] =
     metadata =>
