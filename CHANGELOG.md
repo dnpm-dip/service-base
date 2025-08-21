@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.4](https://github.com/dnpm-dip/service-base/compare/v1.0.3...v1.0.4) (2025-08-21)
+
+
+### Bug Fixes
+
+* Made projection method for provision type on Consent wrapper object safe, i.e. avoid JSON look-up exception in case of missing elements ([d1a7614](https://github.com/dnpm-dip/service-base/commit/d1a76144839ea6fd797f6e6e1fd05aa7ab991bf4))
+
 ## [1.0.3](https://github.com/dnpm-dip/service-base/compare/v1.0.2...v1.0.3) (2025-08-19)
 
 
