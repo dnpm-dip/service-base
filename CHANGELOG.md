@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.0.3](https://github.com/dnpm-dip/service-base/compare/v1.0.2...v1.0.3) (2025-08-19)
+
+
+### Bug Fixes
+
+* inlude '0' digit in Hex-Regex ([#4](https://github.com/dnpm-dip/service-base/issues/4)) ([fd82264](https://github.com/dnpm-dip/service-base/commit/fd82264602bff5e5aae0db42596eec53f67b36d8))
+
+## [1.0.2](https://github.com/dnpm-dip/service-base/compare/v1.0.1...v1.0.2) (2025-08-19)
+
+
+### Bug Fixes
+
+* Added validation for TAN in MVH metadata ([94431ea](https://github.com/dnpm-dip/service-base/commit/94431ea3b76a5e6deaadeb4f398b7ba5db60fe9e))
+
 ## [1.0.1](https://github.com/dnpm-dip/service-base/compare/v1.0.0...v1.0.1) (2025-08-11)
 
 
