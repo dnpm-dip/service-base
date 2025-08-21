@@ -83,13 +83,14 @@ final case class ResearchConsent(value: JsObject) extends AnyVal
       .map(_.toLocalDate)
 
   def provisionType(code: String): Option[Consent.Provision.Type.Value] =
-    (value \ "provision" \ "provision").as[Seq[JsObject]]
-      .collectFirst {
-        case provision if (provision \ "code" \\ "coding").exists(coding => (coding \\ "code").exists(_.as[String] == code)) =>
-          (provision \ "type").validate[Consent.Provision.Type.Value]
-            .asOpt
-            .getOrElse(Deny)
+    for {
+      provisions <- (value \ "provision" \ "provision").validate[Seq[JsObject]].asOpt
+
+      `type` <- provisions.collectFirst {
+         case provision if (provision \ "code" \\ "coding").exists(coding => (coding \\ "code").exists(_.as[String] == code)) =>
+          (provision \ "type").validate[Consent.Provision.Type.Value].getOrElse(Deny)
       }
+    } yield `type`
 
   def permits(code: String): Boolean =
     provisionType(code).exists(_ == Permit)
