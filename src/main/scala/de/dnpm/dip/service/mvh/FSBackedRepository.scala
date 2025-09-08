@@ -156,14 +156,20 @@ extends Repository[F,Monad[F],T]
   ): F[Either[String,Unit]] =
     for {
       repFile <- reportFile(id).pure
-      report = readAsJson[Submission.Report].apply(new FileInputStream(repFile))
-    } yield {
-      if (submissionFile(id).delete && repFile.delete){
-        cachedReports -= report.id
-        ().asRight[String]
-      }
-      else
-        s"Failed to delete Submission for Patient $id".asLeft[Unit]
-    }
 
+      result = if (repFile.exists){
+
+        val report = new FileInputStream(repFile) pipe readAsJson[Submission.Report]
+      
+        if (submissionFile(id).delete && repFile.delete){
+          cachedReports -= report.id
+          ().asRight
+        }
+        else s"Failed to delete Submission for Patient $id".asLeft
+
+      // Nothing to do if report file doesn't exist, i.e. there's no submission for the patient
+      } else ().asRight
+     
+    } yield result
+     
 }
