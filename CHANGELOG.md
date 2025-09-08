@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.5](https://github.com/dnpm-dip/service-base/compare/v1.0.4...v1.0.5) (2025-09-08)
+
+
+### Bug Fixes
+
+* Fixed bug throwing exceptions when deleting submissions for non-model-project patients ([50bf91b](https://github.com/dnpm-dip/service-base/commit/50bf91b80357eec04e44be80da3676820cf8e5dc))
+
 ## [1.0.4](https://github.com/dnpm-dip/service-base/compare/v1.0.3...v1.0.4) (2025-08-21)
 
 
