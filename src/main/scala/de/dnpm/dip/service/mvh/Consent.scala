@@ -5,6 +5,10 @@ import java.time.{
   LocalDate,
   LocalDateTime
 }
+import de.dnpm.dip.coding.{
+  CodedEnum,
+  DefaultCodeSystem
+}
 import play.api.libs.json.{
   Json,
   JsObject,
@@ -100,6 +104,33 @@ final case class ResearchConsent(value: JsObject) extends AnyVal
 
 object ResearchConsent
 {
+
+  object ReasonMissing
+  extends CodedEnum("dnpm-dip/mvh/research-consent/reason-missing")
+  with DefaultCodeSystem
+  {
+
+    val PatientInability     = Value("patient-inability")
+    val PatientRefusal       = Value("patient-refusal")
+    val NonReturnedConsent   = Value("consent-not-returned")
+    val OtherPatientReason   = Value("other-patient-reason")
+    val TechnicalIssues      = Value("technical-issues")
+    val OrganizationalIssues = Value("organizational-issues")
+
+    override val display =
+      Map(
+        PatientInability     -> "Einwilligung durch den Patienten nicht möglich",
+        PatientRefusal       -> "Einwilligung vom Patienten abgelehnt",
+        NonReturnedConsent   -> "Einwilligung vom Patienten nicht abgegeben", 
+        OtherPatientReason   -> "Anderer Patienten-bedingter Grund", 
+        TechnicalIssues      -> "Consent aus technischen Gründen nicht verfügbar", 
+        OrganizationalIssues -> "Consent aus organisatorischen Gründen nicht verfügbar"
+      )
+
+    implicit val format: Format[Value] =
+      Json.formatEnum(this)
+  }
+
 
   val MDAT_STORE_AND_PROCESS = "2.16.840.1.113883.3.1937.777.24.5.3.7"
   val MDAT_RESEARCH_USE      = "2.16.840.1.113883.3.1937.777.24.5.3.8"

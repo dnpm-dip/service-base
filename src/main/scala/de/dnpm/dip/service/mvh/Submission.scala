@@ -98,7 +98,8 @@ object Submission
     `type`: Type.Value,
     transferTAN: Id[TransferTAN],
     modelProjectConsent: ModelProjectConsent,
-    researchConsents: Option[List[ResearchConsent]]
+    researchConsents: Option[List[ResearchConsent]],
+    reasonResearchConsentMissing: Option[ResearchConsent.ReasonMissing.Value]
   )
 
 
