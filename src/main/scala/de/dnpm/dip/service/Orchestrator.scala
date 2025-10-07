@@ -182,13 +182,13 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
   ): F[StatusInfo] =
     for {
       validation <- validationService.statusInfo
-      mvh <- mvhService.statusInfo
+//      mvh <- mvhService.statusInfo
       query <- queryService.statusInfo
     } yield StatusInfo(
       Site.local,
       LocalDateTime.now,
       validation,
-      mvh,
+//      mvh,
       query
     )
 

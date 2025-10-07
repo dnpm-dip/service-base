@@ -1,7 +1,10 @@
 package de.dnpm.dip.service.mvh
 
 
-import java.time.LocalDateTime
+import java.time.{
+  LocalTime,
+  LocalDateTime
+}
 import cats.Monad
 import de.dnpm.dip.util.Logging
 import de.dnpm.dip.service.Distribution
@@ -10,9 +13,13 @@ import de.dnpm.dip.model.{
   PatientRecord,
   Site
 }
+import ResearchConsent.{
+  MDAT_RESEARCH_USE,
+  PATDAT_STORE_AND_USE
+}
 
 
-class BaseMVHService[F[_],T <: PatientRecord](
+abstract class BaseMVHService[F[_],T <: PatientRecord](
   override val useCase: UseCase.Value,
   val repo: Repository[F,Monad[F],T]
 )
@@ -24,13 +31,11 @@ with Logging
   import cats.syntax.functor._
   import cats.syntax.flatMap._
   import Submission.Report.Status._
+  import extensions._
+  import NGSReport.Type._
 
 
   type Env = Monad[F]
-
-
-  import extensions._
-  import NGSReport.Type._
 
 
   private implicit val ngsTypeOrdering: Ordering[NGSReport.Type.Value] =
@@ -68,7 +73,20 @@ with Logging
                 useCase,
                 metadata.`type`,
                 record.mvhSequencingReports.map[NGSReport.Type.Value](_.`type`.code).maxOption,
-                record.patient.healthInsurance.`type`.code
+                record.patient.healthInsurance.`type`.code,
+                Some(
+                  Map(
+                    Consent.Category.ModelProject ->
+                      metadata.modelProjectConsent
+                        .provisions
+                        .exists(p => p.purpose == ModelProjectConsent.Purpose.Sequencing && p.`type` == Consent.Provision.Type.Permit),
+                    Consent.Category.Research ->
+                      metadata.researchConsents
+                        .filter(_.nonEmpty)
+                        .exists(_.forall(consent => consent.permits(PATDAT_STORE_AND_USE) || consent.permits(MDAT_RESEARCH_USE)))
+                  )
+                ),
+                metadata.reasonResearchConsentMissing
               ),
               Submission(
                 record,
@@ -138,6 +156,40 @@ with Logging
     repo ? filter
 
 
+  protected def baseReport(
+    criteria: Report.Criteria
+  )(
+    implicit env: Env
+  ): F[BaseReport] = {
+
+    val (quarter,period) = criteria match {
+      case Report.ForQuarter(n,year) => Some(n) -> Report.Quarter(n,year)
+      case Report.ForPeriod(period)  => None -> period 
+    }
+
+    for {
+      submissions <- repo ? Submission.Filter(
+        period.copy(
+          start = period.start.atTime(LocalTime.MIN),
+          end   = period.start.atTime(LocalTime.MIDNIGHT),
+        )
+      )
+
+      metadata  = submissions.map(_.metadata)
+
+    } yield BaseReport(
+       Site.local,
+       LocalDateTime.now,
+       quarter,
+       period,
+       useCase,
+       Distribution.of(metadata.map(_.`type`)),
+       None   // TODO
+    )
+  }
+
+
+/*
   override def statusInfo(
     implicit env: Env
   ): F[StatusInfo] =
@@ -145,5 +197,6 @@ with Logging
       .map(_.map(_.status))
       .map(Distribution.of(_))
       .map(MVHService.StatusInfo(_))
+*/
 
 }

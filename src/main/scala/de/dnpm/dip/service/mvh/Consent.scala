@@ -20,6 +20,25 @@ import play.api.libs.json.{
 object Consent
 {
 
+  object Subject extends Enumeration
+  {
+    val IndexPatient    = Value("index-patient")
+    val NonIndexPatient = Value("non-index-patient")
+
+    implicit val format: Format[Value] =
+      Json.formatEnum(this)
+  }
+
+  object Category extends Enumeration
+  {
+    val ModelProject = Value("mv-consent")
+    val Research     = Value("research-consent")
+
+    implicit val format: Format[Value] =
+      Json.formatEnum(this)
+  }
+
+
   final case class Provision[T]
   (
     date: LocalDate,

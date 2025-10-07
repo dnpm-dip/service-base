@@ -2,6 +2,7 @@ package de.dnpm.dip.service.mvh
 
 
 import de.dnpm.dip.model.{
+  History,
   Id,
   Patient,
   PatientRecord,
@@ -61,6 +62,16 @@ trait Repository[F[_],Env,T <: PatientRecord]
   def ?(filter: Submission.Filter)(
     implicit env: Env
   ): F[Seq[Submission[T]]]
+
+
+  def history(id: Id[Patient])(
+    implicit env: Env
+  ): F[Option[History[Submission[T]]]]
+
+
+//  def histories(filter: Submission.Filter)(
+//    implicit env: Env
+//  ): F[Seq[History[Submission[T]]]]
 
 
   def delete(id: Id[Patient])(

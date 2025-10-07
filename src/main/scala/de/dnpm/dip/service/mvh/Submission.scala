@@ -60,7 +60,9 @@ object Submission
     useCase: UseCase.Value,
     `type`: Type.Value,
     sequencingType: Option[NGSReport.Type.Value],
-    healthInsuranceType: HealthInsurance.Type.Value
+    healthInsuranceType: HealthInsurance.Type.Value,
+    consentStatus: Option[Map[Consent.Category.Value,Boolean]],
+    reasonResearchConsentMissing: Option[ResearchConsent.ReasonMissing.Value]
   )
 
   object Report
@@ -118,6 +120,15 @@ object Submission
     transferTAN: Option[Set[Id[TransferTAN]]] = None,
     period: Option[Period[LocalDateTime]] = None
   )
+
+  object Filter
+  {
+    def apply(period: Period[LocalDateTime]): Filter =
+      Filter(None,Some(period))
+
+    def apply(transferTAN: Set[Id[TransferTAN]]): Filter =
+      Filter(Some(transferTAN),None)
+  }
 
   import play.api.libs.json.JsPath
   import play.api.libs.functional.syntax._

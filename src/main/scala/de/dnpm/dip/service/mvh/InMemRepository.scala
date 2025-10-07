@@ -9,6 +9,7 @@ import cats.Monad
 import cats.syntax.applicative._
 import cats.syntax.either._
 import de.dnpm.dip.model.{
+  History,
   Id,
   Patient,
   PatientRecord,
@@ -71,6 +72,7 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
       }
    )
 
+
   override def ?(fltr: Submission.Report.Filter)(
     implicit env: Env
   ): F[Seq[Submission.Report]] =
@@ -79,12 +81,21 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
       .toSeq
       .pure
 
+
   override def ?(fltr: Submission.Filter)(
     implicit env: Env
   ): F[Seq[Submission[T]]] =
     submissions.values
       .filter(fltr)
       .toSeq
+      .pure
+
+
+  override def history(id: Id[Patient])(
+    implicit env: Env
+  ): F[Option[History[Submission[T]]]] =
+    submissions.get(id)
+      .map(History(_))
       .pure
 
 

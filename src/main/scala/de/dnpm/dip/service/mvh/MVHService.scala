@@ -1,21 +1,18 @@
 package de.dnpm.dip.service.mvh
 
 
-import de.dnpm.dip.service.Distribution
 import de.dnpm.dip.model.{
   Id,
   Patient,
   PatientRecord,
-}
-import play.api.libs.json.{
-  Json,
-  Writes
 }
 
 
 trait MVHService[F[_],Env,T <: PatientRecord]
 {
   import MVHService._
+
+  type ReportType <: Report
 
   val useCase: UseCase.Value
 
@@ -33,9 +30,17 @@ trait MVHService[F[_],Env,T <: PatientRecord]
     implicit env: Env
   ): F[Seq[Submission[T]]]
 
+/*  
   def statusInfo(
     implicit env: Env
   ): F[StatusInfo]
+*/
+
+  def report(
+    criteria: Report.Criteria
+  )(
+    implicit env: Env
+  ): F[ReportType]
 
 }
 
@@ -62,7 +67,7 @@ object MVHService
   final case class InvalidTAN(msg: String) extends Error
   final case class GenericError(msg: String) extends Error
 
-
+/*
   final case class StatusInfo
   (
     submissionReports: Distribution[Submission.Report.Status.Value]
@@ -73,5 +78,5 @@ object MVHService
     implicit val format: Writes[StatusInfo] =
       Json.writes[StatusInfo]
   }
-
+*/
 }
