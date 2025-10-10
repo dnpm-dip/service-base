@@ -57,7 +57,7 @@ object Report
 
   sealed trait Criteria
   final case class ForQuarter(quarter: Quarter.Value, year: Option[Year]) extends Criteria
-  final case class ForPeriod(period: ClosedPeriod[LocalDate]) extends Criteria
+  final case class ForPeriod(start: LocalDate, end: LocalDate) extends Criteria
 
 }
 

@@ -70,8 +70,8 @@ object Submission
 
     object Status extends Enumeration
     { 
-      val Unsubmitted            = Value("unsubmitted")
-      val Submitted              = Value("submitted")
+      val Unsubmitted = Value("unsubmitted")
+      val Submitted   = Value("submitted")
 
       implicit val formatValue: Format[Value] =
         Json.formatEnum(this)
@@ -80,7 +80,8 @@ object Submission
     final case class Filter
     (
       period: Option[Period[LocalDateTime]] = None,
-      status: Option[Set[Status.Value]] = None 
+      status: Option[Set[Status.Value]] = None,
+      `type`: Option[Set[Type.Value]] = None
     )
 
 

@@ -7,6 +7,7 @@ import java.io.{
   FileWriter,
   InputStream
 }
+import java.time.LocalDateTime
 import scala.reflect.ClassTag
 import scala.util.chaining._
 import scala.util.Using
@@ -52,6 +53,19 @@ object TAN
 }
 
 
+private[mvh] final case class SubmissionHeader
+(
+  submittedAt: LocalDateTime,
+  metadata: Submission.Metadata
+)
+
+private[mvh] object SubmissionHeader
+{
+  implicit val reads: Reads[SubmissionHeader] = 
+    Json.reads[SubmissionHeader]
+}
+
+
 class FSBackedRepository[F[_],T <: PatientRecord: Reads: OWrites](
   dataDir: File
 )(
@@ -62,6 +76,15 @@ with Logging
 {
 
   type Env = Monad[F]
+
+/*
+  protected implicit def submissionHeaderPredicate(
+    filter: Submission.Filter
+  ): SubmissionHeader => Boolean =
+    record =>
+      filter.period.map(_ contains record.submittedAt).getOrElse(true) &&
+      filter.transferTAN.map(_ contains record.metadata.transferTAN).getOrElse(true)
+*/
 
   private val REPORT_PREFIX = "SubmissionReport"
 
@@ -101,8 +124,7 @@ with Logging
         dataDir.listFiles(
           (_,name) =>
             (name startsWith REPORT_PREFIX) &&
-            !(name contains "_Patient_") &&
-            !(name contains "_TAN_") &&
+            !(name contains "_Patient_") && !(name contains "_TAN_") &&
             (name endsWith ".json")
         )
         .foldLeft(List.empty[String]){
@@ -118,8 +140,7 @@ with Logging
         dataDir.listFiles(
           (_,name) =>
             (name startsWith SUBMISSION_PREFIX) &&
-            !(name contains "_Patient_") &&
-            !(name contains "_TAN_") &&
+            !(name contains "_Patient_") && !(name contains "_TAN_") &&
             (name endsWith ".json")
         )
         .foldLeft(failedReportMigrations){
@@ -218,6 +239,8 @@ with Logging
       .pure
 
 
+  // TODO: refactor to only read a light-weight Submission, i.e. only the filterable data,
+  // to avoid expensive parsing of the whole submission MDAT, and apply filtering to these only
   override def ?(fltr: Submission.Filter)(
     implicit env: Env
   ): F[Seq[Submission[T]]] =
@@ -276,13 +299,11 @@ with Logging
             else s"Failed to delete $REPORT_PREFIX file $file" :: acc
         }
 
-    } yield
-      if (deletionErrors.isEmpty) ().asRight
-      else
-        deletionErrors
-          .tapEach(log.error)
-          .mkString("; ")
-          .asLeft
+      result =
+        if (deletionErrors.isEmpty) ().asRight
+        else deletionErrors.tapEach(log.error).mkString("; ").asLeft
+
+    } yield result
      
 }
 

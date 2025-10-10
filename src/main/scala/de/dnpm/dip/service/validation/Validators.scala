@@ -419,7 +419,9 @@ trait Validators
             )
             .map(_ => d)
         ),
-        metadata.researchConsents.exists(_.nonEmpty) must be (true) otherwise (MissingValue("MII Forschungs-/Broad-Consent"))
+        (metadata.researchConsents.filter(_.nonEmpty) orElse metadata.reasonResearchConsentMissing) must be (defined) otherwise (
+          MissingValue("Es muss entweder MII Forschungs-/Broad-Consent oder der Grund für dessen Fehlen vorhanden sein")
+        )
       )
       .errorsOr(metadata) on "Metadaten"
 

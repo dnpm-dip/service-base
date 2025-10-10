@@ -6,17 +6,23 @@ import java.time.{
   LocalDateTime
 }
 import cats.Monad
+import cats.syntax.either._
+import cats.syntax.functor._
+import cats.syntax.flatMap._
 import de.dnpm.dip.util.Logging
 import de.dnpm.dip.service.Distribution
 import de.dnpm.dip.model.{
+  ClosedPeriod,
+  Id,
   NGSReport,
   PatientRecord,
   Site
 }
-import ResearchConsent.{
-  MDAT_RESEARCH_USE,
-  PATDAT_STORE_AND_USE
-}
+import MVHService._
+import Submission.Report.Status._
+import extensions._
+import NGSReport.Type._
+
 
 
 abstract class BaseMVHService[F[_],T <: PatientRecord](
@@ -26,14 +32,6 @@ abstract class BaseMVHService[F[_],T <: PatientRecord](
 extends MVHService[F,Monad[F],T] 
 with Logging
 {
-  import MVHService._
-  import cats.syntax.either._
-  import cats.syntax.functor._
-  import cats.syntax.flatMap._
-  import Submission.Report.Status._
-  import extensions._
-  import NGSReport.Type._
-
 
   type Env = Monad[F]
 
@@ -83,7 +81,7 @@ with Logging
                     Consent.Category.Research ->
                       metadata.researchConsents
                         .filter(_.nonEmpty)
-                        .exists(_.forall(consent => consent.permits(PATDAT_STORE_AND_USE) || consent.permits(MDAT_RESEARCH_USE)))
+                        .exists(_.forall(_.isGiven))
                   )
                 ),
                 metadata.reasonResearchConsentMissing
@@ -125,7 +123,7 @@ with Logging
 
               case None =>
                 env.pure(
-                  GenericError(s"Invalid TTAN $id").asLeft
+                  GenericError(s"Invalid TAN $id").asLeft
                 )
             }
 
@@ -150,46 +148,57 @@ with Logging
     repo ? filter
 
 
+  override def ?(id: Id[TransferTAN])(
+    implicit env: Env
+  ): F[Option[Submission.Report]] =
+    repo ? id
+
+
   override def ?(filter: Submission.Filter)(
     implicit env: Env
   ): F[Seq[Submission[T]]] =
     repo ? filter
 
 
+  // Create BaseReport for the criteria and return it together with the submissions it's based on,
+  // in case the implementing subclass needs to extract additional info from the submissions
   protected def baseReport(
     criteria: Report.Criteria
   )(
     implicit env: Env
-  ): F[BaseReport] = {
+  ): F[(BaseReport,Seq[Submission[T]])] = {
+
+    log.info(s"Creating MVH Report: $criteria")
 
     val (quarter,period) = criteria match {
-      case Report.ForQuarter(n,year) => Some(n) -> Report.Quarter(n,year)
-      case Report.ForPeriod(period)  => None -> period 
+      case Report.ForQuarter(n,year)   => Some(n) -> Report.Quarter(n,year)
+      case Report.ForPeriod(start,end) => None -> ClosedPeriod(start,end)
     }
 
     for {
       submissions <- repo ? Submission.Filter(
         period.copy(
           start = period.start.atTime(LocalTime.MIN),
-          end   = period.start.atTime(LocalTime.MIDNIGHT),
+          end   = period.end.atTime(LocalTime.MIDNIGHT),
         )
       )
 
-      metadata  = submissions.map(_.metadata)
+      submissionTypes = submissions.map(_.metadata.`type`)
 
-    } yield BaseReport(
-       Site.local,
-       LocalDateTime.now,
-       quarter,
-       period,
-       useCase,
-       Distribution.of(metadata.map(_.`type`)),
-       None   // TODO
-    )
+      report = BaseReport(
+        Site.local,
+        LocalDateTime.now,
+        quarter,
+        period,
+        useCase,
+        Distribution.of(submissionTypes),
+        None   // TODO
+      )
+
+    } yield report -> submissions
   }
 
 
-/*
   override def statusInfo(
     implicit env: Env
   ): F[StatusInfo] =
@@ -197,6 +206,5 @@ with Logging
       .map(_.map(_.status))
       .map(Distribution.of(_))
       .map(MVHService.StatusInfo(_))
-*/
 
 }

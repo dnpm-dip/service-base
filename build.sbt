@@ -19,7 +19,7 @@ lazy val root = project.in(file("."))
   .settings(
     libraryDependencies ++= Seq(
     "org.scalatest"  %% "scalatest"  % "3.2.18" % Test,
-    "de.dnpm.dip"    %% "core"       % "1.0.0",
+    "de.dnpm.dip"    %% "core"       % "1.1.2",
     "de.ekut.tbi"    %% "validators" % "1.0.0",
     "de.ekut.tbi"    %% "generators" % "1.0.0" % Test
    )

@@ -11,22 +11,27 @@ import de.dnpm.dip.model.{
 
 trait Repository[F[_],Env,T <: PatientRecord]
 {
+/*
+  type FilterableSubmission = { 
+    def submittedAt: LocalDateTime
+    def metadata: Submission.Metadata
+  }
 
-  protected implicit def toPredicate(
-    filter: Submission.Report.Filter
-  ): Submission.Report => Boolean =
+  import scala.language.reflectiveCalls
+
+  protected implicit def submissionPredicate(filter: Submission.Filter): FilterableSubmission => Boolean =
+*/
+
+  protected implicit def submissionReportPredicate(filter: Submission.Report.Filter): Submission.Report => Boolean =
     report =>
+      filter.status.map(_ contains report.status).getOrElse(true) &&
       filter.period.map(_ contains report.createdAt).getOrElse(true) &&
-      filter.status.map(_ contains report.status).getOrElse(true)
+      filter.`type`.map(_ contains report.`type`).getOrElse(true)
 
-
-  protected implicit def toPredicate(
-    filter: Submission.Filter
-  ): Submission[T] => Boolean =
+  protected implicit def submissionPredicate(filter: Submission.Filter): Submission[T] => Boolean =
     record =>
-      filter.period
-        .map(_ contains record.submittedAt)
-        .getOrElse(true)
+      filter.period.map(_ contains record.submittedAt).getOrElse(true) &&
+      filter.transferTAN.map(_ contains record.metadata.transferTAN).getOrElse(true)
 
   
   def alreadyUsed(id: Id[TransferTAN])(
@@ -67,11 +72,6 @@ trait Repository[F[_],Env,T <: PatientRecord]
   def history(id: Id[Patient])(
     implicit env: Env
   ): F[Option[History[Submission[T]]]]
-
-
-//  def histories(filter: Submission.Filter)(
-//    implicit env: Env
-//  ): F[Seq[History[Submission[T]]]]
 
 
   def delete(id: Id[Patient])(

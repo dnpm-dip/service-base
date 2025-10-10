@@ -24,10 +24,7 @@ import de.dnpm.dip.service.validation.{
   ValidationReport
 }
 import de.dnpm.dip.service.query.QueryService
-import de.dnpm.dip.service.mvh.{
-  MVHService,
-  ResearchConsent
-}
+import de.dnpm.dip.service.mvh.MVHService
 
 
 
@@ -80,11 +77,6 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
     DataAcceptableWithIssues
   }
   import Completer.syntax._
-  import ResearchConsent.{ 
-    MDAT_STORE_AND_PROCESS,
-    MDAT_RESEARCH_USE,
-    PATDAT_STORE_AND_USE
-  }
 
 
   def !(
@@ -114,9 +106,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
                       dnpmPermitted =
                         metadata.researchConsents
                           .filter(_.nonEmpty)
-                          .exists(
-                            _.forall(consent => consent.permits(PATDAT_STORE_AND_USE) || (consent.permits(MDAT_STORE_AND_PROCESS) && consent.permits(MDAT_RESEARCH_USE)))
-                          )
+                          .exists(_ forall (_.isGiven))
                 
                       result <- mvhResult match {
                         case Right(_) =>
@@ -182,13 +172,13 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
   ): F[StatusInfo] =
     for {
       validation <- validationService.statusInfo
-//      mvh <- mvhService.statusInfo
+      mvh <- mvhService.statusInfo
       query <- queryService.statusInfo
     } yield StatusInfo(
       Site.local,
       LocalDateTime.now,
       validation,
-//      mvh,
+      mvh,
       query
     )
 
