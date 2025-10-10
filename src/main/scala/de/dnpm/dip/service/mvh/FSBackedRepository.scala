@@ -94,7 +94,7 @@ with Logging
     new File(dataDir,s"${REPORT_PREFIX}_Patient_${id.value}_TAN_${tan.value}.json")
 
   private def submissionFile(id: Id[Patient], tan: Id[TransferTAN]): File =
-    new File(dataDir,s"${SUBMISSION_PREFIX}_Patient_${id.value}_TAN_${id.value}.json")
+    new File(dataDir,s"${SUBMISSION_PREFIX}_Patient_${id.value}_TAN_${tan.value}.json")
 
   private def reportFiles(id: Id[Patient]): Array[File] =
     dataDir.listFiles(
