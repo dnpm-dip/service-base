@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.1.0](https://github.com/dnpm-dip/service-base/compare/v1.0.5...v1.1.0) (2025-10-10)
+
+
+### Features
+
+* Added new field Submission.Metadata.reasonResearchConsentMissing in non-breaking fashion ([84a493a](https://github.com/dnpm-dip/service-base/commit/84a493a39c12161e2b00e39230e44b156f34b8b0))
+* Finished preliminary implementation of (quarterly) reporting for MVH ([84a493a](https://github.com/dnpm-dip/service-base/commit/84a493a39c12161e2b00e39230e44b156f34b8b0))
+* Further elaboration of MVH quarterly reporting ([bccd5ac](https://github.com/dnpm-dip/service-base/commit/bccd5ac2c1e41f793007e2c2e05939a59dd52fae))
+* Preliminary work on adapting consent handling to new requirements ([0809840](https://github.com/dnpm-dip/service-base/commit/08098404807c7be7eb6e2789442b04971cc3e086))
+
+
+### Bug Fixes
+
+* Added migration logic from old to new MVH submission and report file naming pattern ([84a493a](https://github.com/dnpm-dip/service-base/commit/84a493a39c12161e2b00e39230e44b156f34b8b0))
+
 ## [1.0.5](https://github.com/dnpm-dip/service-base/compare/v1.0.4...v1.0.5) (2025-09-08)
 
 
