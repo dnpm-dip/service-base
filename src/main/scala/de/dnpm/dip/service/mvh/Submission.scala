@@ -65,7 +65,7 @@ object Submission
     reasonResearchConsentMissing: Option[ResearchConsent.ReasonMissing.Value]
   )
 
-  object Report
+  object Report extends JsonEnumKeyHelpers
   {
 
     object Status extends Enumeration

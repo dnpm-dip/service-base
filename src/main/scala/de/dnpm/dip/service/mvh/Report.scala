@@ -16,7 +16,7 @@ import de.dnpm.dip.service.Distribution
 import play.api.libs.json.{
   Json,
   Format,
-  OFormat
+  OFormat,
 }
 
 
@@ -87,7 +87,7 @@ final case class BaseReport
 extends Report
 
 
-object BaseReport
+object BaseReport extends JsonEnumKeyHelpers
 {
   implicit val format: OFormat[BaseReport] =
     Json.format[BaseReport]
