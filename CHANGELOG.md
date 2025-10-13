@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.1](https://github.com/dnpm-dip/service-base/compare/v1.1.0...v1.1.1) (2025-10-13)
+
+
+### Bug Fixes
+
+* Added validation for broad consent resource, to ensure all expected provisions are there ([b6d5287](https://github.com/dnpm-dip/service-base/commit/b6d52875279c6c463a3dfe169d1954c841cdd6a2))
+* Fixed bug in filename creation ([6bee022](https://github.com/dnpm-dip/service-base/commit/6bee02235a0c07cb6fccb6f3ab077d0b18f89b22))
+* Fixed JSON representation of Map with Enum.Value key as JsObject ([a0c1084](https://github.com/dnpm-dip/service-base/commit/a0c1084f853941dc69c5e4de64821286b294d2b4))
+
 ## [1.1.0](https://github.com/dnpm-dip/service-base/compare/v1.0.5...v1.1.0) (2025-10-10)
 
 
