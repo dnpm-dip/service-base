@@ -44,7 +44,15 @@ import de.dnpm.dip.model.{
   TherapyRecommendation
 }
 import de.dnpm.dip.service.DataUpload
-import de.dnpm.dip.service.mvh.Submission
+import de.dnpm.dip.service.mvh.{
+  ResearchConsent,
+  Submission
+}
+import ResearchConsent.{
+  MDAT_STORE_AND_PROCESS,
+  MDAT_RESEARCH_USE,
+  PATDAT_STORE_AND_USE,
+}
 import de.dnpm.dip.service.mvh.ModelProjectConsent.Purpose._
 import de.dnpm.dip.service.mvh.Consent.Provision.Type._
 import Issue.{
@@ -400,6 +408,15 @@ trait Validators
 
   private val hexString64 = "[a-fA-F0-9]{64}".r
 
+
+  implicit val researchConsentValidator: Validator[Issue,ResearchConsent] =
+    consent =>
+      all (consent.provision(PATDAT_STORE_AND_USE), consent.provision(MDAT_RESEARCH_USE), consent.provision(MDAT_STORE_AND_PROCESS)) must be (defined) otherwise (
+        Error("""Fehlerhafter Forschungs-/Broad-Consent. Es müssen mind. folgende 'provisions' müssen vorhanden sein: 2.16.840.1.113883.3.1937.777.24.5.3.1 ("Patientendaten erheben, speichern, nutzen"), 2.16.840.1.113883.3.1937.777.24.5.3.7 ("MDAT speichern, verarbeiten"), 2.16.840.1.113883.3.1937.777.24.5.3.8 ("MDAT wissenschaftlich nutzen EU DSGVO NIVEAU")""" ) at "Consent.provision"
+      ) map (_ => consent)
+
+
+
   implicit val metadataValidator: Validator[Issue,Submission.Metadata] =
     metadata =>
       (
@@ -421,7 +438,9 @@ trait Validators
         ),
         (metadata.researchConsents.filter(_.nonEmpty) orElse metadata.reasonResearchConsentMissing) must be (defined) otherwise (
           MissingValue("Es muss entweder MII Forschungs-/Broad-Consent oder der Grund für dessen Fehlen vorhanden sein")
-        )
+        ),
+        ifDefined(metadata.researchConsents.filter(_.nonEmpty)){_.validateEach}
+        
       )
       .errorsOr(metadata) on "Metadaten"
 
