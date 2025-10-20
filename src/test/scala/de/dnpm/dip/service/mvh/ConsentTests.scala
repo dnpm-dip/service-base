@@ -20,16 +20,12 @@ class ConsentTests extends AnyFlatSpec with Matchers
 
 
 
-  "Consent" must "contain MDAT sharing provision" in {
+  "Consent permission check" must "have correctly worked" in {
 
     consent.date mustBe defined
 
-    assert(consent.permits(ResearchConsent.MDAT_RESEARCH_USE))
+    assert(consent.isGiven)
 
   }
-
-
-
-
 
 }
