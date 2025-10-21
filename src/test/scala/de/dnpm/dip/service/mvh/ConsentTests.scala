@@ -22,10 +22,7 @@ class ConsentTests extends AnyFlatSpec with Matchers
 
   "Consent permission check" must "have correctly worked" in {
 
-    consent.date mustBe defined
-
-    assert(consent.isGiven)
-
+    assert(ResearchConsent.isGiven(consent))
   }
 
 }

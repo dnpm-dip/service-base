@@ -18,7 +18,8 @@ import play.api.libs.json.{
   JsPath,
   Format,
   OFormat,
-  Reads
+  Reads,
+  Writes
 }
 import play.api.libs.functional.syntax._
 
@@ -103,6 +104,7 @@ object ModelProjectConsent
 // This avoids explicitly binding to some bad FHIR DTO library (e.g. HAPI FHIR) or
 // having to define DTOs on our own for the bloated/convoluted structure typical of FHIR.
 final case class ResearchConsent(value: JsObject) extends AnyVal
+/*
 {
 
   def date: Option[LocalDate] =
@@ -134,42 +136,10 @@ final case class ResearchConsent(value: JsObject) extends AnyVal
     permits(ResearchConsent.PATDAT_STORE_AND_USE) || 
       (permits(ResearchConsent.MDAT_STORE_AND_PROCESS) && permits(ResearchConsent.MDAT_RESEARCH_USE))
 }
-
+*/
 
 object ResearchConsent
 {
-
-  final case class CodeableConcept[T]
-  (
-    coding: List[Coding[T]]
-  )
-
-  final case class Provision
-  (
-    `type`: Consent.Provision.Type.Value,
-    period: OpenEndPeriod[LocalDateTime],
-    code: Option[List[CodeableConcept[Any]]],
-    provision: Option[List[Provision]]
-  )
-  {
-    def hasCode(c: String): Boolean =
-      this.code.exists(_.exists(_.coding.exists(_.code.value == c)))
-  }
-
-  implicit def readCodeableConcept[T](implicit rc: Reads[Coding[T]]): Reads[CodeableConcept[T]] =
-    Json.reads[CodeableConcept[T]]
-
-  // Explicit Reads required because of recursive nature of "Provision" (sub-provisions)
-  implicit val readProvision: Reads[Provision] =
-    (
-      (JsPath \ "type").read[Consent.Provision.Type.Value] and
-      (JsPath \ "period").read[OpenEndPeriod[LocalDateTime]] and
-      (JsPath \ "code").readNullable[List[CodeableConcept[Any]]] and
-      (JsPath \ "provision").lazyReadNullable(Reads.of[List[Provision]])
-    )(
-      Provision(_,_,_,_)
-    )
-
 
   object ReasonMissing
   extends CodedEnum("dnpm-dip/mvh/research-consent/reason-missing")
@@ -202,7 +172,114 @@ object ResearchConsent
   val MDAT_RESEARCH_USE      = "2.16.840.1.113883.3.1937.777.24.5.3.8"
   val PATDAT_STORE_AND_USE   = "2.16.840.1.113883.3.1937.777.24.5.3.1"
 
-  implicit val format: Format[ResearchConsent] =
-    Json.valueFormat[ResearchConsent]
+  val researchProvisions =
+    Set(MDAT_STORE_AND_PROCESS,MDAT_RESEARCH_USE,PATDAT_STORE_AND_USE)
+
+
+  final case class CodeableConcept[T]
+  (
+    coding: List[Coding[T]]
+  )
+  {
+    def codings = coding
+  }
+
+  final case class Provision
+  (
+    `type`: Consent.Provision.Type.Value,
+    period: OpenEndPeriod[LocalDateTime],
+    private val code: Option[List[CodeableConcept[Any]]],
+    private val provision: Option[List[Provision]]
+  )
+  {
+    def codes = code.getOrElse(List.empty)
+
+    def provisions = provision.getOrElse(List.empty)
+
+    def hasCode(c: String): Boolean =
+      this.codes.exists(_.codings.exists(_.code.value == c))
+
+    def permitted: Boolean = {
+      lazy val today = LocalDate.now
+    
+      (`type` == Consent.Provision.Type.Permit) &&
+      (period.start.toLocalDate isAfter today.minus(5,YEARS)) &&
+      (period.end.exists(_.toLocalDate isAfter today) || period.end.isEmpty)
+    }
+    
+  }
+
+
+  final case class View
+  (
+    dateTime: LocalDateTime,
+    provision: Provision
+  )
+  {
+    def date = dateTime.toLocalDate
+
+    def provision(code: String): Option[ResearchConsent.Provision] =
+      Option.when(provision hasCode code)(provision)
+        .orElse(
+          provision.provisions.find(_ hasCode code)
+        )      
+
+    def permits(code: String): Boolean =
+      provision(code).exists(_.permitted)
+
+  }
+
+
+  def isGiven(consents: List[ResearchConsent]): Boolean =
+    consents
+      .map(rc => Json.fromJson[View](rc.value))
+      .map(_.get) // safe here as incorrect JSON consent would be denied on upload/deserialization
+      .foldLeft(Map.empty[String,Boolean]){ 
+        (acc,consent) =>
+          researchProvisions.foldLeft(acc){ 
+            (acc2,code) => acc2.updatedWith(code){
+              case no @Some(false) => no
+              case _               => Some(consent permits code)
+            }
+          }
+      }
+      .values
+      .exists(_ == true)
+
+  def isGiven(consent: ResearchConsent, consents: ResearchConsent*): Boolean =
+    isGiven(consent :: consents.toList)
+
+
+  implicit def readCodeableConcept[T](implicit rc: Reads[Coding[T]]): Reads[CodeableConcept[T]] =
+    Json.reads[CodeableConcept[T]]
+
+  // Explicit Reads required because of recursive nature of "Provision" (sub-provisions)
+  implicit val readProvision: Reads[Provision] =
+    (
+      (JsPath \ "type").read[Consent.Provision.Type.Value] and
+      (JsPath \ "period").read[OpenEndPeriod[LocalDateTime]] and
+      (JsPath \ "code").readNullable[List[CodeableConcept[Any]]] and
+      (JsPath \ "provision").lazyReadNullable(Reads.of[List[Provision]])
+    )(
+      Provision(_,_,_,_)
+    )
+
+  implicit val readView: Reads[View] =
+    Json.reads[View]
+
+
+  implicit val writes: Writes[ResearchConsent] =
+    Json.valueWrites[ResearchConsent]
+
+  // Decorator Reads[ResearchConsent]:
+  // Try to read the input JSON as a View to have direct error feedback on Consent resources unusable for post-processing,
+  // then return the raw JSON object wrapped in ResearchConsent
+  implicit val reads: Reads[ResearchConsent] =
+    (
+      JsPath.read[View] and
+      JsPath.read[JsObject]
+    )(
+      (_,js) => ResearchConsent(js)
+    )
 
 }
