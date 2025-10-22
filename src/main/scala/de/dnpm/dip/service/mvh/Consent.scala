@@ -203,8 +203,8 @@ object ResearchConsent
         (acc,consent) =>
           researchProvisions.foldLeft(acc){ 
             (acc2,code) => acc2.updatedWith(code){
-              case no @ Some(false) => no
-              case _                => consent.provision(code).map(_.permitted)
+              case denied @ Some(false) => denied   // Short-circuit when denied
+              case _ => consent.provision(code).map(_.permitted)
             }
           }
       }
