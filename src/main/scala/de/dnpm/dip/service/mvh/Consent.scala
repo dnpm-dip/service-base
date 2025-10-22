@@ -99,44 +99,10 @@ object ModelProjectConsent
 }
 
 
-// Wrapper object around a FHIR Consent JSON resource
-// with "projection methods" of the necessary attributes from the underlying JSON data.
+// Wrapper object around a FHIR Consent JSON resource.
 // This avoids explicitly binding to some bad FHIR DTO library (e.g. HAPI FHIR) or
 // having to define DTOs on our own for the bloated/convoluted structure typical of FHIR.
 final case class ResearchConsent(value: JsObject) extends AnyVal
-/*
-{
-
-  def date: Option[LocalDate] =
-    (value \ "dateTime").asOpt[LocalDateTime].map(_.toLocalDate)
-
-  def provision(code: String): Option[ResearchConsent.Provision] = {
-
-    val topLevelProvision =
-      (value \ "provision").validate[ResearchConsent.Provision].asOpt 
-   
-    topLevelProvision.filter(_ hasCode code)
-      .orElse(
-        topLevelProvision.flatMap(_.provision.flatMap(_.find(_ hasCode code)))
-      )
-     
-  }
-
-  def permits(code: String): Boolean =
-    provision(code).exists {
-      p =>
-        lazy val today = LocalDate.now
-
-        (p.`type` == Consent.Provision.Type.Permit) &&
-        (p.period.start.toLocalDate isAfter today.minus(5,YEARS)) &&
-        (p.period.end.exists(_.toLocalDate isAfter today) || p.period.end.isEmpty)
-    }
-
-  def isGiven: Boolean =
-    permits(ResearchConsent.PATDAT_STORE_AND_USE) || 
-      (permits(ResearchConsent.MDAT_STORE_AND_PROCESS) && permits(ResearchConsent.MDAT_RESEARCH_USE))
-}
-*/
 
 object ResearchConsent
 {
@@ -173,13 +139,14 @@ object ResearchConsent
   val PATDAT_STORE_AND_USE   = "2.16.840.1.113883.3.1937.777.24.5.3.1"
 
   val researchProvisions =
-    Set(MDAT_STORE_AND_PROCESS,MDAT_RESEARCH_USE,PATDAT_STORE_AND_USE)
+    Set(
+      MDAT_STORE_AND_PROCESS,
+      MDAT_RESEARCH_USE,
+      PATDAT_STORE_AND_USE
+    )
 
 
-  final case class CodeableConcept[T]
-  (
-    coding: List[Coding[T]]
-  )
+  final case class CodeableConcept[T](coding: List[Coding[T]])
   {
     def codings = coding
   }
@@ -209,7 +176,9 @@ object ResearchConsent
     
   }
 
-
+  // "View" DTO for use as a "projection" of the necessary data
+  // in a raw JSON FHIR Consent within a ResearchConsent instance,
+  // for minimum syntax check and in Consent processing
   final case class View
   (
     dateTime: LocalDateTime,
@@ -224,27 +193,24 @@ object ResearchConsent
           provision.provisions.find(_ hasCode code)
         )      
 
-    def permits(code: String): Boolean =
-      provision(code).exists(_.permitted)
-
   }
 
 
   def isGiven(consents: List[ResearchConsent]): Boolean =
     consents
-      .map(rc => Json.fromJson[View](rc.value))
-      .map(_.get) // safe here as incorrect JSON consent would be denied on upload/deserialization
+      .map(rc => Json.fromJson[View](rc.value).get) // .get safe here as incorrect JSON consent would be denied on upload/deserialization
       .foldLeft(Map.empty[String,Boolean]){ 
         (acc,consent) =>
           researchProvisions.foldLeft(acc){ 
             (acc2,code) => acc2.updatedWith(code){
-              case no @Some(false) => no
-              case _               => Some(consent permits code)
+              case no @ Some(false) => no
+              case _                => consent.provision(code).map(_.permitted)
             }
           }
       }
       .values
       .exists(_ == true)
+
 
   def isGiven(consent: ResearchConsent, consents: ResearchConsent*): Boolean =
     isGiven(consent :: consents.toList)
