@@ -166,7 +166,7 @@ object BroadConsent
     def hasCode(c: String): Boolean =
       this.codes.exists(_.codings.exists(_.code.value == c))
 
-    def permitted: Boolean = {
+    def isPermitted: Boolean = {
       lazy val today = LocalDate.now
     
       (`type` == Consent.Provision.Type.Permit) &&
@@ -204,7 +204,7 @@ object BroadConsent
           researchProvisions.foldLeft(acc){ 
             (acc2,code) => acc2.updatedWith(code){
               case denied @ Some(false) => denied   // Short-circuit when denied
-              case _ => consent.provision(code).map(_.permitted)
+              case _ => consent.provision(code).map(_.isPermitted)
             }
           }
       }
