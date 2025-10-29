@@ -9,8 +9,8 @@ import play.api.libs.json.Json
 class ConsentTests extends AnyFlatSpec with Matchers 
 {
 
-  private def readConsentFile(f: String): ResearchConsent =
-    Json.fromJson[ResearchConsent](
+  private def readConsentFile(f: String): BroadConsent =
+    Json.fromJson[BroadConsent](
       Json.parse(
         this.getClass.getClassLoader.getResourceAsStream(f)
       )
@@ -31,14 +31,14 @@ class ConsentTests extends AnyFlatSpec with Matchers
 
   "Consent check" must "have correctly worked on bundled provisions within one Consent resource" in {
 
-    assert(ResearchConsent.isGiven(consent))
+    assert(BroadConsent.permitsResearchUse(consent))
 
   }
 
 
   it must "have correctly worked on provisions spread across multiple Consent resources" in {
 
-    assert(ResearchConsent.isGiven(partialConsents))
+    assert(BroadConsent.permitsResearchUse(partialConsents))
 
   }
 

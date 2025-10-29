@@ -102,9 +102,9 @@ object ModelProjectConsent
 // Wrapper object around a FHIR Consent JSON resource.
 // This avoids explicitly binding to some bad FHIR DTO library (e.g. HAPI FHIR) or
 // having to define DTOs on our own for the bloated/convoluted structure typical of FHIR.
-final case class ResearchConsent(value: JsObject) extends AnyVal
+final case class BroadConsent(value: JsObject) extends AnyVal
 
-object ResearchConsent
+object BroadConsent
 {
 
   object ReasonMissing
@@ -177,7 +177,7 @@ object ResearchConsent
   }
 
   // "View" DTO for use as a "projection" of the necessary data
-  // in a raw JSON FHIR Consent within a ResearchConsent instance,
+  // in a raw JSON FHIR Consent within a BroadConsent instance,
   // for minimum syntax check and in Consent processing
   final case class View
   (
@@ -187,7 +187,7 @@ object ResearchConsent
   {
     def date = dateTime.toLocalDate
 
-    def provision(code: String): Option[ResearchConsent.Provision] =
+    def provision(code: String): Option[BroadConsent.Provision] =
       Option.when(provision hasCode code)(provision)
         .orElse(
           provision.provisions.find(_ hasCode code)
@@ -196,7 +196,7 @@ object ResearchConsent
   }
 
 
-  def isGiven(consents: List[ResearchConsent]): Boolean =
+  def permitsResearchUse(consents: List[BroadConsent]): Boolean =
     consents
       .map(rc => Json.fromJson[View](rc.value).get) // .get safe here as incorrect JSON consent would be denied on upload/deserialization
       .foldLeft(Map.empty[String,Boolean]){ 
@@ -212,8 +212,8 @@ object ResearchConsent
       .exists(_ == true)
 
 
-  def isGiven(consent: ResearchConsent, consents: ResearchConsent*): Boolean =
-    isGiven(consent :: consents.toList)
+  def permitsResearchUse(consent: BroadConsent, consents: BroadConsent*): Boolean =
+    permitsResearchUse(consent :: consents.toList)
 
 
   implicit def readCodeableConcept[T](implicit rc: Reads[Coding[T]]): Reads[CodeableConcept[T]] =
@@ -234,18 +234,18 @@ object ResearchConsent
     Json.reads[View]
 
 
-  implicit val writes: Writes[ResearchConsent] =
-    Json.valueWrites[ResearchConsent]
+  implicit val writes: Writes[BroadConsent] =
+    Json.valueWrites[BroadConsent]
 
-  // Decorator Reads[ResearchConsent]:
+  // Decorator Reads[BroadConsent]:
   // Try to read the input JSON as a View to have direct error feedback on Consent resources unusable for post-processing,
-  // then return the raw JSON object wrapped in ResearchConsent
-  implicit val reads: Reads[ResearchConsent] =
+  // then return the raw JSON object wrapped in BroadConsent
+  implicit val reads: Reads[BroadConsent] =
     (
       JsPath.read[View] and
       JsPath.read[JsObject]
     )(
-      (_,js) => ResearchConsent(js)
+      (_,js) => BroadConsent(js)
     )
 
 }

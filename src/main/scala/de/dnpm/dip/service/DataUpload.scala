@@ -8,7 +8,7 @@ import play.api.libs.json.{
   Reads
 }
 import de.dnpm.dip.service.mvh.{
-  ResearchConsent,
+  BroadConsent,
   Submission
 }
 import de.dnpm.dip.model.json.BaseSchemas
@@ -55,10 +55,10 @@ object DataUpload
       enumValueSchema[Submission.Type.type]
         .toDefinition("MVH_SubmissionType")
 
-    implicit val researchConsentSchema: Schema[ResearchConsent] =
+    implicit val researchConsentSchema: Schema[BroadConsent] =
       Schema.`object`.Free[JsObject]()
-        .asInstanceOf[Schema[ResearchConsent]]
-        .toDefinition("ResearchConsent")
+        .asInstanceOf[Schema[BroadConsent]]
+        .toDefinition("ResearchConsent")  // Definition name kept for backwards compatibility
 
     implicit val metadataSchema: Schema[Submission.Metadata] =
       Json.schema[Submission.Metadata]

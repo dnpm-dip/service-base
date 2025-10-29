@@ -26,7 +26,7 @@ import de.dnpm.dip.service.validation.{
 import de.dnpm.dip.service.query.QueryService
 import de.dnpm.dip.service.mvh.{
   MVHService,
-  ResearchConsent
+  BroadConsent
 }
 
 
@@ -107,7 +107,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
                       mvhResult <- mvhService ! MVHService.Process(dataUpload.record,metadata)
 
                       dnpmPermitted =
-                        metadata.researchConsents.exists(ResearchConsent.isGiven)
+                        metadata.researchConsents.exists(BroadConsent.permitsResearchUse)
                 
                       result <- mvhResult match {
                         case Right(_) =>
