@@ -3,7 +3,8 @@ package de.dnpm.dip.service.mvh
 
 import java.time.{
   LocalDate,
-  LocalDateTime
+  LocalDateTime,
+  LocalTime
 }
 import java.time.temporal.ChronoUnit.YEARS
 import de.dnpm.dip.coding.{
@@ -219,11 +220,25 @@ object BroadConsent
   implicit def readCodeableConcept[T](implicit rc: Reads[Coding[T]]): Reads[CodeableConcept[T]] =
     Json.reads[CodeableConcept[T]]
 
+
+  // Custom "tolerant" Reads for LocalDateTime to handle both dateTimes and mere dates in FHIR Consent resources
+  private val tolerantDateTime =
+    Reads.of[LocalDateTime] orElse Reads.of[LocalDate].map(_ atTime LocalTime.MIN)
+      
+  private val tolerantPeriod =
+    (
+      (JsPath \ "start").read(tolerantDateTime) and
+      (JsPath \ "end").readNullable(tolerantDateTime)
+    )(
+      OpenEndPeriod(_,_)
+    )
+
+
   // Explicit Reads required because of recursive nature of "Provision" (sub-provisions)
   implicit val readProvision: Reads[Provision] =
     (
       (JsPath \ "type").read[Consent.Provision.Type.Value] and
-      (JsPath \ "period").read[OpenEndPeriod[LocalDateTime]] and
+      (JsPath \ "period").read(tolerantPeriod) and
       (JsPath \ "code").readNullable[List[CodeableConcept[Any]]] and
       (JsPath \ "provision").lazyReadNullable(Reads.of[List[Provision]])
     )(
@@ -231,7 +246,12 @@ object BroadConsent
     )
 
   implicit val readView: Reads[View] =
-    Json.reads[View]
+    (
+      (JsPath \ "dateTime").read(tolerantDateTime) and
+      (JsPath \ "provision").read[Provision]
+    )(
+      View(_,_)
+    )    
 
 
   implicit val writes: Writes[BroadConsent] =
@@ -239,7 +259,7 @@ object BroadConsent
 
   // Decorator Reads[BroadConsent]:
   // Try to read the input JSON as a View to have direct error feedback on Consent resources unusable for post-processing,
-  // then return the raw JSON object wrapped in BroadConsent
+  // but then return the raw JSON object wrapped in BroadConsent
   implicit val reads: Reads[BroadConsent] =
     (
       JsPath.read[View] and
