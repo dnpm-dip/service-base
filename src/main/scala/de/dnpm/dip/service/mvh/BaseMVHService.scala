@@ -22,7 +22,7 @@ import MVHService._
 import Submission.Report.Status._
 import extensions._
 import NGSReport.Type._
-
+import ModelProjectConsent.Purpose.Sequencing 
 
 
 abstract class BaseMVHService[F[_],T <: PatientRecord](
@@ -44,6 +44,10 @@ with Logging
       case Panel           => 1
       case _               => 0
     }
+
+
+  protected def sequenceTypes(record: T): Option[Set[Submission.SequenceType.Value]]
+
 
   override def !(cmd: Command[T])(
     implicit env: Env
@@ -70,18 +74,15 @@ with Logging
                 Site.local,
                 useCase,
                 metadata.`type`,
-                record.mvhSequencingReports.map[NGSReport.Type.Value](_.`type`.code).maxOption,
+                record.mvhSequencingReports.map(_.`type`.code.enumValue).maxOption,
+                sequenceTypes(record),
                 record.patient.healthInsurance.`type`.code,
                 Some(
                   Map(
                     Consent.Category.ModelProject ->
-                      metadata.modelProjectConsent
-                        .provisions
-                        .exists(p => p.purpose == ModelProjectConsent.Purpose.Sequencing && p.`type` == Consent.Provision.Type.Permit),
+                      metadata.modelProjectConsent.provisions.exists(p => p.purpose == Sequencing && p.`type` == Consent.Provision.Type.Permit),
                     Consent.Category.Research ->
-                      metadata.researchConsents
-                        .filter(_.nonEmpty)
-                        .exists(_.forall(_.isGiven))
+                      metadata.researchConsents.filter(_.nonEmpty).exists(_.forall(_.isGiven))
                   )
                 ),
                 metadata.reasonResearchConsentMissing
