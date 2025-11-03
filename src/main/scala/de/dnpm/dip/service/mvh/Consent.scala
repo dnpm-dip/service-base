@@ -221,7 +221,7 @@ object BroadConsent
     Json.reads[CodeableConcept[T]]
 
 
-  // Custom "tolerant" Reads for LocalDateTime to handle both dateTimes and mere dates in FHIR Consent resources
+  // Custom "tolerant" Reads for LocalDateTime to handle either dateTimes or mere dates occurring in FHIR Consent resources
   private val tolerantDateTime =
     Reads.of[LocalDateTime] orElse Reads.of[LocalDate].map(_ atTime LocalTime.MIN)
       
