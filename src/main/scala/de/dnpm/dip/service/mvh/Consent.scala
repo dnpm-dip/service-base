@@ -4,7 +4,6 @@ package de.dnpm.dip.service.mvh
 import java.time.{
   LocalDate,
   LocalDateTime,
-  LocalTime
 }
 import java.time.temporal.ChronoUnit.YEARS
 import de.dnpm.dip.coding.{
@@ -155,7 +154,7 @@ object BroadConsent
   final case class Provision
   (
     `type`: Consent.Provision.Type.Value,
-    period: OpenEndPeriod[LocalDateTime],
+    period: OpenEndPeriod[LocalDate],
     private val code: Option[List[CodeableConcept[Any]]],
     private val provision: Option[List[Provision]]
   )
@@ -171,8 +170,8 @@ object BroadConsent
       lazy val today = LocalDate.now
     
       (`type` == Consent.Provision.Type.Permit) &&
-      (period.start.toLocalDate isAfter today.minus(5,YEARS)) &&
-      (period.end.exists(_.toLocalDate isAfter today) || period.end.isEmpty)
+      (period.start isAfter today.minus(5,YEARS)) &&
+      (period.end.exists(_ isAfter today) || period.end.isEmpty)
     }
     
   }
@@ -182,11 +181,11 @@ object BroadConsent
   // for minimum syntax check and in Consent processing
   final case class View
   (
-    dateTime: LocalDateTime,
+    dateTime: LocalDate,
     provision: Provision
   )
   {
-    def date = dateTime.toLocalDate
+    def date = dateTime
 
     def provision(code: String): Option[BroadConsent.Provision] =
       Option.when(provision hasCode code)(provision)
@@ -222,13 +221,13 @@ object BroadConsent
 
 
   // Custom "tolerant" Reads for LocalDateTime to handle either dateTimes or mere dates occurring in FHIR Consent resources
-  private val tolerantDateTime =
-    Reads.of[LocalDateTime] orElse Reads.of[LocalDate].map(_ atTime LocalTime.MIN)
+  private val tolerantDate =
+    Reads.of[LocalDate] orElse Reads.of[LocalDateTime].map(_.toLocalDate)
       
   private val tolerantPeriod =
     (
-      (JsPath \ "start").read(tolerantDateTime) and
-      (JsPath \ "end").readNullable(tolerantDateTime)
+      (JsPath \ "start").read(tolerantDate) and
+      (JsPath \ "end").readNullable(tolerantDate)
     )(
       OpenEndPeriod(_,_)
     )
@@ -247,7 +246,7 @@ object BroadConsent
 
   implicit val readView: Reads[View] =
     (
-      (JsPath \ "dateTime").read(tolerantDateTime) and
+      (JsPath \ "dateTime").read(tolerantDate) and
       (JsPath \ "provision").read[Provision]
     )(
       View(_,_)
