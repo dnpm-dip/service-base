@@ -50,6 +50,7 @@ import de.dnpm.dip.service.mvh.{
 import de.dnpm.dip.service.mvh.ModelProjectConsent.Purpose._
 import de.dnpm.dip.service.mvh.Consent.Provision.Type._
 import Issue.{
+  Warning,
   Error,
   Fatal,
   Path,
@@ -402,8 +403,9 @@ trait Validators
 
   private val hexString64 = "[a-fA-F0-9]{64}".r
 
-
-  implicit val metadataValidator: Validator[Issue,Submission.Metadata] =
+  implicit def metadataValidator(
+    implicit patient: Patient
+  ): Validator[Issue,Submission.Metadata] =
     metadata =>
       (
         metadata.transferTAN.value must matchRegex (hexString64) otherwise (
@@ -425,8 +427,14 @@ trait Validators
         (metadata.researchConsents.filter(_.nonEmpty) orElse metadata.reasonResearchConsentMissing) must be (defined) otherwise (
           MissingValue("Es muss entweder MII Forschungs-/Broad-Consent oder der Grund für dessen Fehlen vorhanden sein")
         ),
+        option(metadata.researchConsents.filter(_.nonEmpty)) must (have (size (1))) otherwise (
+          Warning("Es kommen mehrere Consent-Ressourcen vor, aber es soll der Broad Consent des Index-Patient als 1 Consent-Ressource gebündelt übertragen werden")
+        ) map (_.get) andThen (
+          consents => option(consents.head.view.patient.map(_.id)) must be (patient.id) otherwise (Warning("Patient-Referenz hat nicht dieselbe Patienten-ID wie am Patient-MDAT-Objekt"))
+        ) at "Broad-Consent"
       )
       .errorsOr(metadata) on "Metadaten"
+
 
 
   def dataUploadValidator[T <: PatientRecord](
@@ -436,6 +444,8 @@ trait Validators
     case upload @ DataUpload(record,optMetadata) => 
       
       import de.dnpm.dip.service.mvh.extensions._
+
+      implicit val patient = record.patient
 
       (
         ifDefined(optMetadata)(

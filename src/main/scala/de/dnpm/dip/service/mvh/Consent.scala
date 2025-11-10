@@ -11,7 +11,12 @@ import de.dnpm.dip.coding.{
   Coding,
   DefaultCodeSystem
 }
-import de.dnpm.dip.model.OpenEndPeriod
+import de.dnpm.dip.model.{
+  Id,
+  OpenEndPeriod,
+  Patient,
+  Reference
+}
 import play.api.libs.json.{
   Json,
   JsObject,
@@ -102,7 +107,11 @@ object ModelProjectConsent
 // Wrapper object around a FHIR Consent JSON resource.
 // This avoids explicitly binding to some bad FHIR DTO library (e.g. HAPI FHIR) or
 // having to define DTOs on our own for the bloated/convoluted structure typical of FHIR.
-final case class BroadConsent(value: JsObject) extends AnyVal
+
+final case class BroadConsent(json: JsObject) extends AnyVal
+{
+  def view = Json.fromJson[BroadConsent.View](json).get  // .get safe here as deserializability of JSON into View is checked in Reads[BroadConsent] (see below)
+}
 
 object BroadConsent
 {
@@ -181,12 +190,11 @@ object BroadConsent
   // for minimum syntax check and in Consent processing
   final case class View
   (
-    dateTime: LocalDate,
+    patient: Option[Reference[Patient]],
+    date: LocalDate,
     provision: Provision
   )
   {
-    def date = dateTime
-
     def provision(code: String): Option[BroadConsent.Provision] =
       Option.when(provision hasCode code)(provision)
         .orElse(
@@ -198,7 +206,7 @@ object BroadConsent
 
   def permitsResearchUse(consents: List[BroadConsent]): Boolean =
     consents
-      .map(rc => Json.fromJson[View](rc.value).get) // .get safe here as incorrect JSON consent would be denied on upload/deserialization
+      .map(_.view)
       .foldLeft(Map.empty[String,Boolean]){ 
         (acc,consent) =>
           researchProvisions.foldLeft(acc){ 
@@ -244,15 +252,22 @@ object BroadConsent
       Provision(_,_,_,_)
     )
 
-  implicit val readView: Reads[View] =
+    
+  private def reference[T](resource: String): Reads[Reference[T]] =
+    ((JsPath \ "reference").read[String] orElse (JsPath \ "identifier" \ "value").read[String])
+      .map(ref => Reference(Id[T](ref.replace(s"$resource/",""))))
+
+  implicit val readView: Reads[View] = {
     (
+      (JsPath \ "patient").readNullable(reference[Patient]("Patient")) and
       (JsPath \ "dateTime").read(tolerantDate) and
       (JsPath \ "provision").read[Provision]
     )(
-      View(_,_)
+      View(_,_,_)
     )    
+  }
 
-
+  
   implicit val writes: Writes[BroadConsent] =
     Json.valueWrites[BroadConsent]
 
