@@ -104,14 +104,85 @@ object ModelProjectConsent
 }
 
 
+
+
+sealed trait BroadConsent
+{
+  def status: BroadConsent.Status.Value
+  def patient: Option[Reference[Patient]]
+  def date: LocalDate
+  def policyUri: String
+  def provision: BroadConsent.Provision
+
+  def provision(code: String): Option[BroadConsent.Provision] =
+    Option.when(provision hasCode code)(provision)
+      .orElse(
+        provision.provisions.find(_ hasCode code)
+      )      
+}
+
+
 // Wrapper object around a FHIR Consent JSON resource.
 // This avoids explicitly binding to some bad FHIR DTO library (e.g. HAPI FHIR) or
 // having to define DTOs on our own for the bloated/convoluted structure typical of FHIR.
-
-final case class BroadConsent(json: JsObject) extends AnyVal
+final case class OriginalBroadConsent
+(
+  json: JsObject
+)
+extends BroadConsent
 {
-  def view = Json.fromJson[BroadConsent.View](json).get  // .get safe here as deserializability of JSON into View is checked in Reads[BroadConsent] (see below)
+  private lazy val view =
+    Json.fromJson[BroadConsent.View](json).get  // .get safe here as deserializability of JSON into View is checked in Reads[BroadConsent] (see below)
+  
+  override def status: BroadConsent.Status.Value = view.status
+
+  override def patient: Option[Reference[Patient]] = view.patient
+
+  override def date: LocalDate = view.date
+
+  override def policyUri: String = view.policyUri
+
+  override def provision: BroadConsent.Provision = view.provision
+
 }
+
+
+// For package internal use only, in order to be able to handle already persisted,
+// but possibly erroneous Consent resources in an error-tolerant fashion
+private final case class TolerantBroadConsent
+(
+  json: JsObject
+)
+extends BroadConsent
+{
+  // Try reading the JSON consent into View, but handle possible failure
+  private lazy val view =
+    Json.fromJson[BroadConsent.View](json).asOpt
+ 
+  override def status: BroadConsent.Status.Value =
+    view.map(_.status).getOrElse(BroadConsent.Status.EnteredInError)
+
+  override def patient: Option[Reference[Patient]] =
+    view.flatMap(_.patient)
+
+  override def date: LocalDate =
+    view.map(_.date).getOrElse(LocalDate.now)
+
+  override def policyUri: String =
+    view.map(_.policyUri).getOrElse("")
+
+  override def provision: BroadConsent.Provision =
+    view.map(_.provision).getOrElse(
+      BroadConsent.Provision(
+        Consent.Provision.Type.Deny,
+        OpenEndPeriod(LocalDate.now,None),
+        None,
+        None
+      )
+    )
+
+}
+
 
 object BroadConsent
 {
@@ -141,6 +212,28 @@ object BroadConsent
     implicit val format: Format[Value] =
       Json.formatEnum(this)
   }
+
+
+  object Status extends Enumeration 
+  {
+    val Draft          = Value("draft")
+    val Proposed       = Value("proposed")
+    val Active         = Value("active")
+    val Rejected       = Value("rejected")
+    val Inactive       = Value("inactive")
+    val EnteredInError = Value("entered-in-error")
+
+    implicit val format: Format[Value] =
+      Json.formatEnum(this)
+  }
+
+
+  val versions =
+    Map(
+      "2.16.840.1.113883.3.1937.777.24.2.1790" -> "1.6d", 
+      "2.16.840.1.113883.3.1937.777.24.2.1791" -> "1.6f",
+      "2.16.840.1.113883.3.1937.777.24.2.2079" -> "1.7.2"
+    )
 
 
   val MDAT_STORE_AND_PROCESS = "2.16.840.1.113883.3.1937.777.24.5.3.7"
@@ -190,34 +283,30 @@ object BroadConsent
   // for minimum syntax check and in Consent processing
   final case class View
   (
+    status: BroadConsent.Status.Value,
     patient: Option[Reference[Patient]],
     date: LocalDate,
+    policyUri: String,
     provision: Provision
   )
-  {
-    def provision(code: String): Option[BroadConsent.Provision] =
-      Option.when(provision hasCode code)(provision)
-        .orElse(
-          provision.provisions.find(_ hasCode code)
-        )      
-
-  }
+  extends BroadConsent
 
 
+  // By validation, the List[BroadConsent] would henceforth contain at most 1 element,
+  // but keep the implementation here agnostic of this, possibly allowing multiple instances
   def permitsResearchUse(consents: List[BroadConsent]): Boolean =
-    consents
-      .map(_.view)
-      .foldLeft(Map.empty[String,Boolean]){ 
-        (acc,consent) =>
-          researchProvisions.foldLeft(acc){ 
-            (acc2,code) => acc2.updatedWith(code){
-              case denied @ Some(false) => denied   // Short-circuit when denied
-              case _ => consent.provision(code).map(_.isPermitted)
-            }
+    consents.forall(_.status == BroadConsent.Status.Active) &&
+    consents.foldLeft(Map.empty[String,Boolean]){ 
+      (acc,consent) =>
+        researchProvisions.foldLeft(acc){ 
+          (acc2,code) => acc2.updatedWith(code){
+            case denied @ Some(false) => denied   // Short-circuit when denied
+            case _ => consent.provision(code).map(_.isPermitted)
           }
-      }
-      .values
-      .exists(_ == true)
+        }
+    }
+    .values
+    .exists(_ == true)
 
 
   def permitsResearchUse(consent: BroadConsent, consents: BroadConsent*): Boolean =
@@ -259,27 +348,32 @@ object BroadConsent
 
   implicit val readView: Reads[View] = {
     (
+      (JsPath \ "status").read[BroadConsent.Status.Value] and
       (JsPath \ "patient").readNullable(reference[Patient]("Patient")) and
       (JsPath \ "dateTime").read(tolerantDate) and
+      (JsPath \ "policy"\ 0 \ "uri").read[String] and
       (JsPath \ "provision").read[Provision]
     )(
-      View(_,_,_)
+      View(_,_,_,_,_)
     )    
   }
 
-  
-  implicit val writes: Writes[BroadConsent] =
-    Json.valueWrites[BroadConsent]
 
-  // Decorator Reads[BroadConsent]:
+  implicit val writes: Writes[BroadConsent] =
+    Writes { 
+      case OriginalBroadConsent(json) => json
+      case TolerantBroadConsent(json) => json
+      case _: View => ???  // Cannot happen, but required for exhaustive pattern match
+    }
+    
+
   // Try to read the input JSON as a View to have direct error feedback on Consent resources unusable for post-processing,
-  // but then return the raw JSON object wrapped in BroadConsent
+  // but then return the original JSON object wrapped in OriginalBroadConsent
   implicit val reads: Reads[BroadConsent] =
     (
       JsPath.read[View] and
       JsPath.read[JsObject]
     )(
-      (_,js) => BroadConsent(js)
+      (_,js) => OriginalBroadConsent(js)
     )
-
 }

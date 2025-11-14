@@ -87,7 +87,7 @@ private object FSBackedRepository
           (JsPath \ "type").read[Submission.Type.Value] and
           (JsPath \ "transferTAN").read[Id[TransferTAN]] and
           (JsPath \ "modelProjectConsent").read[ModelProjectConsent] and
-          (JsPath \ "researchConsents").readNullable(Reads.list(Json.valueReads[BroadConsent])) and
+          (JsPath \ "researchConsents").readNullable(Reads.list(Json.valueReads[TolerantBroadConsent])) and
           (JsPath \ "reasonResearchConsentMissing").readNullable[BroadConsent.ReasonMissing.Value]
         )(
           Submission.Metadata(_,_,_,_,_)
