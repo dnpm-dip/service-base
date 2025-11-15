@@ -34,7 +34,13 @@ import de.dnpm.dip.service.mvh.{
 object Orchestrator
 {
   sealed trait Command[+T]
-  final case class Process[T <: PatientRecord](upload: DataUpload[T]) extends Command[T]
+  final case class Process[T <: PatientRecord]
+  (
+    upload: DataUpload[T],
+    deidentifyBroadConsent: Boolean = false
+  )
+  extends Command[T]
+
   final case class Delete(id: Id[Patient]) extends Command[Nothing]
 
   sealed trait Outcome
@@ -89,7 +95,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
   ): F[Either[Error,Orchestrator.Outcome]] =
     cmd match {
 
-      case Process(rawData) =>
+      case Process(rawData,deidentifyBroadConsent) =>
         for { 
 
           dataUpload <- rawData.copy(record = rawData.record.complete).pure  // Load completed record into Monad
@@ -104,10 +110,9 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
                 saveResult <- dataUpload.metadata match {
                   case Some(metadata) =>
                     for {
-                      mvhResult <- mvhService ! MVHService.Process(dataUpload.record,metadata)
+                      mvhResult <- mvhService ! MVHService.Process(dataUpload.record,metadata,deidentifyBroadConsent)
 
-                      dnpmPermitted =
-                        metadata.researchConsents.exists(BroadConsent.permitsResearchUse)
+                      dnpmPermitted = metadata.researchConsents.exists(BroadConsent.permitsResearchUse)
                 
                       result <- mvhResult match {
                         case Right(_) =>

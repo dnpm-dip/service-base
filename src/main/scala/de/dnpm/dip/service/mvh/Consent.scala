@@ -232,7 +232,8 @@ object BroadConsent
     Map(
       "2.16.840.1.113883.3.1937.777.24.2.1790" -> "1.6d", 
       "2.16.840.1.113883.3.1937.777.24.2.1791" -> "1.6f",
-      "2.16.840.1.113883.3.1937.777.24.2.2079" -> "1.7.2"
+      "2.16.840.1.113883.3.1937.777.24.2.2079" -> "1.7.2",
+      "2.16.840.1.113883.3.1937.777.24.2.3542" -> "1.7.2 (Eltern und Sorgeberechtigte für Minderjährige v1.1)"
     )
 
 
@@ -248,7 +249,7 @@ object BroadConsent
     )
 
 
-  final case class CodeableConcept[T](coding: List[Coding[T]])
+  final case class CodeableConcept[T](private val coding: List[Coding[T]])
   {
     def codings = coding
   }
