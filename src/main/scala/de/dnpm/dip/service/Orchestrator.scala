@@ -30,7 +30,6 @@ import de.dnpm.dip.service.mvh.{
 }
 
 
-
 object Orchestrator
 {
   sealed trait Command[+T]
@@ -76,6 +75,9 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
   validationService: ValidationService[F,Monad[F],T],
   mvhService: MVHService[F,Monad[F],T],
   queryService: QueryService.DataOps[F,Monad[F],T]
+)(
+//  implicit patientSetter: T => Patient => T
+  implicit patientSetter: (T,Patient) => T
 )
 {
 
@@ -86,6 +88,14 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
     DataAcceptableWithIssues
   }
   import Completer.syntax._
+
+
+  // Couldn't get "Monocle" to work, so workaround with an extension method
+  private implicit class SetterSyntax(val record: T)
+  {
+    def withPatient(patient: Patient): T = patientSetter(record,patient)
+//    def withPatient(patient: Patient): T = patientSetter(record)(patient)
+  }
 
 
   def !(
@@ -106,6 +116,12 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
             
             // Validation (partially) passed
             case Right(outcome) =>
+
+              lazy val recordWithTrimmedPatient =
+                dataUpload.record.withPatient(
+                  dataUpload.record.patient.copy(address = None)
+                )
+
               for {
                 saveResult <- dataUpload.metadata match {
                   case Some(metadata) =>
@@ -116,15 +132,17 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
                 
                       result <- mvhResult match {
                         case Right(_) =>
-                          if (dnpmPermitted) queryService ! QueryService.Save(dataUpload.record)
+                          if (dnpmPermitted){
+                            queryService ! QueryService.Save(recordWithTrimmedPatient)
+                          }
                           else mvhResult.pure
-                
+
                         case err => err.pure
                       }
 
                     } yield result
 
-                  case None => queryService ! QueryService.Save(dataUpload.record)
+                  case None => queryService ! QueryService.Save(recordWithTrimmedPatient)
                 }
                   
               } yield saveResult match {
