@@ -117,7 +117,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
             // Validation (partially) passed
             case Right(outcome) =>
 
-              lazy val recordWithTrimmedPatient =
+              lazy val recordForQuery =
                 dataUpload.record.withPatient(
                   dataUpload.record.patient.copy(address = None)
                 )
@@ -132,9 +132,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
                 
                       result <- mvhResult match {
                         case Right(_) =>
-                          if (dnpmPermitted){
-                            queryService ! QueryService.Save(recordWithTrimmedPatient)
-                          }
+                          if (dnpmPermitted) queryService ! QueryService.Save(recordForQuery)
                           else mvhResult.pure
 
                         case err => err.pure
@@ -142,7 +140,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
 
                     } yield result
 
-                  case None => queryService ! QueryService.Save(recordWithTrimmedPatient)
+                  case None => queryService ! QueryService.Save(recordForQuery)
                 }
                   
               } yield saveResult match {
