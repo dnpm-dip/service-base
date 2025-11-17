@@ -126,7 +126,7 @@ sealed trait BroadConsent
 // Wrapper object around a FHIR Consent JSON resource.
 // This avoids explicitly binding to some bad FHIR DTO library (e.g. HAPI FHIR) or
 // having to define DTOs on our own for the bloated/convoluted structure typical of FHIR.
-private final case class OriginalBroadConsent
+private final case class WrappedBroadConsent
 (
   json: JsObject
 )
@@ -150,7 +150,7 @@ extends BroadConsent
 
 // For package internal use only, in order to be able to handle already persisted,
 // but possibly erroneous Consent resources in an error-tolerant fashion
-private final case class TolerantBroadConsent
+private final case class UnvalidatedBroadConsent
 (
   json: JsObject
 )
@@ -356,20 +356,20 @@ object BroadConsent
 
   implicit val writes: Writes[BroadConsent] =
     Writes { 
-      case OriginalBroadConsent(json) => json
-      case TolerantBroadConsent(json) => json
+      case WrappedBroadConsent(json) => json
+      case UnvalidatedBroadConsent(json) => json
       case _: View => ???  // Cannot happen, but required for exhaustive pattern match
     }
     
 
   // Try to read the input JSON as a View to have direct error feedback on Consent resources unusable for post-processing,
-  // but then return the original JSON object wrapped in OriginalBroadConsent
+  // but then return the original JSON object wrapped in WrappedBroadConsent
   implicit val reads: Reads[BroadConsent] =
     (
       JsPath.read[View] and
       JsPath.read[JsObject]
     )(
-      (_,js) => OriginalBroadConsent(js)
+      (_,js) => WrappedBroadConsent(js)
     )
 
 
@@ -381,8 +381,8 @@ object BroadConsent
   implicit def deidentifier(
     implicit patient: Id[Patient]
   ): Deidentifier[BroadConsent] = {
-    case OriginalBroadConsent(json) =>
-      OriginalBroadConsent(json - "id" + ("patient" -> Json.obj("reference" -> s"Patient/${patient}")))
+    case WrappedBroadConsent(json) =>
+      WrappedBroadConsent(json - "id" + ("patient" -> Json.obj("reference" -> s"Patient/${patient}")))
 
     // Default case: Cannot occur, but required for exhaustive pattern match
     case consent => consent 

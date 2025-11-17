@@ -40,7 +40,7 @@ class ConsentTests extends AnyFlatSpec with Matchers
 
     implicit val id = Id[Patient]("DummyPatientId")
 
-    val deidentifiedConsent @ OriginalBroadConsent(json) = Deidentifier[BroadConsent].apply(consent)
+    val deidentifiedConsent @ WrappedBroadConsent(json) = Deidentifier[BroadConsent].apply(consent)
     
     // Consent.id must have been removed
     json.value.get("id") must not be defined
