@@ -100,17 +100,21 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
         implicit lazy val patId = rawData.record.patient.id
 
         for { 
-          dataUpload <-
-            rawData.copy(
-              record = rawData.record.complete,  // Complete the PatientRecord (resolve display value of Codings etc)
-              metadata =
-                if (deidentifyBroadConsent)
-                  rawData.metadata.map(
-                    m => m.copy(researchConsents = m.researchConsents.map(_ map Deidentifier[BroadConsent]))
-                  )
-                else rawData.metadata
-            )
-            .pure  // Load pre-processed data into Monad
+
+          dataUpload <- rawData.copy(
+
+            // Complete the PatientRecord (resolve display value of Codings etc)
+            record = rawData.record.complete,
+
+            // Deidentify BroadConsent, if specified by the client
+            metadata =
+              if (deidentifyBroadConsent)
+                rawData.metadata.map(
+                  m => m.copy(researchConsents = m.researchConsents.map(_ map Deidentifier[BroadConsent]))
+                )
+              else rawData.metadata
+          )
+          .pure  // Load pre-processed data into Monad
 
           validationResult <- (validationService ! Validate(dataUpload))
 

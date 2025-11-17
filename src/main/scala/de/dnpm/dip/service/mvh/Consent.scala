@@ -294,37 +294,19 @@ object BroadConsent
   extends BroadConsent
 
 
-  // By validation, the List[BroadConsent] would henceforth contain at most 1 element,
-  // but keep the implementation here agnostic of this, possibly allowing multiple instances
+  // By validation, the List[BroadConsent] contains at most 1 element
+  // (The signature Metadata.researchConsents: List[BroadConsent] being only retained for backwards compatibility)
   def permitsResearchUse(consents: List[BroadConsent]): Boolean =
-    consents.forall(_.status == BroadConsent.Status.Active) &&
-    consents.foldLeft(Map.empty[String,Boolean]){ 
-      (acc,consent) =>
-        researchProvisions.foldLeft(acc){ 
-          (acc2,code) => acc2.updatedWith(code){
-            case denied @ Some(false) => denied   // Short-circuit when denied
-            case _ => consent.provision(code).map(_.isPermitted)
-          }
-        }
-    }
-    .values
-    .exists(_ == true)
+    consents.headOption.exists(permitsResearchUse)
 
-  def permitsResearchUse(consent: BroadConsent, consents: BroadConsent*): Boolean =
-    permitsResearchUse(consent :: consents.toList)
-
-
-  // By validation, the List[BroadConsent] would henceforth contain at most 1 element
   def permitsResearchUse(consent: BroadConsent): Boolean =
     consent.status == BroadConsent.Status.Active &&
-    researchProvisions.map( 
+    researchProvisions.exists( 
       code => consent.provision(code) match {
         case Some(provision) => provision.isPermitted
         case None => false
       }
     )
-    .exists(_ == true)
-
     
   implicit def readCodeableConcept[T](implicit rc: Reads[Coding[T]]): Reads[CodeableConcept[T]] =
     Json.reads[CodeableConcept[T]]
@@ -390,8 +372,9 @@ object BroadConsent
       (_,js) => OriginalBroadConsent(js)
     )
 
-   /*
-   * Deidentfier for the BroadConsent:
+
+  /*
+   * Deidentifier for the BroadConsent:
    * - Remove Consent.id
    * - Replace Consent.patient with a reference using the same id as the MDAT Patient object in the submission
    */
