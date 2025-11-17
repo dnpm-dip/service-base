@@ -50,25 +50,14 @@ with Logging
   ): F[Either[Error,Outcome]] =
     cmd match {
 
-      case Process(record,rawMetadata,deidentifyBroadConsent) =>
+      case Process(record,metadata) =>
 
         log.info(s"Processing MVH submission for Patient record ${record.id}")
 
         for {
-          tanAlreadyUsed <- repo.alreadyUsed(rawMetadata.transferTAN)
+          tanAlreadyUsed <- repo.alreadyUsed(metadata.transferTAN)
 
           result <- if (!tanAlreadyUsed){
-
-            val metadata =
-              deidentifyBroadConsent match {
-                case true =>
-                  implicit val patient = record.patient.id
-                  rawMetadata.copy(
-                    researchConsents = rawMetadata.researchConsents.map(_.map(deidentify))
-                  )
-
-                case false => rawMetadata  
-              }
 
             val submittedAt = LocalDateTime.now
 
@@ -108,7 +97,7 @@ with Logging
               )
             )
           } else {
-            val msg = s"Invalid submission: TAN ${rawMetadata.transferTAN} has already been used"
+            val msg = s"Invalid submission: TAN ${metadata.transferTAN} has already been used"
             log.warn(s"$msg, refusing submission")
             env.pure(InvalidTAN(msg).asLeft)
           }

@@ -96,9 +96,21 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
     cmd match {
 
       case Process(rawData,deidentifyBroadConsent) =>
-        for { 
 
-          dataUpload <- rawData.copy(record = rawData.record.complete).pure  // Load completed record into Monad
+        implicit lazy val patId = rawData.record.patient.id
+
+        for { 
+          dataUpload <-
+            rawData.copy(
+              record = rawData.record.complete,  // Complete the PatientRecord (resolve display value of Codings etc)
+              metadata =
+                if (deidentifyBroadConsent)
+                  rawData.metadata.map(
+                    m => m.copy(researchConsents = m.researchConsents.map(_ map Deidentifier[BroadConsent]))
+                  )
+                else rawData.metadata
+            )
+            .pure  // Load pre-processed data into Monad
 
           validationResult <- (validationService ! Validate(dataUpload))
 
@@ -110,7 +122,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
                 saveResult <- dataUpload.metadata match {
                   case Some(metadata) =>
                     for {
-                      mvhResult <- mvhService ! MVHService.Process(dataUpload.record,metadata,deidentifyBroadConsent)
+                      mvhResult <- mvhService ! MVHService.Process(dataUpload.record,metadata)
 
                       dnpmPermitted = metadata.researchConsents.exists(BroadConsent.permitsResearchUse)
                 

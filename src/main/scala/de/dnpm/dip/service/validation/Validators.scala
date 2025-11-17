@@ -443,7 +443,7 @@ trait Validators
                   Error(s"Ungültige OID '${consent.policyUri}', muss auf eine der zulässigen BC Versionen {${BroadConsent.versions.values.mkString(", ")}} verweisen.") at "Consent.policy.uri"
                 ),
                 option(consent.patient.map(_.id)) must be (patient.id) otherwise (
-                  Warning("Patient-Referenz hat nicht dieselbe Patienten-ID wie am Patient-MDAT-Objekt") at "Consent.patient"
+                  Warning("Patient-Referenz entspricht nicht der Patient-Pseudonym-ID") at "Consent.patient"
                 )
               )
               .errorsOr(consents) on "Broad-Consent"

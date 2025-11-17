@@ -9,6 +9,7 @@ import de.dnpm.dip.model.{
   Id,
   Patient
 }
+import de.dnpm.dip.service.Deidentifier
 import play.api.libs.json.Json
 
 
@@ -49,13 +50,13 @@ class ConsentTests extends AnyFlatSpec with Matchers
   }
 
 
-  "Deidentification" must "have worked as expected" in {
+  "Deidentifier[BroadConsent]" must "have worked as expected" in {
 
     implicit val id = Id[Patient]("DummyPatientId")
 
     forAll(consent :: partialConsents){ bc => 
 
-      val deidentifiedConsent @ OriginalBroadConsent(json) = MVHService.deidentify(bc)
+      val deidentifiedConsent @ OriginalBroadConsent(json) = Deidentifier[BroadConsent].apply(bc)
       
       // Consent.id must have been removed
       json.value.get("id") must not be defined
