@@ -90,18 +90,11 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
   import Deidentifier.syntax._
 
 
-  // Couldn't get "Monocle" library to work, so workaround with an extension method for readability
-  private implicit class SetterSyntax(val record: T)
-  {
-    def withPatient(patient: Patient): T = patientSetter(record,patient)
-  }
-
-
   // PatientRecord Deidentifier:
   // - Remove MV-specific element Patient.address in PatientRecords transferred into the Query module
   private implicit lazy val recordDeidentifier: Deidentifier.Of[T] =
     (record: T) =>
-       record.withPatient(record.patient.copy(address = None))
+       patientSetter(record,record.patient.copy(address = None))
 
 
   def !(
