@@ -90,4 +90,23 @@ object MVHService
       Json.format[StatusInfo]
   }
 
+
+  /*
+   * Deidentying the BroadConsent: 
+   * - Remove Consent.id
+   * - Replace Consent.patient with a reference using the same id as the MDAT Patient object in the submission
+   */
+/*  
+  def deidentify(
+    consent: BroadConsent
+  )(
+    implicit patient: Id[Patient]
+  ):  BroadConsent =
+    consent match {
+      case OriginalBroadConsent(json) =>
+        OriginalBroadConsent(json - "id" + ("patient" -> Json.obj("reference" -> s"Patient/${patient}")))
+ 
+      case consent => consent // Won't ever occur, but required for exhaustive pattern match
+    }
+*/
 }

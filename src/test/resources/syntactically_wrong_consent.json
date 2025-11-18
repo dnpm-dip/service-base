@@ -27,7 +27,6 @@
           ]
        }
     ],
-    "status":"active",
     "scope":{
        "coding":[
           {
@@ -72,13 +71,7 @@
           "display":"MII"
        }
     ],
-    "policy":[
-       {
-          "uri":"2.16.840.1.113883.3.1937.777.24.2.2079"
-       }
-    ],
     "provision":{
-       "type":"deny",
        "period":{
           "start":"2025-02-11",
           "end":"2025-02-11"
