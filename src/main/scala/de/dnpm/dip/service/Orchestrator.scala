@@ -76,7 +76,6 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
   mvhService: MVHService[F,Monad[F],T],
   queryService: QueryService.DataOps[F,Monad[F],T]
 )(
-//  implicit patientSetter: T => Patient => T
   implicit patientSetter: (T,Patient) => T
 )
 {
@@ -88,14 +87,21 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
     DataAcceptableWithIssues
   }
   import Completer.syntax._
+  import Deidentifier.syntax._
 
 
-  // Couldn't get "Monocle" to work, so workaround with an extension method
+  // Couldn't get "Monocle" library to work, so workaround with an extension method for readability
   private implicit class SetterSyntax(val record: T)
   {
     def withPatient(patient: Patient): T = patientSetter(record,patient)
-//    def withPatient(patient: Patient): T = patientSetter(record)(patient)
   }
+
+
+  // PatientRecord Deidentifier:
+  // - Remove MV-specific element Patient.address in PatientRecords transferred into the Query module
+  private implicit lazy val recordDeidentifier: Deidentifier.Of[T] =
+    (record: T) =>
+       record.withPatient(record.patient.copy(address = None))
 
 
   def !(
@@ -106,9 +112,25 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
     cmd match {
 
       case Process(rawData,deidentifyBroadConsent) =>
+
         for { 
 
-          dataUpload <- rawData.copy(record = rawData.record.complete).pure  // Load completed record into Monad
+          dataUpload <- rawData.copy(
+
+            // Complete the PatientRecord (resolve display value of Codings etc)
+            record = rawData.record.complete,
+
+            // Deidentify BroadConsent, if specified by the client
+            metadata =
+              if (deidentifyBroadConsent)
+                rawData.metadata.map(
+                  m => m.copy(
+                    researchConsents = m.researchConsents.map(_.map(_.deidentifiedWith(rawData.record.patient.id)))
+                  )
+                )
+              else rawData.metadata
+          )
+          .pure  // Load pre-processed data into Monad
 
           validationResult <- (validationService ! Validate(dataUpload))
 
@@ -117,22 +139,17 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
             // Validation (partially) passed
             case Right(outcome) =>
 
-              lazy val recordForQuery =
-                dataUpload.record.withPatient(
-                  dataUpload.record.patient.copy(address = None)
-                )
-
               for {
                 saveResult <- dataUpload.metadata match {
                   case Some(metadata) =>
                     for {
-                      mvhResult <- mvhService ! MVHService.Process(dataUpload.record,metadata,deidentifyBroadConsent)
+                      mvhResult <- mvhService ! MVHService.Process(dataUpload.record,metadata)
 
                       dnpmPermitted = metadata.researchConsents.exists(BroadConsent.permitsResearchUse)
                 
                       result <- mvhResult match {
                         case Right(_) =>
-                          if (dnpmPermitted) queryService ! QueryService.Save(recordForQuery)
+                          if (dnpmPermitted) queryService ! QueryService.Save(dataUpload.record.deidentified)
                           else mvhResult.pure
 
                         case err => err.pure
@@ -140,7 +157,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
 
                     } yield result
 
-                  case None => queryService ! QueryService.Save(recordForQuery)
+                  case None => queryService ! QueryService.Save(dataUpload.record.deidentified)
                 }
                   
               } yield saveResult match {

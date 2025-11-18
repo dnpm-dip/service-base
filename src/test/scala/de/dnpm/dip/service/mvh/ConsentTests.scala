@@ -3,28 +3,31 @@ package de.dnpm.dip.service.mvh
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
-import org.scalatest.Inspectors._
 import org.scalatest.OptionValues._
 import de.dnpm.dip.model.{
   Id,
   Patient
 }
-import play.api.libs.json.Json
+import de.dnpm.dip.service.Deidentifier
+import Deidentifier.syntax._
+import play.api.libs.json.{
+  Json,
+  JsResult
+}
 
 
 class ConsentTests extends AnyFlatSpec with Matchers 
 {
 
-  private def readConsent(f: String): BroadConsent =
+  private def readConsent(f: String): JsResult[BroadConsent] =
     Json.fromJson[BroadConsent](
       Json.parse(
         this.getClass.getClassLoader.getResourceAsStream(f)
       )
     )
-    .get
 
 
-  val consent = readConsent("consent.json")
+  val consent = readConsent("consent.json").get
 
   val partialConsents =
     List(
@@ -42,28 +45,25 @@ class ConsentTests extends AnyFlatSpec with Matchers
   }
 
 
-  it must "have correctly worked on provisions spread across multiple Consent resources" in {
+  "BroadConsent deidentification" must "have worked as expected" in {
 
-    BroadConsent.permitsResearchUse(partialConsents) mustBe true
+    implicit val dummyId = Id[Patient]("DummyPatientId")
+
+    val deidentifiedConsent @ WrappedBroadConsent(json) = consent.deidentifiedWith(dummyId)
+    
+    // Consent.id must have been removed
+    json.value.get("id") must not be defined
+    
+    // Id[Patient] on the Consent.patient reference must have been replaced
+    deidentifiedConsent.patient.value.id mustBe dummyId
 
   }
 
 
-  "Deidentification" must "have worked as expected" in {
+  "Deserialization of syntactically wrong consent" must "have failed" in { 
 
-    implicit val id = Id[Patient]("DummyPatientId")
+    readConsent("syntactically_wrong_consent.json").isError mustBe true
 
-    forAll(consent :: partialConsents){ bc => 
-
-      val deidentifiedConsent @ OriginalBroadConsent(json) = MVHService.deidentify(bc)
-      
-      // Consent.id must have been removed
-      json.value.get("id") must not be defined
-      
-      // Id[Patient] on the Consent.patient reference must have been replaced
-      deidentifiedConsent.patient.value.id mustBe id
-
-    }
   }
 
 }

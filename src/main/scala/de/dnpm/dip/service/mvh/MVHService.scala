@@ -62,8 +62,7 @@ object MVHService
 
   final case class Process[T <: PatientRecord](
     record: T,
-    metadata: Submission.Metadata,
-    deidentifyBroadConsent: Boolean = false
+    metadata: Submission.Metadata
   )
   extends Command[T]
 
@@ -90,34 +89,5 @@ object MVHService
     implicit val format: OFormat[StatusInfo] =
       Json.format[StatusInfo]
   }
-
-
-  /*
-   * Deidentying the BroadConsent: 
-   * - Remove Consent.id
-   * - Replace Consent.patient with a reference using the same id as the MDAT Patient object in the submission
-   */
-  def deidentify(
-    consent: BroadConsent
-  )(
-    implicit patient: Id[Patient]
-  ):  BroadConsent =
-    consent match {
-      case OriginalBroadConsent(json) =>
-        OriginalBroadConsent(json - "id" + ("patient" -> Json.obj("reference" -> s"Patient/${patient}")))
- 
-      case consent => consent // Won't ever occur, but required for exhaustive pattern match
-    }
-
-/*  
-  def deidentify(
-    implicit patient: Id[Patient]
-  ): BroadConsent => BroadConsent = {
-    case OriginalBroadConsent(json) =>
-      OriginalBroadConsent(json - "id" + ("patient" -> Json.obj("reference" -> s"Patient/${patient}")))
- 
-    case consent => consent // Won't ever occur, but required for exhaustive pattern match
-  }
-*/
 
 }

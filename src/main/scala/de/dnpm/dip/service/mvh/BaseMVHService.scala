@@ -22,7 +22,7 @@ import MVHService._
 import Submission.Report.Status._
 import extensions._
 import NGSReport.Type._
-
+import ModelProjectConsent.Purpose.Sequencing 
 
 
 abstract class BaseMVHService[F[_],T <: PatientRecord](
@@ -45,30 +45,23 @@ with Logging
       case _               => 0
     }
 
+
+  protected def sequenceTypes(record: T): Option[Set[Submission.SequenceType.Value]]
+
+
   override def !(cmd: Command[T])(
     implicit env: Env
   ): F[Either[Error,Outcome]] =
     cmd match {
 
-      case Process(record,rawMetadata,deidentifyBroadConsent) =>
+      case Process(record,metadata) =>
 
         log.info(s"Processing MVH submission for Patient record ${record.id}")
 
         for {
-          tanAlreadyUsed <- repo.alreadyUsed(rawMetadata.transferTAN)
+          tanAlreadyUsed <- repo.alreadyUsed(metadata.transferTAN)
 
           result <- if (!tanAlreadyUsed){
-
-            val metadata =
-              deidentifyBroadConsent match {
-                case true =>
-                  implicit val patient = record.patient.id
-                  rawMetadata.copy(
-                    researchConsents = rawMetadata.researchConsents.map(_.map(deidentify))
-                  )
-
-                case false => rawMetadata  
-              }
 
             val submittedAt = LocalDateTime.now
 
@@ -81,14 +74,13 @@ with Logging
                 Site.local,
                 useCase,
                 metadata.`type`,
-                record.mvhSequencingReports.map[NGSReport.Type.Value](_.`type`.code).maxOption,
+                record.mvhSequencingReports.map(_.`type`.code.enumValue).maxOption,
+                sequenceTypes(record),
                 record.patient.healthInsurance.`type`.code,
                 Some(
                   Map(
                     Consent.Category.ModelProject ->
-                      metadata.modelProjectConsent
-                        .provisions
-                        .exists(p => p.purpose == ModelProjectConsent.Purpose.Sequencing && p.`type` == Consent.Provision.Type.Permit),
+                      metadata.modelProjectConsent.provisions.exists(p => p.purpose == Sequencing && p.`type` == Consent.Provision.Type.Permit),
                     Consent.Category.Research ->
                       metadata.researchConsents.exists(BroadConsent.permitsResearchUse)
                   )
@@ -108,7 +100,7 @@ with Logging
               )
             )
           } else {
-            val msg = s"Invalid submission: TAN ${rawMetadata.transferTAN} has already been used"
+            val msg = s"Invalid submission: TAN ${metadata.transferTAN} has already been used"
             log.warn(s"$msg, refusing submission")
             env.pure(InvalidTAN(msg).asLeft)
           }

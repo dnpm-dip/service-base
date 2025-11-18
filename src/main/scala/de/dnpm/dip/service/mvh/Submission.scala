@@ -50,6 +50,15 @@ object Submission
   }
 
 
+  object SequenceType extends Enumeration
+  {
+    val DNA, RNA = Value
+  
+    implicit val format: Format[Value] =
+      Json.formatEnum(this)
+  }
+
+
   final case class Report
   (
     id: Id[TransferTAN],
@@ -60,6 +69,7 @@ object Submission
     useCase: UseCase.Value,
     `type`: Type.Value,
     sequencingType: Option[NGSReport.Type.Value],
+    sequenceTypes: Option[Set[SequenceType.Value]],
     healthInsuranceType: HealthInsurance.Type.Value,
     consentStatus: Option[Map[Consent.Category.Value,Boolean]],
     reasonResearchConsentMissing: Option[BroadConsent.ReasonMissing.Value]

@@ -17,6 +17,7 @@ import de.dnpm.dip.model.{
   Patient,
   Reference
 }
+import de.dnpm.dip.service.Deidentifier
 import play.api.libs.json.{
   Json,
   JsObject,
@@ -125,7 +126,7 @@ sealed trait BroadConsent
 // Wrapper object around a FHIR Consent JSON resource.
 // This avoids explicitly binding to some bad FHIR DTO library (e.g. HAPI FHIR) or
 // having to define DTOs on our own for the bloated/convoluted structure typical of FHIR.
-final case class OriginalBroadConsent
+private final case class WrappedBroadConsent
 (
   json: JsObject
 )
@@ -149,7 +150,7 @@ extends BroadConsent
 
 // For package internal use only, in order to be able to handle already persisted,
 // but possibly erroneous Consent resources in an error-tolerant fashion
-private final case class TolerantBroadConsent
+private final case class UnvalidatedBroadConsent
 (
   json: JsObject
 )
@@ -282,7 +283,7 @@ object BroadConsent
   // "View" DTO for use as a "projection" of the necessary data
   // in a raw JSON FHIR Consent within a BroadConsent instance,
   // for minimum syntax check and in Consent processing
-  final case class View
+  private[mvh] final case class View
   (
     status: BroadConsent.Status.Value,
     patient: Option[Reference[Patient]],
@@ -293,27 +294,21 @@ object BroadConsent
   extends BroadConsent
 
 
-  // By validation, the List[BroadConsent] would henceforth contain at most 1 element,
-  // but keep the implementation here agnostic of this, possibly allowing multiple instances
+  // By validation, the List[BroadConsent] contains at most 1 element
+  // (The signature Metadata.researchConsents: List[BroadConsent] being only retained for backwards compatibility)
   def permitsResearchUse(consents: List[BroadConsent]): Boolean =
-    consents.forall(_.status == BroadConsent.Status.Active) &&
-    consents.foldLeft(Map.empty[String,Boolean]){ 
-      (acc,consent) =>
-        researchProvisions.foldLeft(acc){ 
-          (acc2,code) => acc2.updatedWith(code){
-            case denied @ Some(false) => denied   // Short-circuit when denied
-            case _ => consent.provision(code).map(_.isPermitted)
-          }
-        }
-    }
-    .values
-    .exists(_ == true)
+    consents.headOption.exists(permitsResearchUse)
 
-
-  def permitsResearchUse(consent: BroadConsent, consents: BroadConsent*): Boolean =
-    permitsResearchUse(consent :: consents.toList)
-
-
+  def permitsResearchUse(consent: BroadConsent): Boolean =
+    consent.status == BroadConsent.Status.Active &&
+    researchProvisions.exists( 
+      code => consent.provision(code) match {
+        case Some(provision) => provision.isPermitted
+        case None => false
+      }
+    )
+    
+    
   implicit def readCodeableConcept[T](implicit rc: Reads[Coding[T]]): Reads[CodeableConcept[T]] =
     Json.reads[CodeableConcept[T]]
 
@@ -362,19 +357,38 @@ object BroadConsent
 
   implicit val writes: Writes[BroadConsent] =
     Writes { 
-      case OriginalBroadConsent(json) => json
-      case TolerantBroadConsent(json) => json
+      case WrappedBroadConsent(json) => json
+      case UnvalidatedBroadConsent(json) => json
       case _: View => ???  // Cannot happen, but required for exhaustive pattern match
     }
     
 
   // Try to read the input JSON as a View to have direct error feedback on Consent resources unusable for post-processing,
-  // but then return the original JSON object wrapped in OriginalBroadConsent
+  // but then return the original JSON object wrapped in WrappedBroadConsent
   implicit val reads: Reads[BroadConsent] =
     (
       JsPath.read[View] and
       JsPath.read[JsObject]
     )(
-      (_,js) => OriginalBroadConsent(js)
+      (_,js) => WrappedBroadConsent(js)
     )
+
+
+  /*
+   * Deidentifier for the BroadConsent:
+   * - Remove Consent.id
+   * - Replace Consent.patient with a reference using the same id as the MDAT Patient object in the submission
+   */
+  implicit val deidentifier: Deidentifier[BroadConsent,Id[Patient]] =
+    Deidentifier(
+      (consent: BroadConsent, patient: Id[Patient]) =>
+        consent match {
+          case WrappedBroadConsent(json) =>
+            WrappedBroadConsent(json - "id" + ("patient" -> Json.obj("reference" -> s"Patient/${patient}")))
+        
+          // Default case: Cannot occur, but required for exhaustive pattern match
+          case bc => bc 
+        }
+    )
+    
 }
