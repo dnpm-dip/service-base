@@ -30,7 +30,6 @@ import de.dnpm.dip.service.mvh.{
 }
 
 
-
 object Orchestrator
 {
   sealed trait Command[+T]
@@ -76,6 +75,8 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
   validationService: ValidationService[F,Monad[F],T],
   mvhService: MVHService[F,Monad[F],T],
   queryService: QueryService.DataOps[F,Monad[F],T]
+)(
+  implicit patientSetter: (T,Patient) => T
 )
 {
 
@@ -86,8 +87,21 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
     DataAcceptableWithIssues
   }
   import Completer.syntax._
+  import Deidentifier.syntax._
 
-  private lazy val consentDeidentifier = Deidentifier[BroadConsent,Id[Patient]]
+
+  // Couldn't get "Monocle" library to work, so workaround with an extension method for readability
+  private implicit class SetterSyntax(val record: T)
+  {
+    def withPatient(patient: Patient): T = patientSetter(record,patient)
+  }
+
+
+  // PatientRecord Deidentifier:
+  // - Remove MV-specific element Patient.address in PatientRecords transferred into the Query module
+  private implicit lazy val recordDeidentifier: Deidentifier.Of[T] =
+    (record: T) =>
+       record.withPatient(record.patient.copy(address = None))
 
 
   def !(
@@ -98,8 +112,6 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
     cmd match {
 
       case Process(rawData,deidentifyBroadConsent) =>
-
-        implicit lazy val patId = rawData.record.patient.id
 
         for { 
 
@@ -112,7 +124,9 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
             metadata =
               if (deidentifyBroadConsent)
                 rawData.metadata.map(
-                  m => m.copy(researchConsents = m.researchConsents.map(_.map(consentDeidentifier(_))))
+                  m => m.copy(
+                    researchConsents = m.researchConsents.map(_.map(_.deidentifiedWith(rawData.record.patient.id)))
+                  )
                 )
               else rawData.metadata
           )
@@ -124,6 +138,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
             
             // Validation (partially) passed
             case Right(outcome) =>
+
               for {
                 saveResult <- dataUpload.metadata match {
                   case Some(metadata) =>
@@ -134,15 +149,15 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
                 
                       result <- mvhResult match {
                         case Right(_) =>
-                          if (dnpmPermitted) queryService ! QueryService.Save(dataUpload.record)
+                          if (dnpmPermitted) queryService ! QueryService.Save(dataUpload.record.deidentified)
                           else mvhResult.pure
-                
+
                         case err => err.pure
                       }
 
                     } yield result
 
-                  case None => queryService ! QueryService.Save(dataUpload.record)
+                  case None => queryService ! QueryService.Save(dataUpload.record.deidentified)
                 }
                   
               } yield saveResult match {

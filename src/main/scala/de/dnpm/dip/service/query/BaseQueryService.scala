@@ -276,23 +276,19 @@ with Logging
 
     cmd match {
 
-      case sub @ Query.Submit(optMode,optSites,crit) => {
+      case submit @ Query.Submit(optMode,optSites,crit) => {
 
-        log.info(s"Processing new query by $querier: \n${Json.prettyPrint(Json.toJson(sub))}") 
+        log.info(s"Processing new query by $querier: \n${Json.prettyPrint(Json.toJson(submit))}") 
 
-        val id =
-          cache.newQueryId
+        val id = cache.newQueryId
 
-        val (mode,sites) =
-          modeAndSites(optMode,optSites.complete)
+        val (mode,sites) = modeAndSites(optMode,optSites.complete)
 
         //TODO: criteria validation
-        val criteria =
-          crit.complete
+        val criteria = crit.complete
 
         for {
-          resultsBySite <-
-            executeQuery(id,sites,criteria) 
+          resultsBySite <- executeQuery(id,sites,criteria) 
 
           errsOrResults =
             resultsBySite
@@ -301,54 +297,47 @@ with Logging
               .reduceOption(_ combine _)
               .getOrElse(Seq.empty.rightIor)
 
-          errsOrQuery =
-            errsOrResults.toEither match {
-              case Right(results) if (results.nonEmpty) =>
-                Query[Criteria](
-                  id,
-                  LocalDateTime.now,
-                  querier,
-                  mode,
-                  ConnectionStatus.from(resultsBySite),
-                  criteria,
-                  cache.timeoutSeconds,
-                  Instant.now
-                )
-                .tap(query => cache += query -> ResultSetFrom(query,results))
-                .asRight
+          errsOrQuery = errsOrResults.toEither match {
+            case Right(results) if (results.nonEmpty) =>
+              Query[Criteria](
+                id,
+                LocalDateTime.now,
+                querier,
+                mode,
+                ConnectionStatus.from(resultsBySite),
+                criteria,
+                cache.timeoutSeconds,
+                Instant.now
+              )
+              .tap(query => cache += query -> ResultSetFrom(query,results))
+              .asRight
 
-              case Right(_) => Query.NoResults.asLeft
-                  
-              case Left(errs) => Query.ConnectionErrors(errs).asLeft
-            }
+            case Right(_) => Query.NoResults.asLeft
+                
+            case Left(errs) => Query.ConnectionErrors(errs).asLeft
+          }
 
         } yield errsOrQuery
 
       }
 
-      case up @ Query.Update(id,optMode,optSites,optCriteria) => {
+      case update @ Query.Update(id,optMode,optSites,optCriteria) => {
 
-        log.info(s"Updating Query $id by $querier: \n${Json.prettyPrint(Json.toJson(up))}") 
+        log.info(s"Updating Query $id by $querier: \n${Json.prettyPrint(Json.toJson(update))}") 
         
         cache.getQuery(id) match {
 
-          case None =>
-            Query.InvalidId
-              .asLeft
-              .pure[F]
+          case None => Query.InvalidId.asLeft.pure[F]
 
           case Some(query) => {
 
-            val (mode,sites) =
-              modeAndSites(optMode.getOrElse(query.mode),optSites.complete)
+            val (mode,sites) = modeAndSites(optMode.getOrElse(query.mode),optSites.complete)
 
-            val sitesChanged =
-              sites != query.peers.map(_.site).toSet
+            val sitesChanged = sites != query.peers.map(_.site).toSet
 
             //TODO: criteria validation
               
-            val criteria =
-              optCriteria.complete
+            val criteria = optCriteria.complete
 
             val criteriaChanged =
               (criteria,query.criteria) match {
@@ -362,8 +351,7 @@ with Logging
               log.debug(s"Query target sites or criteria changed, re-submitting...") 
 
               for {
-                resultsBySite <-
-                  executeQuery(id,sites,criteria) 
+                resultsBySite <- executeQuery(id,sites,criteria) 
               
                 errsOrResults =
                   resultsBySite
@@ -372,33 +360,31 @@ with Logging
                     .reduceOption(_ combine _)
                     .getOrElse(Seq.empty.rightIor)
 
-                errsOrQuery =
-                  errsOrResults.toEither match {
-                    case Right(results) if (results.nonEmpty) =>
-                      Query[Criteria](
-                        id,
-                        LocalDateTime.now,
-                        querier,
-                        mode,
-                        ConnectionStatus.from(resultsBySite),
-                        criteria,
-                        cache.timeoutSeconds,
-                        Instant.now
-                      )
-                      .tap(query => cache += query -> ResultSetFrom(query,results))
-                      .asRight
+                errsOrQuery = errsOrResults.toEither match {
+                  case Right(results) if (results.nonEmpty) =>
+                    Query[Criteria](
+                      id,
+                      LocalDateTime.now,
+                      querier,
+                      mode,
+                      ConnectionStatus.from(resultsBySite),
+                      criteria,
+                      cache.timeoutSeconds,
+                      Instant.now
+                    )
+                    .tap(query => cache += query -> ResultSetFrom(query,results))
+                    .asRight
       
-                    case Right(_) => Query.NoResults.asLeft
+                  case Right(_) => Query.NoResults.asLeft
 
-                    case Left(errs) => Query.ConnectionErrors(errs).asLeft
-                  }
+                  case Left(errs) => Query.ConnectionErrors(errs).asLeft
+                }
               
               } yield errsOrQuery
               
             } else {
               log.debug(s"Query target sites or criteria unchanged, nothing to do") 
-              query.asRight
-                .pure[F]
+              query.asRight.pure[F]
             }
 
           }
@@ -411,16 +397,11 @@ with Logging
 
         cache.getQuery(id) match {
 
-          case None =>
-            Query.InvalidId
-              .asLeft
-              .pure[F]
+          case None => Query.InvalidId.asLeft.pure[F]
 
-          case Some(query) => {
+          case Some(query) => 
             cache -= id
-            query.asRight
-              .pure[F]
-          }
+            query.asRight.pure[F]
 
         }
 
@@ -431,6 +412,31 @@ with Logging
   }
 
 
+  // Introduced as a (temporary) workaround:
+  // The current data protection concept doesn't allow federated queries.
+  // To avoid changing all components from the UI to here, just execute any query locally under the hood.
+  private def executeQuery(
+    id: Query.Id,
+    sites: Set[Coding[Site]],
+    criteria: Option[Criteria]
+  )(
+    implicit env: Monad[F]
+  ): F[Map[Coding[Site],Either[String,Seq[Query.Match[PatientRecord,Criteria]]]]] = {
+
+    // Expand the query criteria only here,
+    // to save bandwidth transmitting them to peers and
+    // to avoid "log pollution" with potentially very long expanded criteria 
+    sites.contains(Site.local) match {
+      case true =>
+        (db ? criteria.map(CriteriaExpander))
+          .map(results => Map(Site.local -> results))
+
+      case _ => Map.empty.pure[F]
+    }
+
+  }
+
+/*
   private def executeQuery(
     id: Query.Id,
     sites: Set[Coding[Site]],
@@ -480,7 +486,7 @@ with Logging
       .mapN(_ ++ _)
 
   }
-
+*/
 
   override def queries(
     implicit

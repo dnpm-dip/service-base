@@ -308,6 +308,7 @@ object BroadConsent
       }
     )
     
+    
   implicit def readCodeableConcept[T](implicit rc: Reads[Coding[T]]): Reads[CodeableConcept[T]] =
     Json.reads[CodeableConcept[T]]
 

@@ -9,10 +9,18 @@ trait Deidentifier[T,Ctx]
 
 object Deidentifier
 {
+
+  type Of[T] = Deidentifier[T,DummyImplicit] 
+
+
+  def of[T](implicit deidentifier: Deidentifier.Of[T]) = deidentifier
+
+
   def apply[T,Ctx](implicit deidentifier: Deidentifier[T,Ctx]) = deidentifier
 
-  implicit def fromFunction[T](f: T => T): Deidentifier[T,DummyImplicit] =
-    new Deidentifier[T,DummyImplicit]{
+
+  implicit def fromFunction[T](f: T => T): Deidentifier.Of[T] =
+    new Deidentifier.Of[T]{
       override def apply(t: T)(implicit ctx: DummyImplicit) = f(t)
     }
 
@@ -25,5 +33,22 @@ object Deidentifier
     new Deidentifier[T,Ctx]{
       override def apply(t: T)(implicit ctx: Ctx) = f(t,ctx)
     }
+
+
+
+  object syntax
+  {
+
+    implicit class DeidentificationOps[T](val t: T) extends AnyVal
+    {
+      def deidentified(implicit deidentifier: Deidentifier.Of[T]) =
+        deidentifier(t)
+
+      def deidentifiedWith[Ctx](ctx: Ctx)(implicit deidentifier: Deidentifier[T,Ctx]) =
+        deidentifier(t)(ctx)
+    }
+
+  }
+
 }
 

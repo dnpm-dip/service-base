@@ -9,6 +9,7 @@ import de.dnpm.dip.model.{
   Patient
 }
 import de.dnpm.dip.service.Deidentifier
+import Deidentifier.syntax._
 import play.api.libs.json.{
   Json,
   JsResult
@@ -28,24 +29,33 @@ class ConsentTests extends AnyFlatSpec with Matchers
 
   val consent = readConsent("consent.json").get
 
-  "Consent permission check" must "have correctly worked" in {
+  val partialConsents =
+    List(
+      readConsent("partial_consent1.json"),
+      readConsent("partial_consent2.json"),
+      readConsent("partial_consent3.json")
+    )
+
+
+
+  "Consent check" must "have correctly worked on bundled provisions within one Consent resource" in {
 
     BroadConsent.permitsResearchUse(consent) mustBe true
 
   }
 
 
-  "Deidentifier[BroadConsent]" must "have worked as expected" in {
+  "BroadConsent deidentification" must "have worked as expected" in {
 
-    implicit val id = Id[Patient]("DummyPatientId")
+    implicit val dummyId = Id[Patient]("DummyPatientId")
 
-    val deidentifiedConsent @ WrappedBroadConsent(json) = Deidentifier[BroadConsent,Id[Patient]].apply(consent)
+    val deidentifiedConsent @ WrappedBroadConsent(json) = consent.deidentifiedWith(dummyId)
     
     // Consent.id must have been removed
     json.value.get("id") must not be defined
     
     // Id[Patient] on the Consent.patient reference must have been replaced
-    deidentifiedConsent.patient.value.id mustBe id
+    deidentifiedConsent.patient.value.id mustBe dummyId
 
   }
 
