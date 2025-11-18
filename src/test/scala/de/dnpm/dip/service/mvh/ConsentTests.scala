@@ -29,14 +29,6 @@ class ConsentTests extends AnyFlatSpec with Matchers
 
   val consent = readConsent("consent.json").get
 
-  val partialConsents =
-    List(
-      readConsent("partial_consent1.json"),
-      readConsent("partial_consent2.json"),
-      readConsent("partial_consent3.json")
-    )
-
-
 
   "Consent check" must "have correctly worked on bundled provisions within one Consent resource" in {
 
