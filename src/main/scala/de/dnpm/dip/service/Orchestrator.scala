@@ -87,6 +87,8 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
   }
   import Completer.syntax._
 
+  private lazy val consentDeidentifier = Deidentifier[BroadConsent,Id[Patient]]
+
 
   def !(
     cmd: Orchestrator.Command[T]
@@ -110,7 +112,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
             metadata =
               if (deidentifyBroadConsent)
                 rawData.metadata.map(
-                  m => m.copy(researchConsents = m.researchConsents.map(_ map Deidentifier[BroadConsent]))
+                  m => m.copy(researchConsents = m.researchConsents.map(_.map(consentDeidentifier(_))))
                 )
               else rawData.metadata
           )

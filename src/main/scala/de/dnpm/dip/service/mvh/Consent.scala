@@ -378,14 +378,16 @@ object BroadConsent
    * - Remove Consent.id
    * - Replace Consent.patient with a reference using the same id as the MDAT Patient object in the submission
    */
-  implicit def deidentifier(
-    implicit patient: Id[Patient]
-  ): Deidentifier[BroadConsent] = {
-    case WrappedBroadConsent(json) =>
-      WrappedBroadConsent(json - "id" + ("patient" -> Json.obj("reference" -> s"Patient/${patient}")))
-
-    // Default case: Cannot occur, but required for exhaustive pattern match
-    case consent => consent 
-  }
-
+  implicit val deidentifier: Deidentifier[BroadConsent,Id[Patient]] =
+    Deidentifier(
+      (consent: BroadConsent, patient: Id[Patient]) =>
+        consent match {
+          case WrappedBroadConsent(json) =>
+            WrappedBroadConsent(json - "id" + ("patient" -> Json.obj("reference" -> s"Patient/${patient}")))
+        
+          // Default case: Cannot occur, but required for exhaustive pattern match
+          case bc => bc 
+        }
+    )
+    
 }
