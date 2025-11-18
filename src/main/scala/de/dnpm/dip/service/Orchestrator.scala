@@ -24,14 +24,23 @@ import de.dnpm.dip.service.validation.{
   ValidationReport
 }
 import de.dnpm.dip.service.query.QueryService
-import de.dnpm.dip.service.mvh.MVHService
+import de.dnpm.dip.service.mvh.{
+  MVHService,
+  BroadConsent
+}
 
 
 
 object Orchestrator
 {
   sealed trait Command[+T]
-  final case class Process[T <: PatientRecord](upload: DataUpload[T]) extends Command[T]
+  final case class Process[T <: PatientRecord]
+  (
+    upload: DataUpload[T],
+    deidentifyBroadConsent: Boolean = false
+  )
+  extends Command[T]
+
   final case class Delete(id: Id[Patient]) extends Command[Nothing]
 
   sealed trait Outcome
@@ -78,6 +87,8 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
   }
   import Completer.syntax._
 
+  private lazy val consentDeidentifier = Deidentifier[BroadConsent,Id[Patient]]
+
 
   def !(
     cmd: Orchestrator.Command[T]
@@ -86,10 +97,26 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
   ): F[Either[Error,Orchestrator.Outcome]] =
     cmd match {
 
-      case Process(rawData) =>
+      case Process(rawData,deidentifyBroadConsent) =>
+
+        implicit lazy val patId = rawData.record.patient.id
+
         for { 
 
-          dataUpload <- rawData.copy(record = rawData.record.complete).pure  // Load completed record into Monad
+          dataUpload <- rawData.copy(
+
+            // Complete the PatientRecord (resolve display value of Codings etc)
+            record = rawData.record.complete,
+
+            // Deidentify BroadConsent, if specified by the client
+            metadata =
+              if (deidentifyBroadConsent)
+                rawData.metadata.map(
+                  m => m.copy(researchConsents = m.researchConsents.map(_.map(consentDeidentifier(_))))
+                )
+              else rawData.metadata
+          )
+          .pure  // Load pre-processed data into Monad
 
           validationResult <- (validationService ! Validate(dataUpload))
 
@@ -103,10 +130,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
                     for {
                       mvhResult <- mvhService ! MVHService.Process(dataUpload.record,metadata)
 
-                      dnpmPermitted =
-                        metadata.researchConsents
-                          .filter(_.nonEmpty)
-                          .exists(_ forall (_.isGiven))
+                      dnpmPermitted = metadata.researchConsents.exists(BroadConsent.permitsResearchUse)
                 
                       result <- mvhResult match {
                         case Right(_) =>

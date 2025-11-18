@@ -3,28 +3,56 @@ package de.dnpm.dip.service.mvh
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
-import play.api.libs.json.Json
-
+import org.scalatest.OptionValues._
+import de.dnpm.dip.model.{
+  Id,
+  Patient
+}
+import de.dnpm.dip.service.Deidentifier
+import play.api.libs.json.{
+  Json,
+  JsResult
+}
 
 
 class ConsentTests extends AnyFlatSpec with Matchers 
 {
 
-  lazy val consent =
-    Json.fromJson[ResearchConsent](
+  private def readConsent(f: String): JsResult[BroadConsent] =
+    Json.fromJson[BroadConsent](
       Json.parse(
-        this.getClass.getClassLoader.getResourceAsStream("consent.json")
+        this.getClass.getClassLoader.getResourceAsStream(f)
       )
     )
-    .get
 
 
+  val consent = readConsent("consent.json").get
 
   "Consent permission check" must "have correctly worked" in {
 
-    consent.date mustBe defined
+    BroadConsent.permitsResearchUse(consent) mustBe true
 
-    assert(consent.isGiven)
+  }
+
+
+  "Deidentifier[BroadConsent]" must "have worked as expected" in {
+
+    implicit val id = Id[Patient]("DummyPatientId")
+
+    val deidentifiedConsent @ WrappedBroadConsent(json) = Deidentifier[BroadConsent,Id[Patient]].apply(consent)
+    
+    // Consent.id must have been removed
+    json.value.get("id") must not be defined
+    
+    // Id[Patient] on the Consent.patient reference must have been replaced
+    deidentifiedConsent.patient.value.id mustBe id
+
+  }
+
+
+  "Deserialization of syntactically wrong consent" must "have failed" in { 
+
+    readConsent("syntactically_wrong_consent.json").isError mustBe true
 
   }
 

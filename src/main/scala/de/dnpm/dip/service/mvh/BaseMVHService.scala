@@ -82,7 +82,7 @@ with Logging
                     Consent.Category.ModelProject ->
                       metadata.modelProjectConsent.provisions.exists(p => p.purpose == Sequencing && p.`type` == Consent.Provision.Type.Permit),
                     Consent.Category.Research ->
-                      metadata.researchConsents.filter(_.nonEmpty).exists(_.forall(_.isGiven))
+                      metadata.researchConsents.exists(BroadConsent.permitsResearchUse)
                   )
                 ),
                 metadata.reasonResearchConsentMissing

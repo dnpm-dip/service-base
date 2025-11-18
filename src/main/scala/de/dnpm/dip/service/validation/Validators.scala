@@ -45,11 +45,13 @@ import de.dnpm.dip.model.{
 }
 import de.dnpm.dip.service.DataUpload
 import de.dnpm.dip.service.mvh.{
+  BroadConsent,
   Submission
 }
 import de.dnpm.dip.service.mvh.ModelProjectConsent.Purpose._
 import de.dnpm.dip.service.mvh.Consent.Provision.Type._
 import Issue.{
+  Warning,
   Error,
   Fatal,
   Path,
@@ -400,10 +402,29 @@ trait Validators
 
 
 
+  implicit def broadConsentValidator(
+    implicit patient: Id[Patient]
+  ): Validator[Issue,BroadConsent] =
+    consent =>
+      (
+        consent.status must be (BroadConsent.Status.Active) otherwise (
+          Warning(s"Unerwarteter Wert '${consent.status}', eigentlich '${BroadConsent.Status.Active}' erwartet") at "Consent.status"
+        ), 
+        consent.policyUri.replace("urn:oid:","") must be (in (BroadConsent.versions.keys)) otherwise (
+          Error(s"Ungültige OID '${consent.policyUri}', muss auf eine der zulässigen BC Versionen {${BroadConsent.versions.values.mkString(", ")}} verweisen.") at "Consent.policy.uri"
+        ),
+        option(consent.patient.map(_.id)) must be (patient) otherwise (
+          Error("Patient-Referenz entspricht nicht der Patient-Pseudonym-ID. Hinweis: Im Daten-Upload kann als Parameter gesetzt werden, dass der BroadConsent im DIP-System automatisch deidentifiziert werden soll") at "Consent.patient"
+        )
+      )
+      .errorsOr(consent) on "Broad-Consent"
+
+
   private val hexString64 = "[a-fA-F0-9]{64}".r
 
-
-  implicit val metadataValidator: Validator[Issue,Submission.Metadata] =
+  implicit def metadataValidator(
+    implicit patient: Id[Patient]
+  ): Validator[Issue,Submission.Metadata] =
     metadata =>
       (
         metadata.transferTAN.value must matchRegex (hexString64) otherwise (
@@ -425,8 +446,16 @@ trait Validators
         (metadata.researchConsents.filter(_.nonEmpty) orElse metadata.reasonResearchConsentMissing) must be (defined) otherwise (
           MissingValue("Es muss entweder MII Forschungs-/Broad-Consent oder der Grund für dessen Fehlen vorhanden sein")
         ),
+        ifDefined (metadata.researchConsents.filter(_.nonEmpty)){
+          _ must (have (size (1))) otherwise (
+            Error("Es kommen mehrere Consent-Ressourcen vor, aber es soll der Broad Consent des Index-Patient als 1 Consent-Ressource gebündelt übertragen werden") at "Broad Consent"
+          ) andThen (
+            consents => validate(consents.head).map(_ => consents)
+          )
+        }
       )
       .errorsOr(metadata) on "Metadaten"
+
 
 
   def dataUploadValidator[T <: PatientRecord](
@@ -436,6 +465,8 @@ trait Validators
     case upload @ DataUpload(record,optMetadata) => 
       
       import de.dnpm.dip.service.mvh.extensions._
+
+      implicit val patient = record.patient.id
 
       (
         ifDefined(optMetadata)(

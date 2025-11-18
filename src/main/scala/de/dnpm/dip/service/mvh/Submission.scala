@@ -72,7 +72,7 @@ object Submission
     sequenceTypes: Option[Set[SequenceType.Value]],
     healthInsuranceType: HealthInsurance.Type.Value,
     consentStatus: Option[Map[Consent.Category.Value,Boolean]],
-    reasonResearchConsentMissing: Option[ResearchConsent.ReasonMissing.Value]
+    reasonResearchConsentMissing: Option[BroadConsent.ReasonMissing.Value]
   )
 
   object Report extends JsonEnumKeyHelpers
@@ -111,8 +111,8 @@ object Submission
     `type`: Type.Value,
     transferTAN: Id[TransferTAN],
     modelProjectConsent: ModelProjectConsent,
-    researchConsents: Option[List[ResearchConsent]],
-    reasonResearchConsentMissing: Option[ResearchConsent.ReasonMissing.Value]
+    researchConsents: Option[List[BroadConsent]],
+    reasonResearchConsentMissing: Option[BroadConsent.ReasonMissing.Value]
   )
 
 
