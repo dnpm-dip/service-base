@@ -41,13 +41,17 @@ class ConsentTests extends AnyFlatSpec with Matchers
 
     implicit val dummyId = Id[Patient]("DummyPatientId")
 
-    val deidentifiedConsent @ WrappedBroadConsent(json) = consent.deidentifiedWith(dummyId)
+    val deidentifiedConsent = consent.deidentifiedWith(dummyId)
+    val WrappedBroadConsent(json) = deidentifiedConsent
     
     // Consent.id must have been removed
     json.value.get("id") must not be defined
     
     // Id[Patient] on the Consent.patient reference must have been replaced
     deidentifiedConsent.patient.value.id mustBe dummyId
+
+    // The deidentified, i.e. modified JSON consent must still be valid 
+    Json.fromJson[BroadConsent](json).isSuccess mustBe true
 
   }
 
