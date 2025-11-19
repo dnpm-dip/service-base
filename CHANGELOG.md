@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.2.0](https://github.com/dnpm-dip/service-base/compare/v1.1.2...v1.2.0) (2025-11-19)
+
+
+### Features
+
+* Adapted Broad Consent validation rules ([8f99fd4](https://github.com/dnpm-dip/service-base/commit/8f99fd48f9d87964dc89f3cd40b4fb6afccf614e))
+* Added attribute 'sequenceTypes' to SubmissionReport ([d5e9f7d](https://github.com/dnpm-dip/service-base/commit/d5e9f7d09d69c5d53090cd46124ea769234c8528))
+* Added flag to allow BroadConsent deidentification ([8845b00](https://github.com/dnpm-dip/service-base/commit/8845b00ed03ca2749f8d2b35a9f59964e2fc7de7))
+* Reworked deidentification logic for PatientRecord transferred to Query module ([da47cc4](https://github.com/dnpm-dip/service-base/commit/da47cc4b381e899c57f484a2c9630e36f3948318))
+
+
+### Bug Fixes
+
+* Adapted Query execution to be always local as workaround to be in line with current data protection concept ([cfbc965](https://github.com/dnpm-dip/service-base/commit/cfbc9650702dcd52f59a76d624270eb4c2002090))
+* Added logic to remove Patient.address in PatientRecord passed to QueryService, as this is only relevant for MVGenomSeq and too identifying ([cfbc965](https://github.com/dnpm-dip/service-base/commit/cfbc9650702dcd52f59a76d624270eb4c2002090))
+* Final work on refactored Consent handling, with tests ([00e9958](https://github.com/dnpm-dip/service-base/commit/00e9958ec2b4655e82d798b09398c0905eb133bf))
+
 ## [1.1.2](https://github.com/dnpm-dip/service-base/compare/v1.1.1...v1.1.2) (2025-10-15)
 
 
