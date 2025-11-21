@@ -25,7 +25,7 @@ import play.api.libs.json.{
   Format,
   OFormat,
   Reads,
-  Writes
+  OWrites
 }
 import play.api.libs.functional.syntax._
 
@@ -355,8 +355,8 @@ object BroadConsent
   }
 
 
-  implicit val writes: Writes[BroadConsent] =
-    Writes { 
+  implicit val writes: OWrites[BroadConsent] =
+    OWrites { 
       case WrappedBroadConsent(json) => json
       case UnvalidatedBroadConsent(json) => json
       case _: View => ???  // Cannot happen, but required for exhaustive pattern match
