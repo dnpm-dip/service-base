@@ -4,6 +4,7 @@ package de.dnpm.dip.service.validation
 import scala.util.chaining._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers._
+import org.scalatest.Inspectors._
 import Issue.Path
 import play.api.libs.json.Json
 import de.dnpm.dip.service.mvh.BroadConsent
@@ -12,6 +13,8 @@ import de.dnpm.dip.model.{
   Id,
   Patient
 }
+import de.dnpm.dip.coding.Code
+import de.dnpm.dip.coding.hgvs.HGVS
 
 
 class Tests extends AnyFlatSpec with Validators
@@ -61,6 +64,33 @@ class Tests extends AnyFlatSpec with Validators
     val validation = validate(consent)
 
     validation.isValid mustBe false
+  }
+
+
+  "HGVS protein change validation" must "have succeeded on correct codes" in { 
+
+    val proteinChanges =
+      Seq(
+        "p.Gly12Cys",
+        "p.(=)"
+      )
+      .map(Code[HGVS.Protein](_))
+
+    forAll(proteinChanges)(code => validate(code).isValid mustBe true)
+
+  }
+
+  it must "have failed on incorrect codes" in { 
+
+    val proteinChanges =
+      Seq(
+        "p.G12C",
+        "p.whatever"
+      )
+      .map(Code[HGVS.Protein](_))
+
+    forAll(proteinChanges)(code => validate(code).isValid mustBe false)
+
   }
 
 }

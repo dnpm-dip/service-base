@@ -222,7 +222,7 @@ trait Validators
 
   implicit val proteinChangeValidator: Validator[Issue,Code[HGVS.Protein]] =
     code =>
-      code.value must (matchRegex (HGVS.Protein.threeLetterCode) or contain ("?")) otherwise (
+      code.value must (matchRegex (HGVS.Protein.threeLetterCode) or matchRegex("(\\?|=)".r.unanchored)) otherwise (
         Error(s"Ungültiger Code '${code}', erwarte 3-Buchstaben-Format für Amino-Säure") at "Amino-Säure-Austausch"
       ) map (_ => code)
 
