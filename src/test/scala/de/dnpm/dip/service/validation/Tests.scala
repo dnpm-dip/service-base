@@ -72,6 +72,8 @@ class Tests extends AnyFlatSpec with Validators
     val proteinChanges =
       Seq(
         "p.Gly12Cys",
+        "p.?",
+        "p.0?",
         "p.(=)"
       )
       .map(Code[HGVS.Protein](_))

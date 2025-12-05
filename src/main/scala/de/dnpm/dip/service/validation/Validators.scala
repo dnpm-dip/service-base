@@ -220,13 +220,18 @@ trait Validators
         .map(_.asInstanceOf[Coding[H :+: CNil]])
 
 
-  implicit val proteinChangeValidator: Validator[Issue,Code[HGVS.Protein]] =
+  implicit val proteinChangeValidator: Validator[Issue,Code[HGVS.Protein]] = {
+
+    // https://hgvs-nomenclature.org/stable/recommendations/uncertain/#protein
+    val uncertain = "p.(0?\\?|\\(=\\))".r.unanchored
+
     code =>
-      code.value must (matchRegex (HGVS.Protein.threeLetterCode) or matchRegex("(\\?|=)".r.unanchored)) otherwise (
+      code.value must (matchRegex (HGVS.Protein.threeLetterCode) or matchRegex (uncertain)) otherwise (
         Error(s"Ungültiger Code '${code}', erwarte 3-Buchstaben-Format für Amino-Säure") at "Amino-Säure-Austausch"
       ) map (_ => code)
+  }
 
-      
+
   implicit def referenceValidator[T <: { def id: Id[_] }](
     implicit
     ts: Iterable[T],
