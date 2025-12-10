@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/dnpm-dip/service-base/compare/v1.2.0...v1.2.1) (2025-12-10)
+
+
+### Bug Fixes
+
+* protein change validation ([#16](https://github.com/dnpm-dip/service-base/issues/16)) ([e9d3e5b](https://github.com/dnpm-dip/service-base/commit/e9d3e5b12eb0c4b854d3f3eea3c1bbe3f884f6d7))
+
 ## [1.2.0](https://github.com/dnpm-dip/service-base/compare/v1.1.2...v1.2.0) (2025-11-19)
 
 
