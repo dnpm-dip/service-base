@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.3](https://github.com/dnpm-dip/service-base/compare/v1.2.2...v1.2.3) (2025-12-15)
+
+
+### Bug Fixes
+
+* Fixed tolerantDataUploadReads in validation service repository ([67102e3](https://github.com/dnpm-dip/service-base/commit/67102e30dca81f0011a9c44207498fcf14aa70a8))
+
 ## [1.2.2](https://github.com/dnpm-dip/service-base/compare/v1.2.1...v1.2.2) (2025-12-15)
 
 
