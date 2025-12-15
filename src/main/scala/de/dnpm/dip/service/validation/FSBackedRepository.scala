@@ -74,7 +74,7 @@ with Logging
 
   private val tolerantDataUploadReads: Reads[DataUpload[PatientRecord]] =
     (
-      (JsPath \ "record").read[PatientRecord] and
+      JsPath.read[PatientRecord] and
       (JsPath \ "metadata").readNullable(Submission.tolerantReads.metadata)
     )(
       DataUpload(_,_)
