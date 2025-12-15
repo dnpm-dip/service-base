@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2](https://github.com/dnpm-dip/service-base/compare/v1.2.1...v1.2.2) (2025-12-15)
+
+
+### Bug Fixes
+
+* Added tolerant Reads to repository implementation for validation service ([cabec72](https://github.com/dnpm-dip/service-base/commit/cabec72d6c13b163d6b88fb4e9cee61d08452e6e))
+
 ## [1.2.1](https://github.com/dnpm-dip/service-base/compare/v1.2.0...v1.2.1) (2025-12-15)
 
 
