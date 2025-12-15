@@ -23,7 +23,6 @@ import cats.syntax.applicative._
 import cats.syntax.either._
 import play.api.libs.json.{
   Json,
-  JsPath,
   Reads,
   Writes,
   OWrites
@@ -67,40 +66,6 @@ private[mvh] object SubmissionHeader
 }
 
 
-private object FSBackedRepository
-{
-
-  import play.api.libs.functional.syntax._
-
-  // Introduced as a (temporary?) workaround:
-  // The adapted default Reads for BroadConsent now performs syntactical validation on the JSON,
-  // by trying to read the input JSON as a BroadConsent.View, in order to provide error
-  // feedback on uploads with erroneous Consent resources.
-  // However, in order to retain backward compatibility for already persisted submissions
-  // with possibly (as of now) erroneous Consent, a tolerant json.Reads (i.e. which just reads BroadConsent
-  // objects as plain JsObject) must be used for Submission.Metadata under the hood here.
-  def tolerantSubmissionReads[T <: PatientRecord: Reads]: Reads[Submission[T]] =
-    (
-      JsPath.read[T] and
-      (JsPath \ "metadata").read(
-        (
-          (JsPath \ "type").read[Submission.Type.Value] and
-          (JsPath \ "transferTAN").read[Id[TransferTAN]] and
-          (JsPath \ "modelProjectConsent").read[ModelProjectConsent] and
-          (JsPath \ "researchConsents").readNullable(Reads.list(Json.valueReads[UnvalidatedBroadConsent])) and
-          (JsPath \ "reasonResearchConsentMissing").readNullable[BroadConsent.ReasonMissing.Value]
-        )(
-          Submission.Metadata(_,_,_,_,_)
-        )
-      ) and
-      (JsPath \ "submittedAt").read[LocalDateTime]
-    )(
-      Submission(_,_,_)
-    )
-
-}
-
-
 class FSBackedRepository[F[_],T <: PatientRecord: Reads: OWrites](
   dataDir: File
 )(
@@ -121,8 +86,7 @@ with Logging
       filter.transferTAN.map(_ contains record.metadata.transferTAN).getOrElse(true)
 */
 
-  private val tolerantSubmissionReads =
-    FSBackedRepository.tolerantSubmissionReads[T]
+  private val tolerantSubmissionReads = Submission.tolerantReads.submission[T]
 
 
   private val REPORT_PREFIX = "SubmissionReport"
@@ -148,7 +112,6 @@ with Logging
   private def toPrettyJson[A: Writes](a: A): String =
     Json.toJson(a) pipe Json.prettyPrint
 
-//  private def readAsJson[A: Reads]: InputStream => A =
   private def readAsJson[A](implicit reads: Reads[A]): InputStream => A =
     in =>
       Json.parse(in)

@@ -22,16 +22,19 @@ import cats.syntax.applicative._
 import cats.syntax.either._
 import play.api.libs.json.{
   Json,
+  JsPath,
   Reads,
   Writes,
   OWrites
 }
+import play.api.libs.functional.syntax._
 import de.dnpm.dip.util.Logging
 import de.dnpm.dip.model.{
   Id,
   Patient
 }
 import de.dnpm.dip.service.DataUpload
+import de.dnpm.dip.service.mvh.Submission
 
 
 class FSBackedRepository[
@@ -69,8 +72,16 @@ with Logging
   private def toPrettyJson[T: Writes](t: T): String =
     Json.toJson(t) pipe Json.prettyPrint
 
+  private val tolerantDataUploadReads: Reads[DataUpload[PatientRecord]] =
+    (
+      (JsPath \ "record").read[PatientRecord] and
+      (JsPath \ "metadata").readNullable(Submission.tolerantReads.metadata)
+    )(
+      DataUpload(_,_)
+    )
 
-  private def readJson[T: Reads](file: File): T =
+
+  private def readJson[T](file: File)(implicit reads: Reads[T]): T =
     Json.parse(new FileInputStream(file))
       .pipe(Json.fromJson[T](_)) 
       .tap(
@@ -91,7 +102,7 @@ with Logging
         (_,name) => (name startsWith prefix) && (name endsWith ".json")
       )
       .to(LazyList)
-      .map(readJson[DataUpload[PatientRecord]])
+      .map(readJson[DataUpload[PatientRecord]](_)(tolerantDataUploadReads))
       .map {
         data =>
           val report =

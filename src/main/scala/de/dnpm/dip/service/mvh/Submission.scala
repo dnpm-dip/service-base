@@ -123,6 +123,7 @@ object Submission
   
     implicit val writesMetadata: OWrites[Metadata] =
       Json.writes[Metadata]
+
   }
 
 
@@ -161,6 +162,40 @@ object Submission
     )(
       unlift(Submission.unapply[T](_))
     )
+
+  // Introduced as a (temporary?) workaround:
+  // The adapted default Reads for BroadConsent now performs syntactical validation on the JSON,
+  // by trying to read the input JSON as a BroadConsent.View, in order to provide error
+  // feedback on uploads with erroneous Consent resources.
+  // However, in order to retain backward compatibility for already persisted submissions
+  // with possibly (as of now) erroneous Consent, a tolerant json.Reads (i.e. which just reads BroadConsent
+  // objects as plain JsObject) must be used for Submission.Metadata under the hood here.
+  object tolerantReads 
+  {
+
+    import play.api.libs.functional.syntax._
+
+    def metadata: Reads[Metadata] =
+      (
+        (JsPath \ "type").read[Submission.Type.Value] and
+        (JsPath \ "transferTAN").read[Id[TransferTAN]] and
+        (JsPath \ "modelProjectConsent").read[ModelProjectConsent] and
+        (JsPath \ "researchConsents").readNullable(Reads.list(Json.valueReads[UnvalidatedBroadConsent])) and
+        (JsPath \ "reasonResearchConsentMissing").readNullable[BroadConsent.ReasonMissing.Value]
+      )(
+        Submission.Metadata(_,_,_,_,_)
+      )
+    
+    def submission[T <: PatientRecord: Reads]: Reads[Submission[T]] =
+      (
+        JsPath.read[T] and
+        (JsPath \ "metadata").read(metadata) and
+        (JsPath \ "submittedAt").read[LocalDateTime]
+      )(
+        Submission(_,_,_)
+      )
+
+  }
 
 }
 
