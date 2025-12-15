@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.1](https://github.com/dnpm-dip/service-base/compare/v1.2.0...v1.2.1) (2025-12-15)
+
+
+### Bug Fixes
+
+* protein change validation ([#16](https://github.com/dnpm-dip/service-base/issues/16)) ([e9d3e5b](https://github.com/dnpm-dip/service-base/commit/e9d3e5b12eb0c4b854d3f3eea3c1bbe3f884f6d7))
+* Removed all BC-related adaptations (temporarily, until BC handling specs are officially finalized), to allow creating a release with other fixes ([90e03de](https://github.com/dnpm-dip/service-base/commit/90e03de2002a68b0d1cf40f168b75b88c9515b06))
+
 ## [1.2.0](https://github.com/dnpm-dip/service-base/compare/v1.1.2...v1.2.0) (2025-11-19)
 
 
