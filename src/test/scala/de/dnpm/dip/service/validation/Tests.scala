@@ -6,13 +6,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers._
 import org.scalatest.Inspectors._
 import Issue.Path
-import play.api.libs.json.Json
-import de.dnpm.dip.service.mvh.BroadConsent
 import de.ekut.tbi.validation.dsl.validate
-import de.dnpm.dip.model.{
-  Id,
-  Patient
-}
 import de.dnpm.dip.coding.Code
 import de.dnpm.dip.coding.hgvs.HGVS
 
@@ -34,6 +28,7 @@ class Tests extends AnyFlatSpec with Validators
 
 
 
+/*
   private def readConsent(f: String): BroadConsent =
     Json.fromJson[BroadConsent](
       Json.parse(
@@ -65,7 +60,7 @@ class Tests extends AnyFlatSpec with Validators
 
     validation.isValid mustBe false
   }
-
+*/
 
   "HGVS protein change validation" must "have succeeded on correct codes" in { 
 

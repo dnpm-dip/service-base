@@ -36,7 +36,7 @@ object Orchestrator
   final case class Process[T <: PatientRecord]
   (
     upload: DataUpload[T],
-    deidentifyBroadConsent: Boolean = false
+//    deidentifyBroadConsent: Boolean = false
   )
   extends Command[T]
 
@@ -104,7 +104,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
   ): F[Either[Error,Orchestrator.Outcome]] =
     cmd match {
 
-      case Process(rawData,deidentifyBroadConsent) =>
+      case Process(rawData) =>
 
         for { 
 
@@ -112,7 +112,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
 
             // Complete the PatientRecord (resolve display value of Codings etc)
             record = rawData.record.complete,
-
+/*
             // Deidentify BroadConsent, if specified by the client
             metadata =
               if (deidentifyBroadConsent)
@@ -122,6 +122,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
                   )
                 )
               else rawData.metadata
+*/              
           )
           .pure  // Load pre-processed data into Monad
 

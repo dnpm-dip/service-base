@@ -17,7 +17,6 @@ import de.dnpm.dip.model.{
   Patient,
   Reference
 }
-import de.dnpm.dip.service.Deidentifier
 import play.api.libs.json.{
   Json,
   JsObject,
@@ -294,6 +293,7 @@ object BroadConsent
   extends BroadConsent
 
 
+/*
   // By validation, the List[BroadConsent] contains at most 1 element
   // (The signature Metadata.researchConsents: List[BroadConsent] being only retained for backwards compatibility)
   def permitsResearchUse(consents: List[BroadConsent]): Boolean =
@@ -307,8 +307,24 @@ object BroadConsent
         case None => false
       }
     )
-    
-    
+*/
+
+  def permitsResearchUse(consents: List[BroadConsent]): Boolean =
+    consents.foldLeft(Map.empty[String,Boolean])(
+      (acc,consent) => researchProvisions.foldLeft(acc)(
+        (acc2,code) => acc2.updatedWith(code){
+          case denied @ Some(false) => denied
+          case _ => consent.provision(code).map(_.isPermitted)
+        }
+      )
+    )
+    .values
+    .exists(_ == true)
+
+  def permitsResearchUse(consent: BroadConsent): Boolean =
+    permitsResearchUse(List(consent))
+  
+
   implicit def readCodeableConcept[T](implicit rc: Reads[Coding[T]]): Reads[CodeableConcept[T]] =
     Json.reads[CodeableConcept[T]]
 
@@ -379,6 +395,8 @@ object BroadConsent
    * - Remove Consent.id
    * - Replace Consent.patient with a reference using the same id as the MDAT Patient object in the submission
    */
+/*  
+  NOTE: Temporarily removed until BC handling specs are finalized
   implicit val deidentifier: Deidentifier[BroadConsent,Id[Patient]] =
     Deidentifier(
       (consent: BroadConsent, patient: Id[Patient]) =>
@@ -390,5 +408,5 @@ object BroadConsent
           case bc => bc 
         }
     )
-    
+*/    
 }

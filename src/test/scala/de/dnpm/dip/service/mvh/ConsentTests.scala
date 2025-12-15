@@ -3,13 +3,8 @@ package de.dnpm.dip.service.mvh
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
-import org.scalatest.OptionValues._
-import de.dnpm.dip.model.{
-  Id,
-  Patient
-}
-import de.dnpm.dip.service.Deidentifier
-import Deidentifier.syntax._
+//import de.dnpm.dip.service.Deidentifier
+//import Deidentifier.syntax._
 import play.api.libs.json.{
   Json,
   JsResult
@@ -36,7 +31,7 @@ class ConsentTests extends AnyFlatSpec with Matchers
 
   }
 
-
+/*
   "BroadConsent deidentification" must "have worked as expected" in {
 
     implicit val dummyId = Id[Patient]("DummyPatientId")
@@ -54,7 +49,7 @@ class ConsentTests extends AnyFlatSpec with Matchers
     Json.fromJson[BroadConsent](json).isSuccess mustBe true
 
   }
-
+*/
 
   "Deserialization of syntactically wrong consent" must "have failed" in { 
 
