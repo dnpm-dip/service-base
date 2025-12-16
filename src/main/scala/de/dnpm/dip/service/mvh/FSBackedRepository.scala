@@ -263,12 +263,12 @@ with Logging
     implicit env: Env
   ): F[Option[History[Submission[T]]]] =
     for {
-      subFiles <- submissionFiles(id).pure
+      files <- submissionFiles(id).pure
 
       submissions =
-        subFiles.map(
-          file => new FileInputStream(file) pipe readAsJson[Submission[T]]
-        )
+        files
+          .map(new FileInputStream(_))
+          .map(readAsJson(tolerantSubmissionReads))
 
       history =
         NonEmptyList.fromList(submissions.toList)

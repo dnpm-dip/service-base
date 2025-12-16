@@ -72,6 +72,7 @@ with Logging
   private def toPrettyJson[T: Writes](t: T): String =
     Json.toJson(t) pipe Json.prettyPrint
 
+
   private val tolerantDataUploadReads: Reads[DataUpload[PatientRecord]] =
     (
       JsPath.read[PatientRecord] and
