@@ -486,6 +486,10 @@ trait Validators
                     (record.mvhSequencingReports must be (nonEmpty)) orElse (mvhCp.noSequencingPerformedReason must be (defined)) otherwise ( 
                       Error("Kein MVH-Sequenzierung-Bericht vorhanden, obwohl im Board-Beschluss nicht begründet ist, dass/warum keine MVH-Sequenzierung beantragt worden ist")
                         at "Sequenzier-Berichte"
+                    ),
+                    (mvhCp.noSequencingPerformedReason must be (undefined)) orElse (record.mvhSequencingReports must be (empty)) otherwise (
+                      Error("Im Board-Beschluss ist begründet, dass/warum keine MVH-Sequenzierung beantragt worden ist, obwohl MVH-Sequenzierung-Berichte vorhanden sind")
+                        at "Sequenzier-Berichte"
                     )
                   )
                   .errorsOr(mvhCp)
