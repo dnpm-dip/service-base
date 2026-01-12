@@ -91,7 +91,8 @@ object Submission
     (
       period: Option[Period[LocalDateTime]] = None,
       status: Option[Set[Status.Value]] = None,
-      `type`: Option[Set[Type.Value]] = None
+      `type`: Option[Set[Type.Value]] = None,
+      patient: Option[Set[Id[Patient]]] = None
     )
 
 
