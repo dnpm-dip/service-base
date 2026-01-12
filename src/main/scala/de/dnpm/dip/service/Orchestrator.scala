@@ -65,6 +65,7 @@ object Orchestrator
     def apply(err: ValidationService.Error): Either[Error,Outcome] =
       err.asLeft[Either[MVHService.Error,QueryService.DataError]]
         .asLeft
+  }
 
 }
 
