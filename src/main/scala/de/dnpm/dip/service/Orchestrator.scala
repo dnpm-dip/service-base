@@ -52,20 +52,19 @@ object Orchestrator
 
   object Error
   {
-    def apply[T](err: QueryService.DataError): Either[Error,Outcome] =
+    def apply(err: QueryService.DataError): Either[Error,Outcome] =
       err.asRight[MVHService.Error]
         .asRight[ValidationService.Error]
         .asLeft
 
-    def apply[T](err: MVHService.Error): Either[Error,Outcome] =
+    def apply(err: MVHService.Error): Either[Error,Outcome] =
       err.asLeft[QueryService.DataError]
         .asRight[ValidationService.Error]
         .asLeft
 
-    def apply[T](err: ValidationService.Error): Either[Error,Outcome] =
+    def apply(err: ValidationService.Error): Either[Error,Outcome] =
       err.asLeft[Either[MVHService.Error,QueryService.DataError]]
         .asLeft
-  }
 
 }
 
@@ -163,21 +162,21 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
                     case DataAcceptableWithIssues(data,report) => SavedWithIssues(report).asRight
 
                     // Can't occur but required for exhaustive pattern match
-                    case ValidationService.Deleted(_) => Error[T](ValidationService.GenericError("Unexpected validation outcome"))
+                    case ValidationService.Deleted(_) => Error(ValidationService.GenericError("Unexpected validation outcome"))
                   }
             
-                case Left(err: MVHService.Error) => Error[T](err)
+                case Left(err: MVHService.Error) => Error(err)
 
-                case Left(err: QueryService.DataError) => Error[T](err)
+                case Left(err: QueryService.DataError) => Error(err)
             
                 // These cases can't occur but are required for exhaustive pattern match:
                 case Right(_) => Saved.asRight   // In this case saving has worked
-                case Left(_)  => Error[T](QueryService.GenericError("Unexpected data saving outcome"))
+                case Left(_)  => Error(QueryService.GenericError("Unexpected data saving outcome"))
 
               }
 
             // Validation failed
-            case Left(err) => Error[T](err).pure 
+            case Left(err) => Error(err).pure 
 
           }
 
@@ -194,7 +193,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
           (out,_,_) =>
             out match {
               case Right(_)  => Deleted(id).asRight
-              case Left(err) => Error[T](err)
+              case Left(err) => Error(err)
             }
         )
     }
