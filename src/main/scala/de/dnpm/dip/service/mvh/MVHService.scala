@@ -76,6 +76,7 @@ object MVHService
 
   sealed trait Error
   final case class InvalidTAN(msg: String) extends Error
+  final case class InvalidSubmissionType(msg: String) extends Error
   final case class GenericError(msg: String) extends Error
 
 
