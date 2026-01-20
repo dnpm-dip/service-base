@@ -17,7 +17,7 @@ import de.dnpm.dip.model.json.BaseSchemas
 final case class DataUpload[T]
 (
   record: T,
-  metadata: Option[Submission.Metadata]
+  metadata: Option[Submission.Metadata],
 )
 
 
