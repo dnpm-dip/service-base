@@ -9,10 +9,3 @@ final class FakeValidationService[F[+_],T <: PatientRecord] extends BaseValidati
   _.validNel,
   new InMemRepository[F,T]
 )
-
-/*
-final class FakeValidationService[F[+_]] extends BaseValidationService[F,DummyPatientRecord](
-  _.validNel,
-  new InMemRepository[F,DummyPatientRecord]
-)
-*/

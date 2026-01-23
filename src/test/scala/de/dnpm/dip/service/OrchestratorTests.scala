@@ -56,7 +56,9 @@ class OrchestratorTests extends AsyncFlatSpec
 
   val querier = Querier("Dummy")
 
-  val record = Gen.of[DummyPatientRecord].next
+  val dataUpload = Gen.of[DataUpload[DummyPatientRecord]].next
+  lazy val record = dataUpload.record
+
 
   lazy val retrievalRequest =
     PatientRecordRequest[DummyPatientRecord](
@@ -70,11 +72,15 @@ class OrchestratorTests extends AsyncFlatSpec
   "DataUpload processing" must "have succeeded" in { 
 
     for {
-      outcome <- orchestrator ! Process(DataUpload(record,None))
+      outcome <- orchestrator ! Process(dataUpload)
 
       _ = outcome.value mustBe Saved
 
+      submissionReport <- mvhService ? dataUpload.metadata.get.transferTAN
+
       snapshot <- queryService ! retrievalRequest
+
+      _ = submissionReport.value.patient mustBe record.id
 
     } yield snapshot.value.data.id mustBe record.id
 
@@ -88,7 +94,11 @@ class OrchestratorTests extends AsyncFlatSpec
     
       _ = outcome.value mustBe a [Deleted]
 
+      submissionReport <- mvhService ? dataUpload.metadata.get.transferTAN
+
       snapshot <- queryService ! retrievalRequest
+
+      _ <- submissionReport must not be defined
 
     } yield snapshot must not be defined
 

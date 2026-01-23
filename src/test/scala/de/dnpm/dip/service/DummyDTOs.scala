@@ -4,7 +4,9 @@ package de.dnpm.dip.service
 import java.time.LocalDate
 import cats.data.NonEmptyList
 import de.dnpm.dip.util.Completer
+import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
+  CarePlan,
   Diagnosis,
   EpisodeOfCare,
   Id,
@@ -27,6 +29,7 @@ final case class DummyEpisodeOfCare
 )
 extends EpisodeOfCare
 
+
 final case class DummyDiagnosis
 (
   id: Id[Diagnosis],
@@ -39,21 +42,36 @@ extends Diagnosis
 }
 
 
+final case class DummyCarePlan
+(
+  id: Id[CarePlan],
+  patient: Reference[Patient],
+  issuedOn: LocalDate,
+  noSequencingPerformedReason: Option[Coding[CarePlan.NoSequencingPerformedReason.Value]]
+)
+extends CarePlan
+{
+  val reason = None
+  val therapyRecommendations = None
+  val medicationRecommendations = None
+  val studyEnrollmentRecommendations = None
+  val notes = None
+}
+
+
 final case class DummyPatientRecord
 (
   patient: Patient,
   episodesOfCare: NonEmptyList[DummyEpisodeOfCare],
-  diagnoses: NonEmptyList[DummyDiagnosis]
+  diagnoses: NonEmptyList[DummyDiagnosis],
+  carePlans: NonEmptyList[DummyCarePlan]
 )
 extends PatientRecord
 {
   override val ngsReports = None
-
   override val followUps = None
-
   override val systemicTherapies = None
-
-  override def getCarePlans = List.empty
+  override def getCarePlans = carePlans.toList
 }
 
 
@@ -74,6 +92,9 @@ object DummyPatientRecord
 
   implicit val formatDiagnosis: OFormat[DummyDiagnosis] =
     Json.format[DummyDiagnosis]
+
+  implicit val formatCarePlan: OFormat[DummyCarePlan] =
+    Json.format[DummyCarePlan]
 
   implicit val format: OFormat[DummyPatientRecord] =
     Json.format[DummyPatientRecord]

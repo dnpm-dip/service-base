@@ -12,6 +12,7 @@ import de.ekut.tbi.generators.DateTimeGens._
 import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
   Address,
+  CarePlan,
   Diagnosis,
   EpisodeOfCare,
   ExternalId,
@@ -23,6 +24,14 @@ import de.dnpm.dip.model.{
   Id,
   Patient
 }
+import de.dnpm.dip.service.mvh.{
+  BroadConsent,
+  Consent,
+  ModelProjectConsent,
+  Submission,
+  TransferTAN
+}
+import play.api.libs.json.Json
 
 
 object Gens
@@ -105,6 +114,19 @@ object Gens
     )
 
 
+  def genCarePlan(
+    patient: Patient
+  ): Gen[DummyCarePlan] =
+    for { 
+      id <- Gen.of[Id[DummyCarePlan]]
+    } yield DummyCarePlan(
+      id,
+      Reference.to(patient),
+      LocalDate.now,
+      Some(Coding(CarePlan.NoSequencingPerformedReason.Other))
+    )
+
+
   implicit val genDummyPatientRecord: Gen[DummyPatientRecord] =
     for { 
       patient <- Gen.of[Patient]
@@ -113,10 +135,59 @@ object Gens
 
       diagnosis <- genDiagnosis(patient)
 
+      carePlan <- genCarePlan(patient)
+
     } yield DummyPatientRecord(
       patient,
       NonEmptyList.of(episode),
-      NonEmptyList.of(diagnosis)
+      NonEmptyList.of(diagnosis),
+      NonEmptyList.of(carePlan)
+    )
+
+
+  private lazy val broadConsent =
+    Json.fromJson[BroadConsent](
+      Json.parse(getClass.getClassLoader.getResourceAsStream("consent.json"))
+    )
+    .get
+
+
+  implicit val genDataUpload: Gen[DataUpload[DummyPatientRecord]] =
+    for {
+      ttan <- Gen.listOf(64, Gen.oneOf("0","1","2","3","4","5","6","7","8","9","A","B","C","D","E","F")).map(_.mkString)
+
+      record <- Gen.of[DummyPatientRecord]
+
+      consentDate =
+        record.getCarePlans
+          .map(_.issuedOn)
+          .minOption
+          .map(_ minusWeeks 2)
+          .getOrElse(LocalDate.now)
+
+      metadata =
+        Submission.Metadata(
+          Submission.Type.Test,
+          Id[TransferTAN](ttan),
+          ModelProjectConsent(
+            "Patient Info TE Consent MVGenomSeq vers01",
+            Some(consentDate minusDays 1),
+            ModelProjectConsent.Purpose.values
+              .toList
+              .map(
+                Consent.Provision(
+                  consentDate,
+                  _,
+                  Consent.Provision.Type.Permit
+                )
+              )
+          ),
+      Some(List(broadConsent)),
+      None
+        )
+    } yield DataUpload(
+      record,
+      Some(metadata)
     )
 
 }
