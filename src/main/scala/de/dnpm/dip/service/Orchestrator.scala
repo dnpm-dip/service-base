@@ -25,11 +25,15 @@ import de.dnpm.dip.service.validation.{
 }
 import de.dnpm.dip.service.query.QueryService
 import de.dnpm.dip.service.mvh.MVHService
+import de.dnpm.dip.service.mvh.BroadConsent
 
 
 
 object UsageScope extends Enumeration
 {
+  type UsageScope = Value
+
+//  val Validation = Value
   val MVGenomSeq = Value
   val Research = Value
 }
@@ -41,7 +45,7 @@ object Orchestrator
   final case class Process[T <: PatientRecord]
   (
     upload: DataUpload[T],
-    scopes: Option[Set[UsageScope.Value]] = None
+//    scopes: Option[Set[UsageScope.Value]] = None
   )
   extends Command[T]
 
@@ -89,6 +93,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
 {
 
   import Orchestrator._
+  import UsageScope._
   import ValidationService.{
     Validate,
     DataValid,
@@ -112,7 +117,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
   ): F[Either[List[Error],Orchestrator.Outcome]] =
     cmd match {
 
-      case Process(rawData,optScopes) =>
+      case Process(rawData) =>
 
         for { 
 
@@ -120,7 +125,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
             // Complete the PatientRecord (resolve display value of Codings etc)
             record = rawData.record.complete,
           )
-          .pure  // Load pre-processed data into Monad
+          .pure // Load pre-processed data into Monad
 
           validationResult <- validationService ! Validate(dataUpload)
 
@@ -129,17 +134,30 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
             // Validation (partially) passed
             case Right(validationOutcome) =>
 
-              val scopes = optScopes.getOrElse(UsageScope.values.toSet).toList
+              // For now, infer the scopes from the metadata (if present) to ensure identical behaviour to previous implementation
+              val scopes: List[UsageScope] =
+                dataUpload.metadata match {
+
+                  // MV submission
+                  case Some(metadata) =>
+                    if (metadata.researchConsents.exists(BroadConsent.permitsResearchUse))
+                      List(MVGenomSeq,Research)
+                    else 
+                      List(MVGenomSeq)
               
+                  // No MV metadata, so "DNPM-only"
+                  case None => List(Research)
+                }
+
               for {
                 saveResults <- scopes.traverse {
              
-                  case UsageScope.MVGenomSeq => dataUpload.metadata match {
+                  case MVGenomSeq => dataUpload.metadata match {
                     case Some(metadata) => mvhService ! MVHService.Process(dataUpload.record,metadata)
                     case None           => MVHService.GenericError("Missing metadata for MVGenomSeq export").asLeft.pure
                   }
              
-                  case UsageScope.Research => queryService ! QueryService.Save(dataUpload.record.deidentified)
+                  case Research => queryService ! QueryService.Save(dataUpload.record.deidentified)
                 }
               
                 errors = saveResults.collect {
@@ -172,22 +190,23 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
         } yield finalResult
 
 
-      case delete @ Orchestrator.Delete(id,_) =>
+      case Orchestrator.Delete(id,optScopes) =>
 
-        //TODO: How to handle data stored in ValidationService (not shared externally)
-
-        val scopes = delete.scopes.getOrElse(UsageScope.values.toSet).toList
+        val scopes = optScopes.getOrElse(UsageScope.values.toSet).toList
 
         for {
           deleteResults <- scopes.traverse {
-            case UsageScope.MVGenomSeq => mvhService ! MVHService.Delete(id)
-            case UsageScope.Research   => queryService ! QueryService.Delete(id)
+            case MVGenomSeq => mvhService ! MVHService.Delete(id)
+            case Research   => queryService ! QueryService.Delete(id)
           }
 
+          validation <- validationService ! ValidationService.Delete(id)
+
           errors =
-            deleteResults.collect {
-              case Left(err: MVHService.Error)       => Error(err)
-              case Left(err: QueryService.DataError) => Error(err)
+            (validation :: deleteResults).collect {
+              case Left(err: ValidationService.Error) => Error(err)
+              case Left(err: MVHService.Error)        => Error(err)
+              case Left(err: QueryService.DataError)  => Error(err)
             }
 
           outcome = errors.isEmpty match {
