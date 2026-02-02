@@ -7,6 +7,7 @@ import scala.util.{
   Right
 }
 import cats.Monad
+import cats.Traverse
 import cats.syntax.either._
 import cats.syntax.applicative._
 import cats.syntax.functor._
@@ -24,8 +25,11 @@ import de.dnpm.dip.service.validation.{
   ValidationReport
 }
 import de.dnpm.dip.service.query.QueryService
-import de.dnpm.dip.service.mvh.MVHService
-import de.dnpm.dip.service.mvh.BroadConsent
+import de.dnpm.dip.service.mvh.{
+  BroadConsent,
+  MVHService,
+  Submission
+}
 
 
 
@@ -94,6 +98,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
 
   import Orchestrator._
   import UsageScope._
+  import Submission.Type._ //{Addition,Correction,FollowUp}
   import ValidationService.{
     Validate,
     DataValid,
@@ -134,33 +139,31 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
             // Validation (partially) passed
             case Right(validationOutcome) =>
 
-              // For now, infer the scopes from the metadata (if present) to ensure identical behaviour to previous implementation
-              val scopes: List[UsageScope] =
-                dataUpload.metadata match {
-
-                  // MV submission
-                  case Some(metadata) =>
-                    if (metadata.researchConsents.exists(BroadConsent.permitsResearchUse))
-                      List(MVGenomSeq,Research)
-                    else 
-                      List(MVGenomSeq)
-              
-                  // No MV metadata, so "DNPM-only"
-                  case None => List(Research)
-                }
-
               for {
-                saveResults <- scopes.traverse {
-             
-                  case MVGenomSeq => dataUpload.metadata match {
-                    case Some(metadata) => mvhService ! MVHService.Process(dataUpload.record,metadata)
-                    case None           => MVHService.GenericError("Missing metadata for MVGenomSeq export").asLeft.pure
+                results <- Traverse[List].sequence {
+
+                  dataUpload.metadata match {
+
+                    // MV submission
+                    case Some(metadata) =>
+                      (mvhService ! MVHService.Process(dataUpload.record,metadata)) :: 
+                      metadata.researchConsents
+                        .map(BroadConsent.permitsResearchUse(_) -> metadata.`type`)
+                        .collect {
+                          // If ResearchConsent is given, save the data in the query module irrespective of submission type
+                          case (true,_) => queryService ! QueryService.Save(dataUpload.record.deidentified)
+
+                          // Else for a non-initial submission, in case data had been saved upon initial submission, trigger deletion from the query context
+                          case (false, Addition | Correction | FollowUp) => queryService ! QueryService.Delete(dataUpload.record.id)
+                        }
+                        .toList
+
+                    // No MV metadata ("DNPM-only"): Only save in query module
+                    case None => List(queryService ! QueryService.Save(dataUpload.record.deidentified))
                   }
-             
-                  case Research => queryService ! QueryService.Save(dataUpload.record.deidentified)
                 }
-              
-                errors = saveResults.collect {
+
+                errors = results.collect {
                   case Left(err: MVHService.Error)       => Error(err)
                   case Left(err: QueryService.DataError) => Error(err)
                 }
@@ -181,7 +184,6 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
               
               } yield outcome
 
-
             // Validation failed
             case Left(err) => List(Error(err)).asLeft.pure 
 
@@ -195,7 +197,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
         val scopes = optScopes.getOrElse(UsageScope.values.toSet).toList
 
         for {
-          deleteResults <- scopes.traverse {
+          results <- scopes.traverse {
             case MVGenomSeq => mvhService ! MVHService.Delete(id)
             case Research   => queryService ! QueryService.Delete(id)
           }
@@ -203,7 +205,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
           validation <- validationService ! ValidationService.Delete(id)
 
           errors =
-            (validation :: deleteResults).collect {
+            (validation :: results).collect {
               case Left(err: ValidationService.Error) => Error(err)
               case Left(err: MVHService.Error)        => Error(err)
               case Left(err: QueryService.DataError)  => Error(err)
