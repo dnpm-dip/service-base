@@ -7,10 +7,8 @@ import scala.util.{
   Left,
   Right
 }
-import cats.data.{
-  Validated,
-}
 import cats.Monad
+import cats.data.Validated
 import de.dnpm.dip.util.Logging
 import de.dnpm.dip.model.{
   Id,
