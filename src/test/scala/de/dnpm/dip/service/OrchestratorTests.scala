@@ -12,7 +12,10 @@ import de.dnpm.dip.model.{
   Site
 }
 import de.dnpm.dip.service.validation.FakeValidationService
-import de.dnpm.dip.service.mvh.FakeMVHService
+import de.dnpm.dip.service.mvh.{
+  FakeMVHService,
+  Submission
+}
 import de.dnpm.dip.service.query.{
   FakeQueryService,
   PatientRecordRequest,
@@ -29,22 +32,18 @@ class OrchestratorTests extends AsyncFlatSpec
   System.setProperty("dnpm.dip.site","UKX:Musterlingen")
 
 
-  implicit val rnd: Random =
-    new Random(42)
+  implicit val rnd: Random = new Random(42)
 
 
   implicit val patientSetter: (DummyPatientRecord,Patient) => DummyPatientRecord =
     (record,patient) => record.copy(patient = patient)
 
    
-  val validationService =
-    new FakeValidationService[Future,DummyPatientRecord]
+  val validationService = new FakeValidationService[Future,DummyPatientRecord]
 
-  val mvhService =
-    new FakeMVHService[Future,DummyPatientRecord]
+  val mvhService = new FakeMVHService[Future,DummyPatientRecord]
 
-  val queryService =
-    new FakeQueryService[Future,DummyPatientRecord]()
+  val queryService = new FakeQueryService[Future,DummyPatientRecord]()
 
 
   val orchestrator =
@@ -54,35 +53,84 @@ class OrchestratorTests extends AsyncFlatSpec
       queryService
     )
 
-  val querier = Querier("Dummy")
+  val record = Gen.of[DummyPatientRecord].next
 
-  val dataUpload = Gen.of[DataUpload[DummyPatientRecord]].next
-  lazy val record = dataUpload.record
+  val initialUpload =
+    DataUpload(
+      record,
+      Some(
+        genMetadata(
+          record,
+          Submission.Type.Initial,
+          true
+        )
+        .next
+      )
+    )
+
+  val subsequentUpload =
+    initialUpload.copy(
+      metadata = Some(
+        genMetadata(
+          record,
+          Submission.Type.Addition,
+          false
+        )
+        .next
+      )
+    )
 
 
   lazy val retrievalRequest =
     PatientRecordRequest[DummyPatientRecord](
       Site.local,
-      querier,
+      Querier("Dummy"),
       record.id,
       None
     )
 
 
-  "DataUpload processing" must "have succeeded" in { 
+
+  "Data Upload" must "have worked as expected on initial submission with Research Consent" in { 
 
     for {
-      outcome <- orchestrator ! Process(dataUpload)
+
+      outcome <- orchestrator ! Process(initialUpload)
 
       _ = outcome.value mustBe Saved
 
-      submissionReport <- mvhService ? dataUpload.metadata.get.transferTAN
-
-      snapshot <- queryService ! retrievalRequest
+      submissionReport <- mvhService ? initialUpload.metadata.get.transferTAN
 
       _ = submissionReport.value.patient mustBe record.id
 
-    } yield snapshot.value.data.id mustBe record.id
+      snapshot <- queryService ! retrievalRequest
+
+      // The data mst have been saved in the queryService
+      _ = snapshot.value.data.id mustBe record.id
+
+    } yield succeed // If not failed before, test passed
+
+  }
+
+
+  it must "have worked as expected on subsequent submission without Research Consent" in { 
+
+    for {
+
+      outcome <- orchestrator ! Process(subsequentUpload)
+
+      _ = outcome.value mustBe Saved
+
+      submissionReport <- mvhService ? subsequentUpload.metadata.get.transferTAN
+
+      _ = submissionReport.value.patient mustBe record.id
+
+      snapshot <- queryService ! retrievalRequest
+
+      // Now the data mst have been deleted from the queryService
+      _ = snapshot must not be defined
+
+    } yield succeed // If not failed before, test passed
 
   }
 
@@ -94,13 +142,15 @@ class OrchestratorTests extends AsyncFlatSpec
     
       _ = outcome.value mustBe a [Deleted]
 
-      submissionReport <- mvhService ? dataUpload.metadata.get.transferTAN
-
-      snapshot <- queryService ! retrievalRequest
+      submissionReport <- mvhService ? initialUpload.metadata.get.transferTAN
 
       _ <- submissionReport must not be defined
+    
+      snapshot <- queryService ! retrievalRequest
 
-    } yield snapshot must not be defined
+     _ = snapshot must not be defined
+
+    } yield succeed // If not failed before, test passed
 
   }
 

@@ -7,7 +7,6 @@ import scala.util.{
   Right
 }
 import cats.Monad
-import cats.Traverse
 import cats.syntax.either._
 import cats.syntax.applicative._
 import cats.syntax.functor._
@@ -27,8 +26,13 @@ import de.dnpm.dip.service.validation.{
 import de.dnpm.dip.service.query.QueryService
 import de.dnpm.dip.service.mvh.{
   BroadConsent,
-  MVHService,
-  Submission
+  MVHService
+}
+import de.dnpm.dip.service.mvh.Submission.Type.{
+  Test,
+  Addition,
+  Correction,
+  FollowUp
 }
 
 
@@ -56,7 +60,7 @@ object Orchestrator
   final case class Delete
   (
     id: Id[Patient],
-    scopes: Option[Set[UsageScope.Value]]
+    scopes: Option[Set[UsageScope.Value]] = None
   )
   extends Command[Nothing]
 
@@ -98,7 +102,6 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
 
   import Orchestrator._
   import UsageScope._
-  import Submission.Type._ //{Addition,Correction,FollowUp}
   import ValidationService.{
     Validate,
     DataValid,
@@ -139,29 +142,33 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
             // Validation (partially) passed
             case Right(validationOutcome) =>
 
+              val transactions = dataUpload.metadata match {
+
+                // MV submission
+                case Some(metadata) =>
+                  (mvhService ! MVHService.Process(dataUpload.record,metadata)) :: 
+                  metadata.researchConsents
+                    .map(BroadConsent.permitsResearchUse)
+                    .collect {
+                      // If ResearchConsent is given, save the data in the query module, except for submission type 'test'
+                      case true if metadata.`type` != Test => queryService ! QueryService.Save(dataUpload.record.deidentified)
+                    }
+                    .orElse(
+                      metadata.`type` match {
+                        // For non-initial submissions, delete data from the query module in case it has been saved on initial submission
+                        case Addition | Correction | FollowUp => Some(queryService ! QueryService.Delete(dataUpload.record.id))
+
+                        case _ => None  // Nothing to do
+                      }
+                    )                                  
+                    .toList
+                  
+                // No MV metadata ("DNPM-only"): Only save in query module
+                case None => List(queryService ! QueryService.Save(dataUpload.record.deidentified))
+              }
+
               for {
-                results <- Traverse[List].sequence {
-
-                  dataUpload.metadata match {
-
-                    // MV submission
-                    case Some(metadata) =>
-                      (mvhService ! MVHService.Process(dataUpload.record,metadata)) :: 
-                      metadata.researchConsents
-                        .map(BroadConsent.permitsResearchUse(_) -> metadata.`type`)
-                        .collect {
-                          // If ResearchConsent is given, save the data in the query module irrespective of submission type
-                          case (true,_) => queryService ! QueryService.Save(dataUpload.record.deidentified)
-
-                          // Else for a non-initial submission, in case data had been saved upon initial submission, trigger deletion from the query context
-                          case (false, Addition | Correction | FollowUp) => queryService ! QueryService.Delete(dataUpload.record.id)
-                        }
-                        .toList
-
-                    // No MV metadata ("DNPM-only"): Only save in query module
-                    case None => List(queryService ! QueryService.Save(dataUpload.record.deidentified))
-                  }
-                }
+                results <- transactions.sequence
 
                 errors = results.collect {
                   case Left(err: MVHService.Error)       => Error(err)
