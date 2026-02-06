@@ -142,6 +142,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
             // Validation (partially) passed
             case Right(validationOutcome) =>
 
+              // Build a List of transactions/operations constituting the "saga" to be orchestrated:
               val transactions = dataUpload.metadata match {
 
                 // MV submission
@@ -168,6 +169,8 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
               }
 
               for {
+
+                // Execute the "saga" 
                 results <- transactions.sequence
 
                 errors = results.collect {
