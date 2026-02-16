@@ -42,8 +42,8 @@ object UsageScope extends Enumeration
   type UsageScope = Value
 
 //  val Validation = Value
-  val MVGenomSeq = Value
-  val Research = Value
+  val MVGenomSeq = Value("mvgenomseq")
+  val Research   = Value("query")
 }
 
 
@@ -204,10 +204,14 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
 
       case Orchestrator.Delete(id,optScopes) =>
 
-        val scopes = optScopes.getOrElse(UsageScope.values.toSet).toList
+        val scopes =
+          optScopes match { 
+            case Some(scopes) if scopes.nonEmpty => values
+            case _                               => UsageScope.values.toSet
+          }
 
         for {
-          results <- scopes.traverse {
+          results <- scopes.toList.traverse {
             case MVGenomSeq => mvhService ! MVHService.Delete(id)
             case Research   => queryService ! QueryService.Delete(id)
           }
