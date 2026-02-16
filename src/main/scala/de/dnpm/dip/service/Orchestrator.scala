@@ -181,8 +181,8 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
                   case Left(err: QueryService.DataError) => Error(err)
                 }
 
-                outcome = errors.isEmpty match {
-                  case true => 
+                outcome =
+                  if (errors.isEmpty){
                     validationOutcome match {
                       case DataValid(data)                       => Saved.asRight
                       case DataAcceptableWithIssues(data,report) => SavedWithIssues(report).asRight
@@ -191,9 +191,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
                       case ValidationService.Deleted(_) => List(Error(ValidationService.GenericError("Unexpected validation outcome"))).asLeft
                     }
 
-                  case false => errors.asLeft
-
-                }
+                  } else errors.asLeft
               
               } yield outcome
 
@@ -210,6 +208,9 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
         val scopes =
           optScopes match { 
             case Some(scopes) if scopes.nonEmpty => scopes
+
+            // In order to retain the same behaviour as previously, i.e. to delete the patient's data from every module/scope
+            // default to all scopes when none is specified...
             case _                               => UsageScope.values.toSet
           }
 
@@ -219,6 +220,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
             case Research   => queryService ! QueryService.Delete(id)
           }
 
+          // ... and delete from the validation service by default
           validation <- validationService ! ValidationService.Delete(id)
 
           errors =
@@ -228,10 +230,9 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
               case Left(err: QueryService.DataError)  => Error(err)
             }
 
-          outcome = errors.isEmpty match {
-            case true => Deleted(id).asRight
-            case false => errors.asLeft
-          }
+          outcome = 
+            if (errors.isEmpty) Deleted(id).asRight
+            else errors.asLeft
               
         } yield outcome
 
