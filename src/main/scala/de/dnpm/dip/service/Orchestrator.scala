@@ -101,7 +101,10 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
 {
 
   import Orchestrator._
-  import UsageScope._
+  import UsageScope.{
+    MVGenomSeq,
+    Research
+  }
   import ValidationService.{
     Validate,
     DataValid,
@@ -206,7 +209,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
 
         val scopes =
           optScopes match { 
-            case Some(scopes) if scopes.nonEmpty => values
+            case Some(scopes) if scopes.nonEmpty => scopes
             case _                               => UsageScope.values.toSet
           }
 
