@@ -259,7 +259,7 @@ with Logging
     .pure
 
 
-  override def history(id: Id[Patient])(
+  override def submissionHistory(id: Id[Patient])(
     implicit env: Env
   ): F[Option[History[Submission[T]]]] =
     for {
@@ -272,6 +272,24 @@ with Logging
 
       history =
         NonEmptyList.fromList(submissions.toList)
+          .map(History(_))
+
+    } yield history
+
+
+  override def submissionReportHistory(id: Id[Patient])(
+    implicit env: Env
+  ): F[Option[History[Submission.Report]]] =
+    for {
+      files <- reportFiles(id).pure
+
+      reports =
+        files
+          .map(new FileInputStream(_))
+          .map(readAsJson[Submission.Report])
+
+      history =
+        NonEmptyList.fromList(reports.toList)
           .map(History(_))
 
     } yield history

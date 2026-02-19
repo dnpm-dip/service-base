@@ -6,6 +6,7 @@ import scala.collection.concurrent.{
   TrieMap
 }
 import cats.Monad
+import cats.data.NonEmptyList
 import cats.syntax.applicative._
 import cats.syntax.either._
 import de.dnpm.dip.model.{
@@ -19,20 +20,21 @@ import de.dnpm.dip.model.{
 
 class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
 {
+
   type Env = Monad[F]
 
 
-  private val reports: Map[Id[Patient],Submission.Report] =
+  private val reports: Map[Id[Patient],Map[Id[TransferTAN],Submission.Report]] =
     TrieMap.empty
 
-  private val submissions: Map[Id[Patient],Submission[T]] =
+  private val submissions: Map[Id[Patient],Map[Id[TransferTAN],Submission[T]]] =
     TrieMap.empty
 
 
   override def alreadyUsed(id: Id[TransferTAN])(
     implicit env: Env
   ): F[Boolean] =
-    reports.exists(_._2.id == id).pure
+    reports.exists(_._2.contains(id)).pure
 
 
   override def save(
@@ -42,8 +44,18 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
     implicit env: Env
   ): F[Either[String,Unit]] = {
 
-    reports += submission.record.id -> report
-    submissions += submission.record.id -> submission
+    val patId = submission.record.id
+    val tan = report.id
+
+    reports.updateWith(patId){ 
+      case None          => Some(TrieMap(tan -> report))
+      case Some(reports) => Some(reports += tan -> report)
+    }
+
+    submissions.updateWith(patId){ 
+      case None       => Some(TrieMap(tan -> submission))
+      case Some(subs) => Some(subs += tan -> submission)
+    }
 
     ().asRight[String].pure
   }
@@ -55,8 +67,9 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
     implicit env: Env
   ): F[Option[Submission.Report]] =
     reports.collectFirst {
-      case (_,r) if r.id == id => r 
+      case (_,rs) if rs contains id => rs
     }
+    .flatMap(_ get id)
     .pure
 
 
@@ -66,9 +79,13 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
     implicit env: Env
   ): F[Either[String,Unit]] =
     env.pure(
-      reports.collectFirst { case (patId,r) if r.id == report.id => patId } match {
-        case Some(patId) => reports.update(patId,report).asRight
-        case None        => s"Update failed: Report with TAN ${report.id} doesn't exist".asLeft
+      reports.get(report.patient) match {
+        case Some(rs) =>
+          rs.replace(report.id,report)
+            .toRight(s"Update failed: Report with TAN ${report.id} doesn't exist")
+            .map(_ => ())
+
+        case None => s"Update failed: Report with TAN ${report.id} doesn't exist".asLeft
       }
    )
 
@@ -77,6 +94,7 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
     implicit env: Env
   ): F[Seq[Submission.Report]] =
     reports.values
+      .flatMap(_.values)
       .filter(fltr)
       .toSeq
       .pure
@@ -86,15 +104,28 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
     implicit env: Env
   ): F[Seq[Submission[T]]] =
     submissions.values
+      .flatMap(_.values)
       .filter(fltr)
       .toSeq
       .pure
 
 
-  override def history(id: Id[Patient])(
+  override def submissionHistory(id: Id[Patient])(
     implicit env: Env
   ): F[Option[History[Submission[T]]]] =
     submissions.get(id)
+      .map(_.values.toList)
+      .flatMap(NonEmptyList.fromList(_))
+      .map(History(_))
+      .pure
+
+
+  override def submissionReportHistory(id: Id[Patient])(
+    implicit env: Env
+  ): F[Option[History[Submission.Report]]] =
+    reports.get(id)
+      .map(_.values.toList)
+      .flatMap(NonEmptyList.fromList(_))
       .map(History(_))
       .pure
 
