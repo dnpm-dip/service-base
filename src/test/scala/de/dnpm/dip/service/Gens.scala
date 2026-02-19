@@ -82,7 +82,7 @@ object Gens
       id,
       gender,
       YearMonth.from(birthDate),
-      dateOfDeath.map(YearMonth.from),
+      dateOfDeath,
       None,
       healthInsurance,
       Some(Address(Address.MunicipalityCode("12345")))
