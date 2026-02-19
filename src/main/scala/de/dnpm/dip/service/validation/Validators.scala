@@ -36,6 +36,7 @@ import de.dnpm.dip.model.{
   Procedure,
   Recommendation,
   MedicationRecommendation,
+  NGSReport,
   Reference,
   ExternalReference,
   Study,
@@ -462,13 +463,20 @@ trait Validators
 
 
 
-  def dataUploadValidator[T <: PatientRecord](
+  def DataUploadValidator[T <: PatientRecord](
+    admissibleSequencingTypes: Set[NGSReport.Type.Value]
+  )(
     implicit recordValidator: Validator[Issue,T]
   ): Validator[Issue,DataUpload[T]] = {
 
     case upload @ DataUpload(record,optMetadata) => 
       
       import de.dnpm.dip.service.mvh.extensions._
+
+      implicit lazy val mvhSequencingTypeValidator: Validator[Issue,NGSReport.Type.Value] =
+        typ => typ must be (in (admissibleSequencingTypes)) otherwise (
+          Error(s"Unzulässige Sequenzier-Art $typ, es kann nur eine von {${admissibleSequencingTypes.mkString(", ")}} geltend gemacht werden") at "MVH-Sequenzier-Art"
+        ) 
 
       (
         ifDefined(optMetadata)(
@@ -487,9 +495,19 @@ trait Validators
                       Error("Kein MVH-Sequenzierung-Bericht vorhanden, obwohl im Board-Beschluss nicht begründet ist, dass/warum keine MVH-Sequenzierung beantragt worden ist")
                         at "Sequenzier-Berichte"
                     )
+/*                  
+                    record.mvhSequencingReports match {
+                      case reports if reports.nonEmpty => reports.map(_.`type`.code.enumValue).validateEach
+                      case _ => Nil.validNel
+                    }
+*/                    
                   )
                   .errorsOr(mvhCp)
               }, 
+              record.mvhSequencingReports match {
+                case reports if reports.nonEmpty => reports.map(_.`type`.code.enumValue).validateEach
+                case _ => Nil.validNel
+              },
               metadata.`type` match {
                 case Submission.Type.FollowUp =>
                   record.followUps.exists(_.nonEmpty) must be (true) otherwise (Error("Es ist 'Follow-up' als Meldungs-Typ deklariert, aber keine Follow-Up-Objekte vorhanden") at "Meldungs-Typ")

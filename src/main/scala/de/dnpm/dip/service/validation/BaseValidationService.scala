@@ -12,6 +12,7 @@ import cats.data.Validated
 import de.dnpm.dip.util.Logging
 import de.dnpm.dip.model.{
   Id,
+  NGSReport,
   Patient,
   PatientRecord,
 }
@@ -37,6 +38,7 @@ class BaseValidationService[
   F[+_],
   T <: PatientRecord,
 ](
+  private val admissibleSequencingTypes: Set[NGSReport.Type.Value],
   private val recordValidator: Validator[Issue,T],
   private val repo: Repository[F,Monad[F],T],
   private val maxSeverity: Severity.Value = Severity.Error
@@ -54,7 +56,7 @@ with Logging
 
 
   private implicit val validator: Validator[Issue,DataUpload[T]] =
-    dataUploadValidator(recordValidator)
+    DataUploadValidator(admissibleSequencingTypes)(recordValidator)
 
 
   private val Acceptable =
