@@ -8,10 +8,10 @@ import scala.util.{
 }
 import cats.Monad
 import cats.syntax.either._
-import cats.syntax.apply._
 import cats.syntax.applicative._
 import cats.syntax.functor._
 import cats.syntax.flatMap._
+import cats.syntax.traverse._
 import de.dnpm.dip.util.Completer
 import de.dnpm.dip.model.{
   Id,
@@ -25,8 +25,25 @@ import de.dnpm.dip.service.validation.{
 }
 import de.dnpm.dip.service.query.QueryService
 import de.dnpm.dip.service.mvh.{
-  MVHService,
-  BroadConsent
+  BroadConsent,
+  MVHService
+}
+import de.dnpm.dip.service.mvh.Submission.Type.{
+  Test,
+  Addition,
+  Correction,
+  FollowUp
+}
+
+
+
+object UsageScope extends Enumeration
+{
+  type UsageScope = Value
+
+//  val Validation = Value
+  val MVGenomSeq = Value("mvgenomseq")
+  val Research   = Value("query")
 }
 
 
@@ -36,11 +53,16 @@ object Orchestrator
   final case class Process[T <: PatientRecord]
   (
     upload: DataUpload[T],
-//    deidentifyBroadConsent: Boolean = false
+//    scopes: Option[Set[UsageScope.Value]] = None
   )
   extends Command[T]
 
-  final case class Delete(id: Id[Patient]) extends Command[Nothing]
+  final case class Delete
+  (
+    id: Id[Patient],
+    scopes: Option[Set[UsageScope.Value]] = None
+  )
+  extends Command[Nothing]
 
   sealed trait Outcome
   final case object Saved extends Outcome
@@ -52,19 +74,17 @@ object Orchestrator
 
   object Error
   {
-    def apply(err: QueryService.DataError): Either[Error,Outcome] =
+    def apply(err: QueryService.DataError): Error =
       err.asRight[MVHService.Error]
         .asRight[ValidationService.Error]
-        .asLeft
 
-    def apply(err: MVHService.Error): Either[Error,Outcome] =
+    def apply(err: MVHService.Error): Error =
       err.asLeft[QueryService.DataError]
         .asRight[ValidationService.Error]
-        .asLeft
 
-    def apply(err: ValidationService.Error): Either[Error,Outcome] =
+    def apply(err: ValidationService.Error): Error =
       err.asLeft[Either[MVHService.Error,QueryService.DataError]]
-        .asLeft
+
   }
 
 }
@@ -81,6 +101,10 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
 {
 
   import Orchestrator._
+  import UsageScope.{
+    MVGenomSeq,
+    Research
+  }
   import ValidationService.{
     Validate,
     DataValid,
@@ -101,7 +125,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
     cmd: Orchestrator.Command[T]
   )(
     implicit env: Monad[F]
-  ): F[Either[Error,Orchestrator.Outcome]] =
+  ): F[Either[List[Error],Orchestrator.Outcome]] =
     cmd match {
 
       case Process(rawData) =>
@@ -109,94 +133,109 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
         for { 
 
           dataUpload <- rawData.copy(
-
             // Complete the PatientRecord (resolve display value of Codings etc)
             record = rawData.record.complete,
-/*
-            // Deidentify BroadConsent, if specified by the client
-            metadata =
-              if (deidentifyBroadConsent)
-                rawData.metadata.map(
-                  m => m.copy(
-                    researchConsents = m.researchConsents.map(_.map(_.deidentifiedWith(rawData.record.patient.id)))
-                  )
-                )
-              else rawData.metadata
-*/              
           )
-          .pure  // Load pre-processed data into Monad
+          .pure // Load pre-processed data into Monad
 
-          validationResult <- (validationService ! Validate(dataUpload))
+          validationResult <- validationService ! Validate(dataUpload)
 
           finalResult <- validationResult match {
             
             // Validation (partially) passed
-            case Right(outcome) =>
+            case Right(validationOutcome) =>
 
-              for {
-                saveResult <- dataUpload.metadata match {
-                  case Some(metadata) =>
-                    for {
-                      mvhResult <- mvhService ! MVHService.Process(dataUpload.record,metadata)
+              // Build a List of transactions/operations constituting the "saga" to be orchestrated:
+              val transactions = dataUpload.metadata match {
 
-                      dnpmPermitted = metadata.researchConsents.exists(BroadConsent.permitsResearchUse)
-                
-                      result <- mvhResult match {
-                        case Right(_) =>
-                          if (dnpmPermitted) queryService ! QueryService.Save(dataUpload.record.deidentified)
-                          else mvhResult.pure
+                // MV submission
+                case Some(metadata) =>
+                  (mvhService ! MVHService.Process(dataUpload.record,metadata)) :: 
+                  metadata.researchConsents
+                    .map(BroadConsent.permitsResearchUse)
+                    .collect {
+                      // If ResearchConsent is given, save the data in the query module, except for submission type 'test'
+                      case true if metadata.`type` != Test => queryService ! QueryService.Save(dataUpload.record.deidentified)
+                    }
+                    .orElse(
+                      metadata.`type` match {
+                        // For non-initial submissions, delete data from the query module in case it has been saved on initial submission
+                        case Addition | Correction | FollowUp => Some(queryService ! QueryService.Delete(dataUpload.record.id))
 
-                        case err => err.pure
+                        case _ => None  // Nothing to do
                       }
-
-                    } yield result
-
-                  case None => queryService ! QueryService.Save(dataUpload.record.deidentified)
-                }
+                    )                                  
+                    .toList
                   
-              } yield saveResult match {
-
-                case Right(MVHService.Saved | QueryService.Saved(_)) => 
-
-                  outcome match {
-                    case DataValid(data)                       => Saved.asRight
-                    case DataAcceptableWithIssues(data,report) => SavedWithIssues(report).asRight
-
-                    // Can't occur but required for exhaustive pattern match
-                    case ValidationService.Deleted(_) => Error(ValidationService.GenericError("Unexpected validation outcome"))
-                  }
-            
-                case Left(err: MVHService.Error) => Error(err)
-
-                case Left(err: QueryService.DataError) => Error(err)
-            
-                // These cases can't occur but are required for exhaustive pattern match:
-                case Right(_) => Saved.asRight   // In this case saving has worked
-                case Left(_)  => Error(QueryService.GenericError("Unexpected data saving outcome"))
-
+                // No MV metadata ("DNPM-only"): Only save in query module
+                case None => List(queryService ! QueryService.Save(dataUpload.record.deidentified))
               }
 
+              for {
+
+                // Execute the "saga" 
+                results <- transactions.sequence
+
+                errors = results.collect {
+                  case Left(err: MVHService.Error)       => Error(err)
+                  case Left(err: QueryService.DataError) => Error(err)
+                }
+
+                outcome =
+                  if (errors.isEmpty){
+                    validationOutcome match {
+                      case DataValid(data)                       => Saved.asRight
+                      case DataAcceptableWithIssues(data,report) => SavedWithIssues(report).asRight
+                    
+                      // Can't occur but required for exhaustive pattern match
+                      case ValidationService.Deleted(_) => List(Error(ValidationService.GenericError("Unexpected validation outcome"))).asLeft
+                    }
+
+                  } else errors.asLeft
+              
+              } yield outcome
+
             // Validation failed
-            case Left(err) => Error(err).pure 
+            case Left(err) => List(Error(err)).asLeft.pure 
 
           }
 
         } yield finalResult
 
 
-      case Orchestrator.Delete(id) =>
-        (
-          validationService ! ValidationService.Delete(id),
-          mvhService ! MVHService.Delete(id),
-          queryService ! QueryService.Delete(id)
-        )
-        .mapN(
-          (out,_,_) =>
-            out match {
-              case Right(_)  => Deleted(id).asRight
-              case Left(err) => Error(err)
+      case Orchestrator.Delete(id,optScopes) =>
+
+        val scopes =
+          optScopes match { 
+            case Some(scopes) if scopes.nonEmpty => scopes
+
+            // In order to retain the same behaviour as previously, i.e. to delete the patient's data from every module/scope
+            // default to all scopes when none is specified...
+            case _                               => UsageScope.values.toSet
+          }
+
+        for {
+          results <- scopes.toList.traverse {
+            case MVGenomSeq => mvhService ! MVHService.Delete(id)
+            case Research   => queryService ! QueryService.Delete(id)
+          }
+
+          // ... and delete from the validation service by default
+          validation <- validationService ! ValidationService.Delete(id)
+
+          errors =
+            (validation :: results).collect {
+              case Left(err: ValidationService.Error) => Error(err)
+              case Left(err: MVHService.Error)        => Error(err)
+              case Left(err: QueryService.DataError)  => Error(err)
             }
-        )
+
+          outcome = 
+            if (errors.isEmpty) Deleted(id).asRight
+            else errors.asLeft
+              
+        } yield outcome
+
     }
 
 
