@@ -16,13 +16,13 @@ import de.dnpm.dip.model.{
   Diagnosis,
   EpisodeOfCare,
   ExternalId,
+  Patient,
   Period,
   Reference,
   Gender,
   HealthInsurance,
   IK,
-  Id,
-  Patient
+  Id
 }
 import de.dnpm.dip.service.mvh.{
   BroadConsent,
@@ -152,13 +152,47 @@ object Gens
     .get
 
 
+  private val genTan: Gen[Id[TransferTAN]] =
+    for {
+      tan <- Gen.listOf(64, Gen.oneOf("0","1","2","3","4","5","6","7","8","9","A","B","C","D","E","F")).map(_.mkString)
+    } yield Id[TransferTAN](tan)
+
+
   def genMetadata(
-    record: DummyPatientRecord,
-    submissionType: Submission.Type.Value,// = Submission.Type.Initial,
-    withBroadConsent: Boolean// = true
+    submissionType: Submission.Type.Value
   ): Gen[Submission.Metadata] =
     for {
-      ttan <- Gen.listOf(64, Gen.oneOf("0","1","2","3","4","5","6","7","8","9","A","B","C","D","E","F")).map(_.mkString)
+      tan <- genTan
+      date = LocalDate.now
+    } yield Submission.Metadata(
+      submissionType,
+      tan,
+      ModelProjectConsent(
+        "Patient Info TE Consent MVGenomSeq vers01",
+        Some(date),
+        ModelProjectConsent.Purpose.values
+          .toList
+          .map(
+            Consent.Provision(
+              date,
+              _,
+              Consent.Provision.Type.Permit
+            )
+          )
+      ),
+      None,
+      Some(BroadConsent.ReasonMissing.OrganizationalIssues)
+    )
+
+
+  // Gen[Submission.Metadata] using record as input to generate temporally consistent metadata (consent date)
+  def genMetadata(
+    record: DummyPatientRecord,
+    submissionType: Submission.Type.Value,
+    withBroadConsent: Boolean
+  ): Gen[Submission.Metadata] =
+    for {
+      tan <- genTan
 
       consentDate =
         record.getCarePlans
@@ -173,7 +207,7 @@ object Gens
 
     } yield Submission.Metadata(
       submissionType,
-      Id[TransferTAN](ttan),
+      tan,
       ModelProjectConsent(
         "Patient Info TE Consent MVGenomSeq vers01",
         Some(consentDate minusDays 1),
@@ -190,48 +224,5 @@ object Gens
       bc,
       noBcReason
     )
-
-/*    
-  def genMetadata(
-    consentDate: LocalDate,
-    submissionType: Submission.Type.Value = Submission.Type.Initial,
-    withBroadConsent: Boolean = true
-  ): Gen[Submission.Metadata] =
-    for {
-      ttan <- Gen.listOf(64, Gen.oneOf("0","1","2","3","4","5","6","7","8","9","A","B","C","D","E","F")).map(_.mkString)
-
-      (bc,noBcReason) =
-        if (withBroadConsent) Some(List(broadConsent)) -> None
-        else None -> Some(BroadConsent.ReasonMissing.OrganizationalIssues)
-
-    } yield Submission.Metadata(
-      submissionType,
-      Id[TransferTAN](ttan),
-      ModelProjectConsent(
-        "Patient Info TE Consent MVGenomSeq vers01",
-        Some(consentDate minusDays 1),
-        ModelProjectConsent.Purpose.values
-          .toList
-          .map(
-            Consent.Provision(
-              consentDate,
-              _,
-              Consent.Provision.Type.Permit
-            )
-          )
-      ),
-      bc,
-      noBcReason
-    )
-
-  implicit val genDataUpload: Gen[DataUpload[DummyPatientRecord]] =
-    for {
-      record <- Gen.of[DummyPatientRecord]
-      metadata <- genMetadata(record)
-    } yield DataUpload(
-      record,
-      Some(metadata)
-    )
-*/
 
 }

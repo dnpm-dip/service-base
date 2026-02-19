@@ -19,6 +19,7 @@ import de.dnpm.dip.model.{
   Site
 }
 import MVHService._
+import Submission.Type._
 import Submission.Report.Status._
 import extensions._
 import NGSReport.Type._
@@ -61,48 +62,73 @@ with Logging
         for {
           tanAlreadyUsed <- repo.alreadyUsed(metadata.transferTAN)
 
-          result <- if (!tanAlreadyUsed){
+          // Check acceptability of submission type for the given Patient
+          submissionTypeOk <- metadata.`type` match {
 
-            val submittedAt = LocalDateTime.now
+            // An initial submission must be the first at all or follow only previous "test" submissions
+            case Initial =>
+              repo.submissionReportHistory(record.patient.id).map {
+                case None => true
+                case Some(s) => s.history.forall(_.`type` == Test)
+              }
 
-            repo.save(
-              Submission.Report(
-                metadata.transferTAN,
-                submittedAt,
-                record.patient.id,
-                Unsubmitted,
-                Site.local,
-                useCase,
-                metadata.`type`,
-                record.mvhSequencingReports.map(_.`type`.code.enumValue).maxOption,
-                sequenceTypes(record),
-                record.patient.healthInsurance.`type`.code,
-                Some(
-                  Map(
-                    Consent.Category.ModelProject ->
-                      metadata.modelProjectConsent.provisions.exists(p => p.purpose == Sequencing && p.`type` == Consent.Provision.Type.Permit),
-                    Consent.Category.Research ->
-                      metadata.researchConsents.exists(BroadConsent.permitsResearchUse)
-                  )
+            // addition, correction, followup can only be appended to an existing submission history with an initial submission
+            case Addition | Correction | FollowUp =>
+              repo.submissionReportHistory(record.patient.id).map(_.exists(_.history.exists(_.`type` == Initial)))
+
+            // Test submission ok any time
+            case Test => env.pure(true)
+          }
+
+          result <- (!tanAlreadyUsed,submissionTypeOk) match {
+            case (true,true) =>
+
+              val submittedAt = LocalDateTime.now
+  
+              repo.save(
+                Submission.Report(
+                  metadata.transferTAN,
+                  submittedAt,
+                  record.patient.id,
+                  Unsubmitted,
+                  Site.local,
+                  useCase,
+                  metadata.`type`,
+                  record.mvhSequencingReports.map(_.`type`.code.enumValue).maxOption,
+                  sequenceTypes(record),
+                  record.patient.healthInsurance.`type`.code,
+                  Some(
+                    Map(
+                      Consent.Category.ModelProject ->
+                        metadata.modelProjectConsent.provisions.exists(p => p.purpose == Sequencing && p.`type` == Consent.Provision.Type.Permit),
+                      Consent.Category.Research ->
+                        metadata.researchConsents.exists(BroadConsent.permitsResearchUse)
+                    )
+                  ),
+                  metadata.reasonResearchConsentMissing
                 ),
-                metadata.reasonResearchConsentMissing
-              ),
-              Submission(
-                record,
-                metadata,
-                submittedAt
+                Submission(
+                  record,
+                  metadata,
+                  submittedAt
+                )
               )
-            )
-            .map(
-              _.bimap(
-                GenericError(_),
-                _ => Saved
+              .map(
+                _.bimap(
+                  GenericError(_),
+                  _ => Saved
+                )
               )
-            )
-          } else {
-            val msg = s"Invalid submission: TAN ${metadata.transferTAN} has already been used"
-            log.warn(s"$msg, refusing submission")
-            env.pure(InvalidTAN(msg).asLeft)
+
+            case (false,_) =>
+              val msg = s"Invalid submission: TAN ${metadata.transferTAN} has already been used"
+              log.warn(s"$msg, refusing submission")
+              env.pure(InvalidTAN(msg).asLeft)
+
+            case (_,false) =>
+              val msg = s"Invalid submission: Type ${metadata.`type`} is inconsistent with previous submission history"
+              log.warn(s"$msg, refusing submission")
+              env.pure(InvalidSubmissionType(msg).asLeft)
           }
 
         } yield result

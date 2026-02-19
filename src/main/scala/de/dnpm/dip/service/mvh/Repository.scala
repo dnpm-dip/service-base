@@ -70,9 +70,14 @@ trait Repository[F[_],Env,T <: PatientRecord]
   ): F[Seq[Submission[T]]]
 
 
-  def history(id: Id[Patient])(
+  def submissionHistory(id: Id[Patient])(
     implicit env: Env
   ): F[Option[History[Submission[T]]]]
+
+
+  def submissionReportHistory(id: Id[Patient])(
+    implicit env: Env
+  ): F[Option[History[Submission.Report]]]
 
 
   def delete(id: Id[Patient])(
