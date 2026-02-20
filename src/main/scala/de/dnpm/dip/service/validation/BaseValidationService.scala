@@ -38,7 +38,7 @@ class BaseValidationService[
   F[+_],
   T <: PatientRecord,
 ](
-  private val admissibleSequencingTypes: Set[NGSReport.Type.Value],
+  private val admissibleMVHSequencingTypes: Set[NGSReport.Type.Value],
   private val recordValidator: Validator[Issue,T],
   private val repo: Repository[F,Monad[F],T],
   private val maxSeverity: Severity.Value = Severity.Error
@@ -54,9 +54,11 @@ with Logging
   import cats.syntax.flatMap._
   import ValidationService._
 
+  private implicit val sequencingTypeValidator: Validator[Issue,NGSReport.Type.Value] =
+    SequencingTypeValidator(admissibleMVHSequencingTypes)
 
   private implicit val validator: Validator[Issue,DataUpload[T]] =
-    DataUploadValidator(admissibleSequencingTypes)(recordValidator)
+    DataUploadValidator(recordValidator,sequencingTypeValidator)
 
 
   private val Acceptable =

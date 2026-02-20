@@ -8,8 +8,6 @@ import de.dnpm.dip.model.NGSReport.Type._
 
 final class FakeValidationService[F[+_],T <: PatientRecord] extends BaseValidationService[F,T](
   Set(
-    Panel,
-    Exome,
     GenomeShortRead,
     GenomeLongRead
   ),
