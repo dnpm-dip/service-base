@@ -83,7 +83,6 @@ final case class DummyPatientRecord
 )
 extends PatientRecord
 {
-//  override val ngsReports = None
   override val followUps = None
   override def getCarePlans = carePlans.toList
   override val systemicTherapies = None

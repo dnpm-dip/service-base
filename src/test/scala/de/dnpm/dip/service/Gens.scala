@@ -121,7 +121,7 @@ object Gens
   ): Gen[DummyNGSReport] =
     for { 
       id <- Gen.of[Id[DummyNGSReport]]
-      typ <- Gen.oneOf(sequencingTypes.toSeq)
+      typ <- Gen.oneOf(sequencingTypes.toList)
     } yield DummyNGSReport(
       id,
       Reference.to(patient),
@@ -162,7 +162,6 @@ object Gens
             report <- genNGSReport(patient,sequencingTypes)
           } yield Some(List(report))
         else Gen.const(Option.empty[List[DummyNGSReport]])
-
     } yield DummyPatientRecord(
       patient,
       NonEmptyList.of(episode),

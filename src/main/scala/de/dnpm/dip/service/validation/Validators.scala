@@ -501,7 +501,7 @@ trait Validators
                   .errorsOr(mvhCp)
               }, 
               record.mvhSequencingReports match {
-                case reports if reports.nonEmpty => reports.map(_.`type`.code.enumValue).validateEach
+                case reports if reports.nonEmpty => validateEach(reports.map(_.`type`.code.enumValue))
                 case _ => Nil.validNel
               },
               metadata.`type` match {
