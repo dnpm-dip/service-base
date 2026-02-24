@@ -16,6 +16,7 @@ import de.dnpm.dip.model.{
   Diagnosis,
   EpisodeOfCare,
   ExternalId,
+  NGSReport,
   Patient,
   Period,
   Reference,
@@ -114,20 +115,38 @@ object Gens
     )
 
 
+  def genNGSReport(
+    patient: Patient,
+    sequencingTypes: Set[NGSReport.Type.Value]
+  ): Gen[DummyNGSReport] =
+    for { 
+      id <- Gen.of[Id[DummyNGSReport]]
+      typ <- Gen.oneOf(sequencingTypes.toList)
+    } yield DummyNGSReport(
+      id,
+      Reference.to(patient),
+      LocalDate.now,
+      Coding(typ)
+    )
+
+
   def genCarePlan(
-    patient: Patient
+    patient: Patient,
+    sequencingRequested: Boolean = false
   ): Gen[DummyCarePlan] =
     for { 
       id <- Gen.of[Id[DummyCarePlan]]
     } yield DummyCarePlan(
       id,
       Reference.to(patient),
-      LocalDate.now,
-      Some(Coding(CarePlan.NoSequencingPerformedReason.Other))
+      LocalDate.now.minusDays(7),
+      Option.when(!sequencingRequested)(Coding(CarePlan.NoSequencingPerformedReason.Other))
     )
 
 
-  implicit val genDummyPatientRecord: Gen[DummyPatientRecord] =
+  def genDummyPatientRecord(
+    sequencingTypes: Set[NGSReport.Type.Value] = Set.empty
+  ): Gen[DummyPatientRecord] =
     for { 
       patient <- Gen.of[Patient]
 
@@ -135,14 +154,24 @@ object Gens
 
       diagnosis <- genDiagnosis(patient)
 
-      carePlan <- genCarePlan(patient)
+      carePlan <- genCarePlan(patient,sequencingTypes.nonEmpty)
 
+      ngsReports <-
+        if (sequencingTypes.nonEmpty)
+          for {
+            report <- genNGSReport(patient,sequencingTypes)
+          } yield Some(List(report))
+        else Gen.const(Option.empty[List[DummyNGSReport]])
     } yield DummyPatientRecord(
       patient,
       NonEmptyList.of(episode),
       NonEmptyList.of(diagnosis),
-      NonEmptyList.of(carePlan)
+      NonEmptyList.of(carePlan),
+      ngsReports
     )
+
+  implicit val genDummyPatientRecordWithoutNGS: Gen[DummyPatientRecord] =
+    genDummyPatientRecord()
 
 
   private lazy val broadConsent =

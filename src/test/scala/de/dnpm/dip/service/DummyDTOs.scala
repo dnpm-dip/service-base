@@ -10,6 +10,7 @@ import de.dnpm.dip.model.{
   Diagnosis,
   EpisodeOfCare,
   Id,
+  NGSReport,
   Patient,
   PatientRecord,
   Period,
@@ -38,7 +39,20 @@ final case class DummyDiagnosis
 )
 extends Diagnosis
 {
-  val notes = None
+  override val notes = None
+}
+
+final case class DummyNGSReport
+(
+  id: Id[DummyNGSReport],
+  patient: Reference[Patient],
+  issuedOn: LocalDate,
+  `type`: Coding[NGSReport.Type.Value]
+)
+extends NGSReport
+{
+  override val notes = None
+  override def variants = Seq.empty
 }
 
 
@@ -64,14 +78,14 @@ final case class DummyPatientRecord
   patient: Patient,
   episodesOfCare: NonEmptyList[DummyEpisodeOfCare],
   diagnoses: NonEmptyList[DummyDiagnosis],
-  carePlans: NonEmptyList[DummyCarePlan]
+  carePlans: NonEmptyList[DummyCarePlan],
+  ngsReports: Option[List[DummyNGSReport]]
 )
 extends PatientRecord
 {
-  override val ngsReports = None
   override val followUps = None
-  override val systemicTherapies = None
   override def getCarePlans = carePlans.toList
+  override val systemicTherapies = None
 }
 
 
@@ -95,6 +109,9 @@ object DummyPatientRecord
 
   implicit val formatCarePlan: OFormat[DummyCarePlan] =
     Json.format[DummyCarePlan]
+
+  implicit val formatNGSReport: OFormat[DummyNGSReport] =
+    Json.format[DummyNGSReport]
 
   implicit val format: OFormat[DummyPatientRecord] =
     Json.format[DummyPatientRecord]

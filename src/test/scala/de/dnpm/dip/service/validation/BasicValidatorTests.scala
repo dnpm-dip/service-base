@@ -11,7 +11,7 @@ import de.dnpm.dip.coding.Code
 import de.dnpm.dip.coding.hgvs.HGVS
 
 
-class Tests extends AnyFlatSpec with Validators
+class BasicValidatorTests extends AnyFlatSpec with Validators
 {
 
   "Path" must "not contain double slashes '//'" in {

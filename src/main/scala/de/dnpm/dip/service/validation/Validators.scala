@@ -36,6 +36,7 @@ import de.dnpm.dip.model.{
   Procedure,
   Recommendation,
   MedicationRecommendation,
+  NGSReport,
   Reference,
   ExternalReference,
   Study,
@@ -460,10 +461,18 @@ trait Validators
       )
       .errorsOr(metadata) on "Metadaten"
 
+  def SequencingTypeValidator(
+    admissibleSequencingTypes: Set[NGSReport.Type.Value]
+  ): Validator[Issue,NGSReport.Type.Value] =
+    typ => typ must be (in (admissibleSequencingTypes)) otherwise (
+      Error(s"Unzulässige Sequenzier-Art $typ, es kann nur eine von {${admissibleSequencingTypes.mkString(", ")}} geltend gemacht werden") at "MVH-Sequenzier-Art"
+    ) 
 
 
-  def dataUploadValidator[T <: PatientRecord](
-    implicit recordValidator: Validator[Issue,T]
+  def DataUploadValidator[T <: PatientRecord](
+    implicit
+    recordValidator: Validator[Issue,T],
+    mvhSequencingTypeValidator: Validator[Issue,NGSReport.Type.Value]
   ): Validator[Issue,DataUpload[T]] = {
 
     case upload @ DataUpload(record,optMetadata) => 
@@ -481,7 +490,8 @@ trait Validators
                     metadata.modelProjectConsent.provisions
                       .find(_.purpose == Sequencing)
                       .exists(provision => !(mvhCp.issuedOn isBefore provision.date)) must be (true) otherwise (
-                        Error("MVH-Einschluss-Fallkonferenz darf nicht vor oder ohne Einwilligung zur Teilnahme stattgefunden haben") at "Datum der MVH-Einwilligung"
+                        Error("MVH-Einschluss-Fallkonferenz darf nicht vor oder ohne Einwilligung zur Teilnahme stattgefunden haben")
+                          at "Datum der MVH-Einwilligung"
                       ),
                     (record.mvhSequencingReports must be (nonEmpty)) orElse (mvhCp.noSequencingPerformedReason must be (defined)) otherwise ( 
                       Error("Kein MVH-Sequenzierung-Bericht vorhanden, obwohl im Board-Beschluss nicht begründet ist, dass/warum keine MVH-Sequenzierung beantragt worden ist")
@@ -490,9 +500,16 @@ trait Validators
                   )
                   .errorsOr(mvhCp)
               }, 
+              record.mvhSequencingReports match {
+                case reports if reports.nonEmpty => validateEach(reports.map(_.`type`.code.enumValue))
+                case _ => Nil.validNel
+              },
               metadata.`type` match {
                 case Submission.Type.FollowUp =>
-                  record.followUps.exists(_.nonEmpty) must be (true) otherwise (Error("Es ist 'Follow-up' als Meldungs-Typ deklariert, aber keine Follow-Up-Objekte vorhanden") at "Meldungs-Typ")
+                  record.followUps.exists(_.nonEmpty) must be (true) otherwise (
+                    Error("Es ist 'Follow-up' als Meldungs-Typ deklariert, aber keine Follow-Up-Objekte vorhanden")
+                      at "Meldungs-Typ"
+                  )
 
                 case _ => true.validNel
               }

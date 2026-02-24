@@ -12,7 +12,7 @@ import NGSReport.Type._
 object extensions
 {
 
-  private val ngsTypes = 
+  private val ngsType = 
     Set(
       Panel,
       Exome,
@@ -33,14 +33,13 @@ object extensions
     // Get sequencing report(s) performed in context of the MVH
     // as those diagnostic reports with a "true" sequencing type
     // and issued after the MVH inclusion conference
-     
     def mvhSequencingReports: List[NGSReport] =
       mvhCarePlan match {
         case Some(cp) if !cp.noSequencingPerformedReason.isDefined =>
           record.ngsReports
             .getOrElse(List.empty)
             .filter(
-              report => (report.issuedOn isAfter cp.issuedOn) && (ngsTypes contains report.`type`.code)
+              report => (report.issuedOn isAfter cp.issuedOn) && ngsType(report.`type`.code)
             )
 
         case _ => List.empty
