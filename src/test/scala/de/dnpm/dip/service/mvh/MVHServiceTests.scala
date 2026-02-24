@@ -28,10 +28,13 @@ class MVHServiceTests extends AsyncFlatSpec
 
   val service = new FakeMVHService[Future,DummyPatientRecord]
 
-  val initialMetadata =
+
+  // Generator for Metadata with submission type 'initial'
+  val initialMetadata: Gen[Submission.Metadata] =
     genMetadata(Initial)
 
-  val nonInitialMetadata =
+  // Generator for Metadata with all submission types except 'initial'/'test'
+  val nonInitialMetadata: Gen[List[Submission.Metadata]] =
     Gen.oneOfEach(
       (Submission.Type.values - Initial - Test).toList.map(genMetadata(_))
     )

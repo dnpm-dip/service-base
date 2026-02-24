@@ -20,6 +20,11 @@ trait MVHService[F[_],Env,T <: PatientRecord]
 
   val useCase: UseCase.Value
 
+  /**
+   * Operator: process a command, hence exclamation mark.
+   *
+   * @param cmd The Command to be processed
+   */
   def !(cmd: Command[T])(
     implicit env: Env
   ): F[Either[Error,Outcome]]
