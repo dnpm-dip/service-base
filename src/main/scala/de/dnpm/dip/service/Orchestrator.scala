@@ -26,13 +26,15 @@ import de.dnpm.dip.service.validation.{
 import de.dnpm.dip.service.query.QueryService
 import de.dnpm.dip.service.mvh.{
   BroadConsent,
-  MVHService
+  MVHService,
+  Submission
 }
 import de.dnpm.dip.service.mvh.Submission.Type.{
   Test,
   Addition,
   Correction,
-  FollowUp
+  FollowUp,
+//  Initial
 }
 
 
@@ -120,6 +122,10 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
     (record: T) =>
        patientSetter(record,record.patient.copy(address = None))
 
+  private val nonInitial: Set[Submission.Type.Value] =
+    Set(Addition,Correction,FollowUp)
+//    (Submission.Type.values - Initial - Test)
+
 
   def !(
     cmd: Orchestrator.Command[T]
@@ -150,23 +156,22 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
 
                 // MV submission
                 case Some(metadata) =>
-                  (mvhService ! MVHService.Process(dataUpload.record,metadata)) :: 
-                  metadata.researchConsents
-                    .map(BroadConsent.permitsResearchUse)
-                    .collect {
-                      // If ResearchConsent is given, save the data in the query module, except for submission type 'test'
-                      case true if metadata.`type` != Test => queryService ! QueryService.Save(dataUpload.record.deidentified)
-                    }
-                    .orElse(
-                      metadata.`type` match {
-                        // For non-initial submissions, delete data from the query module in case it has been saved on initial submission
-                        case Addition | Correction | FollowUp => Some(queryService ! QueryService.Delete(dataUpload.record.id))
+                  (mvhService ! MVHService.Process(dataUpload.record,metadata)) :: (
 
-                        case _ => None  // Nothing to do
-                      }
-                    )                                  
-                    .toList
-                  
+                    // If ResearchConsent is given, save the data in the query module, except for submission type 'test'
+                    if (metadata.researchConsents.map(BroadConsent.permitsResearchUse).getOrElse(false) && metadata.`type` != Test)
+
+                      Some(queryService ! QueryService.Save(dataUpload.record.deidentified))
+                      
+                    // Else for non-initial submissions, delete data from the query module (in case it has been saved on initial submission)
+                    else if (nonInitial(metadata.`type`)) 
+                      Some(queryService ! QueryService.Delete(dataUpload.record.id))
+
+                    else None  // Nothing to do
+                    
+                  )                                  
+                  .toList
+
                 // No MV metadata ("DNPM-only"): Only save in query module
                 case None => List(queryService ! QueryService.Save(dataUpload.record.deidentified))
               }
