@@ -34,7 +34,6 @@ import de.dnpm.dip.service.mvh.Submission.Type.{
   Addition,
   Correction,
   FollowUp,
-//  Initial
 }
 
 
@@ -54,8 +53,7 @@ object Orchestrator
   sealed trait Command[+T]
   final case class Process[T <: PatientRecord]
   (
-    upload: DataUpload[T],
-//    scopes: Option[Set[UsageScope.Value]] = None
+    upload: DataUpload[T]
   )
   extends Command[T]
 
@@ -124,7 +122,6 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
 
   private val nonInitial: Set[Submission.Type.Value] =
     Set(Addition,Correction,FollowUp)
-//    (Submission.Type.values - Initial - Test)
 
 
   def !(
