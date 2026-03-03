@@ -156,8 +156,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
                   (mvhService ! MVHService.Process(dataUpload.record,metadata)) :: (
 
                     // If ResearchConsent is given, save the data in the query module, except for submission type 'test'
-                    if (metadata.researchConsents.map(BroadConsent.permitsResearchUse).getOrElse(false) && metadata.`type` != Test)
-
+                    if (metadata.researchConsents.map(BroadConsent.permitsResearchUse).exists(_ == true) && metadata.`type` != Test)
                       Some(queryService ! QueryService.Save(dataUpload.record.deidentified))
                       
                     // Else for non-initial submissions, delete data from the query module (in case it has been saved on initial submission)
