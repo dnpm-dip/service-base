@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.3.0](https://github.com/dnpm-dip/service-base/compare/v1.2.3...v1.3.0) (2026-03-03)
+
+
+### Features
+
+* Added Patient-ID als filter criterion for Submission.Report ([41f2a93](https://github.com/dnpm-dip/service-base/commit/41f2a93b6ca857a33a481f277ebc5edddfb3f628))
+* submission type check ([#26](https://github.com/dnpm-dip/service-base/issues/26)) ([ed2d8ea](https://github.com/dnpm-dip/service-base/commit/ed2d8ea5c07075624fca0cf7e77048706681209e))
+
+
+### Bug Fixes
+
+* bump backend-core to 1.2.1 ([eaaf0ce](https://github.com/dnpm-dip/service-base/commit/eaaf0ced5e5f5b8dc3ae2abd822b0e6762bb2e58))
+* bump core to 1.2.2 ([f935773](https://github.com/dnpm-dip/service-base/commit/f93577392f6ce328defae347354a5a66fe62265c))
+
 ## [1.2.3](https://github.com/dnpm-dip/service-base/compare/v1.2.2...v1.2.3) (2025-12-15)
 
 
