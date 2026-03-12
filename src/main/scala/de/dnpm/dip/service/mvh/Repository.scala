@@ -11,16 +11,6 @@ import de.dnpm.dip.model.{
 
 trait Repository[F[_],Env,T <: PatientRecord]
 {
-/*
-  type FilterableSubmission = { 
-    def submittedAt: LocalDateTime
-    def metadata: Submission.Metadata
-  }
-
-  import scala.language.reflectiveCalls
-
-  protected implicit def submissionPredicate(filter: Submission.Filter): FilterableSubmission => Boolean =
-*/
 
   protected implicit def submissionReportPredicate(filter: Submission.Report.Filter): Submission.Report => Boolean =
     report =>
@@ -30,9 +20,10 @@ trait Repository[F[_],Env,T <: PatientRecord]
       filter.patient.map(_ contains report.patient).getOrElse(true)
 
   protected implicit def submissionPredicate(filter: Submission.Filter): Submission[T] => Boolean =
-    record =>
-      filter.period.map(_ contains record.submittedAt).getOrElse(true) &&
-      filter.transferTAN.map(_ contains record.metadata.transferTAN).getOrElse(true)
+    submission =>
+      filter.period.map(_ contains submission.submittedAt).getOrElse(true) &&
+      filter.`type`.map(_ contains submission.metadata.`type`).getOrElse(true) &&
+      filter.transferTAN.map(_ contains submission.metadata.transferTAN).getOrElse(true)
 
   
   def alreadyUsed(id: Id[TransferTAN])(
