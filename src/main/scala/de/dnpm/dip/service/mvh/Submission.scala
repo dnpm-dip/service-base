@@ -131,16 +131,21 @@ object Submission
   final case class Filter
   (
     transferTAN: Option[Set[Id[TransferTAN]]] = None,
+    `type`: Option[Set[Type.Value]] = None,
     period: Option[Period[LocalDateTime]] = None
   )
 
   object Filter
   {
     def apply(period: Period[LocalDateTime]): Filter =
-      Filter(None,Some(period))
+      Filter(
+        period = Some(period)
+      )
 
     def apply(transferTAN: Set[Id[TransferTAN]]): Filter =
-      Filter(Some(transferTAN),None)
+      Filter(
+        transferTAN = Some(transferTAN)
+      )
   }
 
   import play.api.libs.json.JsPath
