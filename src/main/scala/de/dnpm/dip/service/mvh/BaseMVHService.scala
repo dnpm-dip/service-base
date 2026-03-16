@@ -36,7 +36,7 @@ with Logging
 
   type Env = Monad[F]
 
-
+  
   private implicit val ngsTypeOrdering: Ordering[NGSReport.Type.Value] =
     Ordering.by {
       case GenomeLongRead  => 4
@@ -46,6 +46,14 @@ with Logging
       case _               => 0
     }
 
+
+ /**
+  * Abstract method to project the "diagnostic extent" from the
+  * use-case-specific specialization of PatientRecord.
+  * This info is added to Submission.Report in order for it to contain all info necessary for 
+  * compilation of quarter report (which include info on number of single, duo, trio cases
+  */
+  protected def diagnosticExtent(record: T): Option[Submission.DiagnosticExtent.Value]
 
   protected def sequenceTypes(record: T): Option[Set[Submission.SequenceType.Value]]
 
@@ -95,6 +103,7 @@ with Logging
                   useCase,
                   metadata.`type`,
                   record.mvhSequencingReports.map(_.`type`.code.enumValue).maxOption,
+                  diagnosticExtent(record),
                   sequenceTypes(record),
                   record.patient.healthInsurance.`type`.code,
                   Some(
