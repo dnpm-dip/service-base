@@ -495,7 +495,7 @@ trait Validators
               },
               metadata.`type` match {
                 case Submission.Type.FollowUp =>
-                  valueIn (record.followUps) must be (nonEmpty) otherwise (
+                  record.followUps.exists(_.nonEmpty) must be (true) otherwise (
                     Error("Es ist 'Follow-up' als Meldungs-Typ deklariert, aber keine Follow-Up-Objekte vorhanden")
                       at "Meldungs-Typ"
                   )

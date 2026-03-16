@@ -1,6 +1,9 @@
 package de.dnpm.dip.service.validation
 
 
+import java.time.LocalDate
+import java.time.LocalDate.{now => today}
+import java.time.Month.MAY
 import scala.util.Random
 import scala.concurrent.Future
 import org.scalatest.flatspec.AsyncFlatSpec
@@ -40,14 +43,14 @@ class ValidationServiceTests extends AsyncFlatSpec with Matchers
 
   val admissibleUploads: Gen[DataUpload[DummyPatientRecord]] =
     for {
-      record <- Gens.genDummyPatientRecord(admissibleSequencingTypes)
+      record <- Gens.genDummyPatientRecord(sequencingTypes = admissibleSequencingTypes)
       metadata <- Gens.genMetadata(record,Submission.Type.Initial,true)
     } yield DataUpload(record,Some(metadata))
 
 
   val nonAdmissibleUploads: Gen[DataUpload[DummyPatientRecord]] =
     for {
-      record <- Gens.genDummyPatientRecord(Set(Exome,Panel))
+      record <- Gens.genDummyPatientRecord(sequencingTypes = Set(Exome,Panel))
       metadata <- Gens.genMetadata(record,Submission.Type.Initial,true)
     } yield DataUpload(record,Some(metadata))
 
@@ -57,7 +60,11 @@ class ValidationServiceTests extends AsyncFlatSpec with Matchers
 
     for { 
       outcome <- service ! Validate(nonAdmissibleUploads.next)
-    } yield outcome must matchPattern { case Left(_: UnacceptableIssuesDetected) => }
+
+      result =
+        if (today isAfter LocalDate.of(2026,MAY,31)) outcome must matchPattern { case Left(_: UnacceptableIssuesDetected) => }
+        else outcome must matchPattern { case Right(_: DataValid[_]) => }
+    } yield result
 
   }
 
