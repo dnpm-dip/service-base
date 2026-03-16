@@ -26,6 +26,9 @@ class MVHServiceTests extends AsyncFlatSpec
 
   implicit val rnd: Random = new Random(42)
 
+  System.setProperty("dnpm.dip.site","UKX:Musterlingen")
+
+
   val service = new FakeMVHService[Future,DummyPatientRecord]
 
 
