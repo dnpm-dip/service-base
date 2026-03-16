@@ -73,16 +73,32 @@ with Logging
           // Check acceptability of submission type for the given Patient
           submissionTypeOk <- metadata.`type` match {
 
-            // An initial submission must be the first at all or follow only previous "test" submissions
+            // An 'initial' submission must be the first at all or, in case of a re-inclusion into MV,
+            // given that at most one 'initial' submission is allowed per episode of care (i.e. "Fall"),
+            // ensure there are more episodes of care that 'initial' submissions
             case Initial =>
               repo.submissionReportHistory(record.patient.id).map {
                 case None => true
-                case Some(s) => s.history.forall(_.`type` == Test)
+
+                case Some(submissions) => 
+                  record.episodesOfCare.size > submissions.history.toList.count(_.`type` == Initial)
               }
 
-            // addition, correction, followup can only be appended to an existing submission history with an initial submission
+            // 'addition', 'correction', 'followup' can only be appended to an existing submission history contaning
+            // 'initial' submission for the latest/current episode of care
             case Addition | Correction | FollowUp =>
-              repo.submissionReportHistory(record.patient.id).map(_.exists(_.history.exists(_.`type` == Initial)))
+              repo.submissionReportHistory(record.patient.id).map {
+                case Some(submissions) =>
+
+                  val currentEpisodeOfCare = record.episodesOfCare.toList.maxBy(_.period.start)
+
+                  submissions.history.exists(
+                    sub => sub.`type` == Initial &&
+                      sub.createdAt.isAfter(currentEpisodeOfCare.period.start.atTime(LocalTime.MIN))
+                  )
+
+                case None => false
+              }
 
             // Test submission ok any time
             case Test => env.pure(true)
@@ -141,6 +157,7 @@ with Logging
           }
 
         } yield result
+
 
       case ConfirmSubmitted(id) =>
         for {
