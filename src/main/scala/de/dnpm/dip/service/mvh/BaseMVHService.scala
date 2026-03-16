@@ -86,27 +86,36 @@ with Logging
             case None =>
               for {
 
-                priorSubmissions <- repo.submissionReportHistory(record.patient.id)
-      
+                priorSubmissions <- repo.submissionReportHistory(record.patient.id).map(_.map(_.history))
+
                 // Check acceptability of submission type for the given Patient
                 optSubmissionTypeError = metadata.`type` match {
-      
+
                   // An Initial submission must be the first at all or follow only previous "test" submissions
                   case Initial =>
                     priorSubmissions match {
                       case None => None
                       case Some(submissions) => 
-                        if (submissions.history.forall(_.`type` == Test)) None
-                        else Some(InvalidSubmissionType(s"Invalid submission: type ${metadata.`type`} can only occur as first or after ${Test} submissions"))
+                        if (record.episodesOfCare.size > submissions.toList.count(_.`type` == Initial)) None
+                        else Some(InvalidSubmissionType(s"Invalid submission: at most one ${Initial} submission allowed per EpisodeOfCare"))
                     }
       
                   // Addition, Correction, FollowUp can only be appended to an existing submission history with an initial submission
                   case Addition | Correction | FollowUp =>
-                    if (priorSubmissions.exists(_.history.exists(_.`type` == Initial))) None
-                    else Some(InvalidSubmissionType(s"Invalid submission: type ${metadata.`type`} can only occur after an ${Initial} submission"))
-      
+
+                    val currentEpisodeOfCare = record.episodesOfCare.toList.maxBy(_.period.start)
+
+                    priorSubmissions match {
+                      case Some(submissions) if (submissions.exists(sub => sub.`type` == Initial && sub.createdAt.isAfter(currentEpisodeOfCare.period.start.atTime(LocalTime.MIN)))) =>
+                        None
+
+                      case _ =>
+                        Some(InvalidSubmissionType(s"Invalid submission: type ${metadata.`type`} can only occur after an ${Initial} submission for the current EpisodeOfCare"))
+                    }
+
                   // Test submission ok any time
                   case Test => None
+
                 }
       
                 result <- optSubmissionTypeError match {
@@ -116,7 +125,7 @@ with Logging
                       record,
                       metadata,
                       priorSubmissions
-                        .map(_.history.filterNot(_.`type` == Test))  // Exclude 'test' SubmissionReports from processing (consent revocation check)
+                        .map(_.filterNot(_.`type` == Test))  // Exclude 'test' SubmissionReports from processing (consent revocation check)
                         .flatMap(_.maxByOption(_.createdAt))
                     )
 
@@ -129,7 +138,6 @@ with Logging
           }
 
         } yield processingResult
-
 
 
       case ConfirmSubmitted(id) =>
@@ -197,7 +205,6 @@ with Logging
             category -> revoked
         }
         .toMap
-
 
       repo.save(
         Submission.Report(
