@@ -273,4 +273,15 @@ object Gens
       noBcReason
     )
 
+
+  def genDataUpload(
+    submissionType: Submission.Type.Value = Submission.Type.Initial,
+    sequencingTypes: Set[NGSReport.Type.Value] = Set.empty,
+    withBroadConsent: Boolean = true
+  ): Gen[DataUpload[DummyPatientRecord]] =
+    for {
+      record <- genDummyPatientRecord(submissionType,sequencingTypes)
+      metadata <- genMetadata(record,submissionType,withBroadConsent)
+    } yield DataUpload(record,Some(metadata))
+  
 }
