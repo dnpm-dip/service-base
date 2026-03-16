@@ -490,7 +490,7 @@ trait Validators
                   .errorsOr(mvhCp)
               }, 
               record.mvhSequencingReports match {
-                case reports if reports.nonEmpty && (LocalDate.now isAfter LocalDate.of(2026,MAY,31)) => validateEach(reports.map(_.`type`.code.enumValue))
+                case reports if (LocalDate.now isAfter LocalDate.of(2026,MAY,31)) && reports.nonEmpty => validateEach(reports.map(_.`type`.code.enumValue))
                 case _ => Nil.validNel
               },
               metadata.`type` match {
