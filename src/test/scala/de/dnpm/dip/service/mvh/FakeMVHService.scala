@@ -12,6 +12,8 @@ final class FakeMVHService[F[_],T <: PatientRecord] extends BaseMVHService[F,T](
 
   type ReportType = BaseReport
 
+  override def diagnosticExtent(record: T) = None
+
   override def sequenceTypes(record: T) = None
 
   override def report(

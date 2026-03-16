@@ -59,6 +59,17 @@ object Submission
   }
 
 
+  object DiagnosticExtent extends Enumeration
+  {
+    val SingleGenome = Value("single-genome")
+    val DuoGenome    = Value("duo-genome")
+    val TrioGenome   = Value("trio-genome")
+  
+    implicit val format: Format[Value] =
+      Json.formatEnum(this)
+  }
+
+
   final case class Report
   (
     id: Id[TransferTAN],
@@ -69,6 +80,7 @@ object Submission
     useCase: UseCase.Value,
     `type`: Type.Value,
     sequencingType: Option[NGSReport.Type.Value],
+    diagnosticExtent: Option[DiagnosticExtent.Value],
     sequenceTypes: Option[Set[SequenceType.Value]],
     healthInsuranceType: HealthInsurance.Type.Value,
     consentStatus: Option[Map[Consent.Category.Value,Boolean]],
