@@ -3,6 +3,7 @@ package de.dnpm.dip.service.validation
 
 import java.net.URI
 import java.time.LocalDate
+import java.time.LocalDate.{now => today}
 import java.time.Month.MAY
 import scala.util.matching.Regex
 import scala.util.chaining._
@@ -414,6 +415,8 @@ trait Validators
 
   private val hexString64 = "[a-fA-F0-9]{64}".r
 
+  private val extendedQcEnforcementDate = LocalDate.of(2026,MAY,31)
+
   private lazy val admissibleConsentMissingReasons =
     (BroadConsent.ReasonMissing.values - TechnicalIssues - OrganizationalIssues)
 
@@ -439,7 +442,7 @@ trait Validators
         (metadata.researchConsents.filter(_.nonEmpty) orElse metadata.reasonResearchConsentMissing) must be (defined) otherwise (
           MissingValue("Es muss entweder MII Forschungs-/Broad-Consent oder der Grund für dessen Fehlen vorhanden sein")
         ),
-        if (LocalDate.now isAfter LocalDate.of(2026,MAY,31))
+        if (today isAfter extendedQcEnforcementDate)
           valueIn (metadata.reasonResearchConsentMissing) must be (in (admissibleConsentMissingReasons)) otherwise (
             Error(s"Unzulässiger Wert, ab 01.06.2026 nur noch folgende gültig: {${admissibleConsentMissingReasons.mkString(", ")}}")
               at "Grund für fehlenden Broad Consent"
@@ -490,7 +493,7 @@ trait Validators
                   .errorsOr(mvhCp)
               }, 
               record.mvhSequencingReports match {
-                case reports if (LocalDate.now isAfter LocalDate.of(2026,MAY,31)) && reports.nonEmpty => validateEach(reports.map(_.`type`.code.enumValue))
+                case reports if (today isAfter extendedQcEnforcementDate) && reports.nonEmpty => validateEach(reports.map(_.`type`.code.enumValue))
                 case _ => Nil.validNel
               },
               metadata.`type` match {
