@@ -69,7 +69,13 @@ object Submission
       Json.formatEnum(this)
   }
 
-
+  /**
+   * This DTO corresponds to a "Prüfbericht" for the Model Project.
+   * The structure is slightly different from the schema defined for the BfArM API:
+   * the conversion/mapping onto the later takes place in the central data node.
+   * Also, this DTO contains additional fields not representeded in the BfArM "Prüfbericht itself,
+   * but which are required for compilation of appendices 1/2 of the quarterly report.
+   */
   final case class Report
   (
     id: Id[TransferTAN],
@@ -80,10 +86,11 @@ object Submission
     useCase: UseCase.Value,
     `type`: Type.Value,
     sequencingType: Option[NGSReport.Type.Value],
-    diagnosticExtent: Option[DiagnosticExtent.Value],
-    sequenceTypes: Option[Set[SequenceType.Value]],
+    diagnosticExtent: Option[DiagnosticExtent.Value], // For quarter report (appendix 1)
+    sequenceTypes: Option[Set[SequenceType.Value]], // For quarter report (appendix 2)
     healthInsuranceType: HealthInsurance.Type.Value,
-    consentStatus: Option[Map[Consent.Category.Value,Boolean]],
+    consentStatus: Option[Map[Consent.Category.Value,Boolean]],      // For quarter report (appendix 2): Is the respective Consent given in the submission?
+    consentRevocation: Option[Map[Consent.Category.Value,Boolean]] , // For quarter report (appendix 2): Has the respective Consent been revoked (compared to previous submission)?
     reasonResearchConsentMissing: Option[BroadConsent.ReasonMissing.Value]
   )
 
