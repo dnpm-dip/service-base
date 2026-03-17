@@ -161,18 +161,21 @@ with Logging
             metadata.researchConsents.exists(BroadConsent.permitsResearchUse)
         )
 
+      // Check for revocation of consent by comparing each Consent.Category status between the previous and current submission:
+      // Change of status from true -> false is interpreted as revocation
       val consentRevocation =
-        previousSubmissionReport.flatMap(_.consentStatus)
-          .map(
-            _.map {
-              case (category,previousStatus) => 
-                val hasBeenRevoked = (previousStatus,consentStatus(category)) match { 
-                  case (true,false) => true
-                  case _ => false
-                }
-                category -> hasBeenRevoked
+        for {
+          previousConsentStatus <- previousSubmissionReport.flatMap(_.consentStatus)
+        } yield Consent.Category.values.map {
+          category => 
+            val revoked = (previousConsentStatus.getOrElse(category,false), consentStatus(category)) match {
+              case (true,false) => true
+              case _ => false
             }
-          )
+            category -> revoked
+        }
+        .toMap
+
 
       repo.save(
         Submission.Report(
