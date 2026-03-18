@@ -92,13 +92,18 @@ class ValidationServiceTests extends AsyncFlatSpec with Matchers with BeforeAndA
 
   it must "have succeeded for PatientRecord with admissible sequencing types" in { 
 
+    System.setProperty("dnpm.dip.extended.qc.enforcement.date", ISO_LOCAL_DATE.format(today minusWeeks 1))
+
     for { 
       outcome <- service ! Validate(admissibleUploads.next)
     } yield outcome must matchPattern { case Right(_: DataValid[_]) => }
 
   }
 
+
   it must "have succeeded for PatientRecord with correct FollowUps" in { 
+
+    // NOTE: System property above not relevant for FollowUp validation
 
     for { 
       outcome <- service ! Validate(followUpUploads.next)
@@ -106,7 +111,10 @@ class ValidationServiceTests extends AsyncFlatSpec with Matchers with BeforeAndA
 
   }
 
+
   it must "have failed for PatientRecord with incorrect FollowUps" in { 
+
+    // NOTE: System property above not relevant for FollowUp validation
 
     for { 
       outcome <- service ! Validate(incorrectFollowUpUploads.next)
