@@ -1,9 +1,10 @@
 package de.dnpm.dip.service.validation
 
 
-import java.time.LocalDate
+//import java.time.LocalDate
 import java.time.LocalDate.{now => today}
-import java.time.Month.MAY
+import java.time.format.DateTimeFormatter.ISO_LOCAL_DATE
+//import java.time.Month.MAY
 import scala.util.Random
 import scala.concurrent.Future
 import org.scalatest.flatspec.AsyncFlatSpec
@@ -28,6 +29,7 @@ import Submission.Type.FollowUp
 
 
 class ValidationServiceTests extends AsyncFlatSpec with Matchers
+// with Validators
 {
 
   implicit val rnd: Random = new Random(42)
@@ -61,15 +63,24 @@ class ValidationServiceTests extends AsyncFlatSpec with Matchers
     )
 
 
-  "Validation" must "have failed for PatientRecord with inadmissible sequencing types" in { 
+  "Validation" must "have succeeded for PatientRecord with inadmissible sequencing types but future enforcement date" in { 
+
+    System.setProperty("dnpm.dip.extended.qc.enforcement.date", ISO_LOCAL_DATE.format(today plusWeeks 1))
 
     for { 
       outcome <- service ! Validate(nonAdmissibleUploads.next)
+    } yield outcome must matchPattern { case Right(_: DataValid[_]) => }
 
-      result =
-        if (today isAfter LocalDate.of(2026,MAY,31)) outcome must matchPattern { case Left(_: UnacceptableIssuesDetected) => }
-        else outcome must matchPattern { case Right(_: DataValid[_]) => }
-    } yield result
+  }
+
+
+  it must "have failed for PatientRecord with inadmissible sequencing types after enforcement date" in { 
+
+    System.setProperty("dnpm.dip.extended.qc.enforcement.date", ISO_LOCAL_DATE.format(today minusWeeks 1))
+
+    for { 
+      outcome <- service ! Validate(nonAdmissibleUploads.next)
+    } yield outcome must matchPattern { case Left(_: UnacceptableIssuesDetected) => }
 
   }
 

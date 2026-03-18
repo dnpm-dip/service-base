@@ -251,7 +251,7 @@ object Gens
 
       (bc,noBcReason) =
         if (withBroadConsent) Some(List(broadConsent)) -> None
-        else None -> Some(BroadConsent.ReasonMissing.OrganizationalIssues)
+        else None -> Some(BroadConsent.ReasonMissing.OtherPatientReason)
 
     } yield Submission.Metadata(
       submissionType,
