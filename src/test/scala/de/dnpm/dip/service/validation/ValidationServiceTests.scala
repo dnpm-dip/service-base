@@ -6,6 +6,7 @@ import java.time.format.DateTimeFormatter.ISO_LOCAL_DATE
 import scala.util.Random
 import scala.concurrent.Future
 import org.scalatest.flatspec.AsyncFlatSpec
+import org.scalatest.BeforeAndAfterEach
 import org.scalatest.matchers.must.Matchers
 import de.dnpm.dip.model.NGSReport.Type.{ 
   Exome,
@@ -26,7 +27,7 @@ import ValidationService.{
 import Submission.Type.FollowUp
 
 
-class ValidationServiceTests extends AsyncFlatSpec with Matchers
+class ValidationServiceTests extends AsyncFlatSpec with Matchers with BeforeAndAfterEach
 {
 
   implicit val rnd: Random = new Random(42)
@@ -58,6 +59,13 @@ class ValidationServiceTests extends AsyncFlatSpec with Matchers
         record = upload.record.copy(followUps = None)
       )
     )
+
+
+  // As suggested by coderabbitai to ensure that the system property is properly reset for each test
+  override def beforeEach(): Unit = {
+    System.clearProperty("dnpm.dip.extended.qc.enforcement.date")
+    ()
+  }
 
 
   "Validation" must "have succeeded for PatientRecord with inadmissible sequencing types but future enforcement date" in { 
