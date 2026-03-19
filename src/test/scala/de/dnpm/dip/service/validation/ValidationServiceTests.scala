@@ -2,11 +2,10 @@ package de.dnpm.dip.service.validation
 
 
 import java.time.LocalDate.{now => today}
-import java.time.format.DateTimeFormatter.ISO_LOCAL_DATE
+//import java.time.format.DateTimeFormatter.ISO_LOCAL_DATE
 import scala.util.Random
 import scala.concurrent.Future
 import org.scalatest.flatspec.AsyncFlatSpec
-import org.scalatest.BeforeAndAfterEach
 import org.scalatest.matchers.must.Matchers
 import de.dnpm.dip.model.NGSReport.Type.{ 
   Exome,
@@ -27,12 +26,11 @@ import ValidationService.{
 import Submission.Type.FollowUp
 
 
-class ValidationServiceTests extends AsyncFlatSpec with Matchers with BeforeAndAfterEach
+class ValidationServiceTests extends AsyncFlatSpec with Matchers with Validators
 {
 
   implicit val rnd: Random = new Random(42)
 
-  val qcDateProperty = "dnpm.dip.extended.qc.enforcement.date"
 
   val admissibleSequencingTypes = Set(GenomeShortRead,GenomeLongRead)
 
@@ -62,43 +60,21 @@ class ValidationServiceTests extends AsyncFlatSpec with Matchers with BeforeAndA
     )
 
 
-  // As suggested by coderabbitai to ensure that the system property is properly reset for each test
-  override def beforeEach() = {
-    System.clearProperty(qcDateProperty)
-    super.beforeEach()
-  }
-
-  override def afterEach() = {
-    System.clearProperty(qcDateProperty)
-    super.afterEach()
-  }
-
-
-  "Validation" must "have succeeded for PatientRecord with inadmissible sequencing types but future enforcement date" in { 
-
-    System.setProperty(qcDateProperty, ISO_LOCAL_DATE.format(today plusWeeks 1))
+  "Validation" must "have succeeded or failed for PatientRecord with inadmissible sequencing types depending on execution date" in { 
 
     for { 
       outcome <- service ! Validate(nonAdmissibleUploads.next)
-    } yield outcome must matchPattern { case Right(_: DataValid[_]) => }
-
-  }
-
-
-  it must "have failed for PatientRecord with inadmissible sequencing types after enforcement date" in { 
-
-    System.setProperty(qcDateProperty, ISO_LOCAL_DATE.format(today minusWeeks 1))
-
-    for { 
-      outcome <- service ! Validate(nonAdmissibleUploads.next)
-    } yield outcome must matchPattern { case Left(_: UnacceptableIssuesDetected) => }
+      result =
+        if (today isAfter extendedQcEnforcementDate)
+          outcome must matchPattern { case Left(_: UnacceptableIssuesDetected) => }
+        else
+          outcome must matchPattern { case Right(_: DataValid[_]) => }
+    } yield result
 
   }
 
 
   it must "have succeeded for PatientRecord with admissible sequencing types" in { 
-
-    System.setProperty(qcDateProperty, ISO_LOCAL_DATE.format(today minusWeeks 1))
 
     for { 
       outcome <- service ! Validate(admissibleUploads.next)
@@ -109,8 +85,6 @@ class ValidationServiceTests extends AsyncFlatSpec with Matchers with BeforeAndA
 
   it must "have succeeded for PatientRecord with correct FollowUps" in { 
 
-    // NOTE: System property above not relevant for FollowUp validation
-
     for { 
       outcome <- service ! Validate(followUpUploads.next)
     } yield outcome must matchPattern { case Right(_: DataValid[_]) => }
@@ -119,8 +93,6 @@ class ValidationServiceTests extends AsyncFlatSpec with Matchers with BeforeAndA
 
 
   it must "have failed for PatientRecord with incorrect FollowUps" in { 
-
-    // NOTE: System property above not relevant for FollowUp validation
 
     for { 
       outcome <- service ! Validate(incorrectFollowUpUploads.next)

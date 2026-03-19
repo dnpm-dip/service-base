@@ -5,8 +5,6 @@ import java.net.URI
 import java.time.LocalDate
 import java.time.LocalDate.{now => today}
 import java.time.Month.MAY
-import java.time.format.DateTimeFormatter.ISO_LOCAL_DATE
-import scala.util.Properties.propOrNone
 import scala.util.matching.Regex
 import scala.util.chaining._
 import cats.Applicative
@@ -419,14 +417,10 @@ trait Validators
 
 
   /**
-   * Date after which to enforce new/extended QC rules.
-   * Defined as def not val in order to be evaluated on each call, so as to be toggled in tests.
-   * Default: 2026-05-31, as new rules must be enforced from 2026-06-01 on.
+   * Date after which to enforce new/extended QC rules:
+   * 2026-05-31, as new rules must be enforced from 2026-06-01 on.
    */
-  private def extendedQcEnforcementDate =
-    propOrNone("dnpm.dip.extended.qc.enforcement.date")
-      .map(LocalDate.parse(_,ISO_LOCAL_DATE))
-      .getOrElse(LocalDate.of(2026,MAY,31))
+  lazy val extendedQcEnforcementDate = LocalDate.of(2026,MAY,31)
 
 
   private lazy val admissibleConsentMissingReasons =
