@@ -68,66 +68,32 @@ with Logging
         log.info(s"Processing MVH submission for Patient record ${record.id}")
 
         for {
+
           tanAlreadyUsed <- repo.alreadyUsed(metadata.transferTAN)
 
-          // Check acceptability of submission type for the given Patient
-          submissionTypeOk <- metadata.`type` match {
+          priorSubmissions <- repo.submissionReportHistory(record.patient.id)
 
-            // An initial submission must be the first at all or follow only previous "test" submissions
+          // Check acceptability of submission type for the given Patient
+          submissionTypeOk = metadata.`type` match {
+
+            // An Initial submission must be the first at all or follow only previous "test" submissions
             case Initial =>
-              repo.submissionReportHistory(record.patient.id).map {
+              priorSubmissions match {
                 case None => true
                 case Some(s) => s.history.forall(_.`type` == Test)
               }
 
-            // addition, correction, followup can only be appended to an existing submission history with an initial submission
+            // Addition, Correction, FollowUp can only be appended to an existing submission history with an initial submission
             case Addition | Correction | FollowUp =>
-              repo.submissionReportHistory(record.patient.id).map(_.exists(_.history.exists(_.`type` == Initial)))
+              priorSubmissions.exists(_.history.exists(_.`type` == Initial))
 
             // Test submission ok any time
-            case Test => env.pure(true)
+            case Test => true
           }
 
           result <- (!tanAlreadyUsed,submissionTypeOk) match {
             case (true,true) =>
-
-              val submittedAt = LocalDateTime.now
-  
-              repo.save(
-                Submission.Report(
-                  metadata.transferTAN,
-                  submittedAt,
-                  record.patient.id,
-                  Unsubmitted,
-                  Site.local,
-                  useCase,
-                  metadata.`type`,
-                  record.mvhSequencingReports.map(_.`type`.code.enumValue).maxOption,
-                  diagnosticExtent(record),
-                  sequenceTypes(record),
-                  record.patient.healthInsurance.`type`.code,
-                  Some(
-                    Map(
-                      Consent.Category.ModelProject ->
-                        metadata.modelProjectConsent.provisions.exists(p => p.purpose == Sequencing && p.`type` == Consent.Provision.Type.Permit),
-                      Consent.Category.Research ->
-                        metadata.researchConsents.exists(BroadConsent.permitsResearchUse)
-                    )
-                  ),
-                  metadata.reasonResearchConsentMissing
-                ),
-                Submission(
-                  record,
-                  metadata,
-                  submittedAt
-                )
-              )
-              .map(
-                _.bimap(
-                  GenericError(_),
-                  _ => Saved
-                )
-              )
+              processSubmission(record,metadata,priorSubmissions.map(_.latestBy(_.createdAt)))
 
             case (false,_) =>
               val msg = s"Invalid submission: TAN ${metadata.transferTAN} has already been used"
@@ -138,30 +104,29 @@ with Logging
               val msg = s"Invalid submission: Type ${metadata.`type`} is inconsistent with previous submission history"
               log.warn(s"$msg, refusing submission")
               env.pure(InvalidSubmissionType(msg).asLeft)
-          }
+
+            }
 
         } yield result
+
 
       case ConfirmSubmitted(id) =>
         for {
           optReport <- repo ? id
 
-          result <- 
-            optReport match {
-              case Some(report) =>
-                repo.update(report.copy(status = Submitted))
-                  .map(
-                    _.bimap(
-                      GenericError(_),
-                      _ => Updated
-                    )
+          result <- optReport match {
+            case Some(report) =>
+              repo.update(report.copy(status = Submitted))
+                .map(
+                  _.bimap(
+                    GenericError(_),
+                    _ => Updated
                   )
-
-              case None =>
-                env.pure(
-                  GenericError(s"Invalid TAN $id").asLeft
                 )
-            }
+
+            case None =>
+              env.pure(GenericError(s"Invalid TAN $id").asLeft)
+          }
 
         } yield result
 
@@ -175,6 +140,73 @@ with Logging
               _ => Deleted
             )
           )
+    }
+
+
+    private def processSubmission(
+      record: T,
+      metadata: Submission.Metadata,
+      previousSubmissionReport: Option[Submission.Report]
+    )(
+      implicit env: Monad[F]
+    ): F[Either[Error,Saved.type]] = {
+
+      val submittedAt = LocalDateTime.now
+
+      val consentStatus =
+        Map(
+          Consent.Category.ModelProject ->
+            metadata.modelProjectConsent.provisions.exists(p => p.purpose == Sequencing && p.`type` == Consent.Provision.Type.Permit),
+          Consent.Category.Research ->
+            metadata.researchConsents.exists(BroadConsent.permitsResearchUse)
+        )
+
+      // Check for revocation of consent by comparing each Consent.Category status between the previous and current submission:
+      // Change of status from true -> false is interpreted as revocation
+      val consentRevocation =
+        for {
+          previousConsentStatus <- previousSubmissionReport.flatMap(_.consentStatus)
+        } yield Consent.Category.values.map {
+          category => 
+            val revoked = (previousConsentStatus.getOrElse(category,false), consentStatus(category)) match {
+              case (true,false) => true
+              case _ => false
+            }
+            category -> revoked
+        }
+        .toMap
+
+
+      repo.save(
+        Submission.Report(
+          metadata.transferTAN,
+          submittedAt,
+          record.patient.id,
+          Unsubmitted,
+          Site.local,
+          useCase,
+          metadata.`type`,
+          record.mvhSequencingReports.map(_.`type`.code.enumValue).maxOption,
+          diagnosticExtent(record),
+          sequenceTypes(record),
+          record.patient.healthInsurance.`type`.code,
+          Some(consentStatus),
+          consentRevocation,
+          metadata.reasonResearchConsentMissing
+        ),
+        Submission(
+          record,
+          metadata,
+          submittedAt
+        )
+      )
+      .map(
+        _.bimap(
+          GenericError(_),
+          _ => Saved
+        )
+      )
+
     }
 
 
