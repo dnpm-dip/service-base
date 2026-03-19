@@ -1,6 +1,7 @@
 package de.dnpm.dip.service.validation
 
 
+import java.time.LocalDate.{now => today}
 import scala.util.Random
 import scala.concurrent.Future
 import org.scalatest.flatspec.AsyncFlatSpec
@@ -11,9 +12,7 @@ import de.dnpm.dip.model.NGSReport.Type.{
   GenomeLongRead,
   Panel
 }
-import de.ekut.tbi.generators.Gen
 import de.dnpm.dip.service.{
-  DataUpload,
   DummyPatientRecord,
   Gens
 }
@@ -23,8 +22,10 @@ import ValidationService.{
   Validate,
   UnacceptableIssuesDetected
 }
+import Submission.Type.FollowUp
 
-class ValidationServiceTests extends AsyncFlatSpec with Matchers
+
+class ValidationServiceTests extends AsyncFlatSpec with Matchers with Validators
 {
 
   implicit val rnd: Random = new Random(42)
@@ -38,26 +39,36 @@ class ValidationServiceTests extends AsyncFlatSpec with Matchers
     )
 
 
-  val admissibleUploads: Gen[DataUpload[DummyPatientRecord]] =
-    for {
-      record <- Gens.genDummyPatientRecord(admissibleSequencingTypes)
-      metadata <- Gens.genMetadata(record,Submission.Type.Initial,true)
-    } yield DataUpload(record,Some(metadata))
+  val admissibleUploads =
+    Gens.genDataUpload(sequencingTypes = admissibleSequencingTypes)
+
+  val nonAdmissibleUploads =
+    Gens.genDataUpload(sequencingTypes = Set(Exome,Panel))
+
+  val followUpUploads =
+    Gens.genDataUpload(
+      submissionType = FollowUp,
+      sequencingTypes = admissibleSequencingTypes
+    )
+
+  val incorrectFollowUpUploads =
+    followUpUploads.map(
+      upload => upload.copy(
+        record = upload.record.copy(followUps = None)
+      )
+    )
 
 
-  val nonAdmissibleUploads: Gen[DataUpload[DummyPatientRecord]] =
-    for {
-      record <- Gens.genDummyPatientRecord(Set(Exome,Panel))
-      metadata <- Gens.genMetadata(record,Submission.Type.Initial,true)
-    } yield DataUpload(record,Some(metadata))
-
-
-
-  "Validation" must "have failed for PatientRecord with inadmissible sequencing types" in { 
+  "Validation" must "have succeeded or failed for PatientRecord with inadmissible sequencing types depending on execution date" in { 
 
     for { 
       outcome <- service ! Validate(nonAdmissibleUploads.next)
-    } yield outcome must matchPattern { case Left(_: UnacceptableIssuesDetected) => }
+      result =
+        if (today isAfter extendedQcEnforcementDate)
+          outcome must matchPattern { case Left(_: UnacceptableIssuesDetected) => }
+        else
+          outcome must matchPattern { case Right(_: DataValid[_]) => }
+    } yield result
 
   }
 
@@ -67,6 +78,24 @@ class ValidationServiceTests extends AsyncFlatSpec with Matchers
     for { 
       outcome <- service ! Validate(admissibleUploads.next)
     } yield outcome must matchPattern { case Right(_: DataValid[_]) => }
+
+  }
+
+
+  it must "have succeeded for PatientRecord with correct FollowUps" in { 
+
+    for { 
+      outcome <- service ! Validate(followUpUploads.next)
+    } yield outcome must matchPattern { case Right(_: DataValid[_]) => }
+
+  }
+
+
+  it must "have failed for PatientRecord with incorrect FollowUps" in { 
+
+    for { 
+      outcome <- service ! Validate(incorrectFollowUpUploads.next)
+    } yield outcome must matchPattern { case Left(_: UnacceptableIssuesDetected) => }
 
   }
 
