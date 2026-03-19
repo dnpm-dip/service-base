@@ -2,7 +2,6 @@ package de.dnpm.dip.service.validation
 
 
 import java.time.LocalDate.{now => today}
-//import java.time.format.DateTimeFormatter.ISO_LOCAL_DATE
 import scala.util.Random
 import scala.concurrent.Future
 import org.scalatest.flatspec.AsyncFlatSpec
