@@ -399,18 +399,9 @@ trait Validators
     ObservationValidator[O](valueValidator)
 
 
-        
   def PatientRecordValidator[T <: PatientRecord]: Validator[Issue,T] = 
     record =>
-      (
-        validate(record.patient),
-        (record.ngsReports.exists(_.nonEmpty) must be (true)) orElse (
-          record.getCarePlans.exists(_.noSequencingPerformedReason.isDefined) must be (true) 
-        ) otherwise (
-          Error("Es sind keine(e) Sequenzierung-Bericht(e) vorhanden, aber auch kein Board-Beschluss mit Begründung, warum keine Sequenzierung beantragt worden ist")
-        ) at "Sequenzier-Berichte/Board-Beschlüsse"
-      )
-      .errorsOr(record)
+      validate(record.patient).map(_ => record)
 
 
   private val hexString64 = "[a-fA-F0-9]{64}".r
