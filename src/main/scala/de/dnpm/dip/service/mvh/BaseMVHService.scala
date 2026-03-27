@@ -103,7 +103,7 @@ with Logging
                   // Addition, Correction, FollowUp can only be appended to an existing submission history with an initial submission
                   case Addition | Correction | FollowUp =>
 
-                    val currentEpisodeOfCare = record.episodesOfCare.toList.maxBy(_.period.start)
+                    val currentEpisodeOfCare = record.currentEpisodeOfCare
 
                     priorSubmissions match {
                       case Some(submissions) if (submissions.exists(sub => sub.`type` == Initial && sub.createdAt.isAfter(currentEpisodeOfCare.period.start.atTime(LocalTime.MIN)))) =>
@@ -211,6 +211,7 @@ with Logging
           metadata.transferTAN,
           submittedAt,
           record.patient.id,
+          Some(record.currentEpisodeOfCare.id),
           Unsubmitted,
           Site.local,
           useCase,

@@ -3,6 +3,7 @@ package de.dnpm.dip.service.mvh
 
 import de.dnpm.dip.model.{
   CarePlan,
+  EpisodeOfCare,
   NGSReport,
   PatientRecord
 }
@@ -24,6 +25,9 @@ object extensions
   // MVH-specific extension methods to PatientRecord
   implicit class PatientRecordExtensions[T <: PatientRecord](val record: T) extends AnyVal
   {
+
+    def currentEpisodeOfCare: EpisodeOfCare =
+      record.episodesOfCare.toList.maxBy(_.period.start)
 
     // Get the MVH board "care plan" as the fisrt by date 
     def mvhCarePlan: Option[CarePlan] = 
