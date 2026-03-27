@@ -4,6 +4,7 @@ package de.dnpm.dip.service.mvh
 import java.time.LocalDateTime
 import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
+  EpisodeOfCare,
   HealthInsurance,
   Id,
   NGSReport,
@@ -75,6 +76,7 @@ object Submission
     id: Id[TransferTAN],
     createdAt: LocalDateTime,
     patient: Id[Patient],
+    episodeOfCare: Option[Id[EpisodeOfCare]],  // Optional for backwards compatibility. Default would be the patient's chronologically first EpisodeOfCare
     status: Report.Status.Value,
     site: Coding[Site],
     useCase: UseCase.Value,

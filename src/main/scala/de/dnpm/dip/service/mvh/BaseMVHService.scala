@@ -70,6 +70,8 @@ with Logging
         for {
           tanAlreadyUsed <- repo.alreadyUsed(metadata.transferTAN)
 
+          currentEpisodeOfCare = record.episodesOfCare.toList.maxBy(_.period.start)
+
           // Check acceptability of submission type for the given Patient
           submissionTypeOk <- metadata.`type` match {
 
@@ -77,7 +79,7 @@ with Logging
             // given that at most one 'initial' submission is allowed per episode of care (i.e. "Fall"),
             // ensure there are more episodes of care that 'initial' submissions
             case Initial =>
-              repo.submissionReportHistory(record.patient.id).map {
+              repo.submissionReportHistory(record.id).map {
                 case None => true
 
                 case Some(submissions) => 
@@ -89,12 +91,8 @@ with Logging
             case Addition | Correction | FollowUp =>
               repo.submissionReportHistory(record.patient.id).map {
                 case Some(submissions) =>
-
-                  val currentEpisodeOfCare = record.episodesOfCare.toList.maxBy(_.period.start)
-
                   submissions.history.exists(
-                    sub => sub.`type` == Initial &&
-                      sub.createdAt.isAfter(currentEpisodeOfCare.period.start.atTime(LocalTime.MIN))
+                    sub => sub.`type` == Initial && sub.createdAt.isAfter(currentEpisodeOfCare.period.start.atTime(LocalTime.MIN))
                   )
 
                 case None => false
@@ -113,7 +111,8 @@ with Logging
                 Submission.Report(
                   metadata.transferTAN,
                   submittedAt,
-                  record.patient.id,
+                  record.id,
+                  Some(currentEpisodeOfCare.id),
                   Unsubmitted,
                   Site.local,
                   useCase,
