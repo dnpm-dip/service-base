@@ -1,19 +1,27 @@
 package de.dnpm.dip.service
 
 
-import java.time.LocalDateTime
+import java.time.{
+  LocalDate,
+  LocalDateTime
+}
 import de.dnpm.dip.coding.Coding
-import de.dnpm.dip.model.Site
+import de.dnpm.dip.model.{
+  Period,
+  Site
+}
 import de.dnpm.dip.service.mvh.MVHService
 import de.dnpm.dip.service.query.QueryService
 import de.dnpm.dip.service.validation.ValidationService
 import play.api.libs.json.{
   Json,
-  Writes
+  OWrites
 }
 
 
-final case class StatusInfo
+sealed trait StatusInfo
+
+final case class LocalStatusInfo
 (
   site: Coding[Site],
   datetime: LocalDateTime,
@@ -21,11 +29,40 @@ final case class StatusInfo
   mvGenomSeq: MVHService.StatusInfo,
   query: QueryService.StatusInfo
 )
+extends StatusInfo
+
+
+object LocalStatusInfo
+{
+  implicit val format: OWrites[LocalStatusInfo] =
+    Json.writes[LocalStatusInfo]
+}
+
+final case class AggregatedStatusInfo
+(
+  datetime: LocalDateTime,
+  sites: List[Coding[Site]],
+  criteria: StatusInfo.Criteria,
+  components: List[LocalStatusInfo]
+)
+extends StatusInfo
 
 
 object StatusInfo
 {
-  implicit val format: Writes[StatusInfo] =
-    Json.writes[StatusInfo]
+
+  final case class Criteria
+  (
+    episodeOfCarePeriod: Option[Period[LocalDate]]
+  )
+
+  final case class Request
+  (
+    sites: Option[Set[Coding[Site]]],
+    criteria: Criteria 
+  )
+
+//  implicit val format: OWrites[StatusInfo] =
+//    Json.writes[StatusInfo]
 }
 
