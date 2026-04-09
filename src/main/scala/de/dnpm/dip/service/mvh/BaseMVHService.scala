@@ -112,7 +112,13 @@ with Logging
                 result <- optSubmissionTypeError match {
 
                   case None => 
-                    processSubmission(record,metadata,priorSubmissions.map(_.latestBy(_.createdAt)))
+                    processSubmission(
+                      record,
+                      metadata,
+                      priorSubmissions
+                        .map(_.history.filterNot(_.`type` == Test))  // Exclude 'test' SubmissionReports from processing (consent revocation check)
+                        .flatMap(_.maxByOption(_.createdAt))
+                    )
 
                   case Some(error) => 
                     log.warn(s"${error.msg}, refusing submission")
