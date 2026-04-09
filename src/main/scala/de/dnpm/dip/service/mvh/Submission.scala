@@ -73,7 +73,7 @@ object Submission
    * This DTO corresponds to a "Prüfbericht" for the Model Project.
    * The structure is slightly different from the schema defined for the BfArM API:
    * the conversion/mapping onto the later takes place in the central data node.
-   * Also, this DTO contains additional fields not representeded in the BfArM "Prüfbericht itself,
+   * Also, this DTO contains additional fields not represented in the BfArM "Prüfbericht" itself,
    * but which are required for compilation of appendices 1/2 of the quarterly report.
    */
   final case class Report
