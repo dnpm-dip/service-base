@@ -2,6 +2,9 @@ package de.dnpm.dip.service.validation
 
 
 import java.net.URI
+import java.time.LocalDate
+import java.time.LocalDate.{now => today}
+import java.time.Month.MAY
 import scala.util.matching.Regex
 import scala.util.chaining._
 import cats.Applicative
@@ -50,6 +53,11 @@ import de.dnpm.dip.service.mvh.{
 }
 import de.dnpm.dip.service.mvh.ModelProjectConsent.Purpose._
 import de.dnpm.dip.service.mvh.Consent.Provision.Type._
+import de.dnpm.dip.service.mvh.BroadConsent
+import BroadConsent.ReasonMissing.{
+  OrganizationalIssues,
+  TechnicalIssues
+}
 import Issue.{
   Error,
   Fatal,
@@ -391,40 +399,24 @@ trait Validators
     ObservationValidator[O](valueValidator)
 
 
-        
   def PatientRecordValidator[T <: PatientRecord]: Validator[Issue,T] = 
     record =>
-      (
-        validate(record.patient),
-        (record.ngsReports.exists(_.nonEmpty) must be (true)) orElse (
-          record.getCarePlans.exists(_.noSequencingPerformedReason.isDefined) must be (true) 
-        ) otherwise (
-          Error("Es sind keine(e) Sequenzierung-Bericht(e) vorhanden, aber auch kein Board-Beschluss mit Begründung, warum keine Sequenzierung beantragt worden ist")
-        ) at "Sequenzier-Berichte/Board-Beschlüsse"
-      )
-      .errorsOr(record)
+      validate(record.patient).map(_ => record)
 
-
-/*
-  implicit def broadConsentValidator(
-    implicit patient: Id[Patient]
-  ): Validator[Issue,BroadConsent] =
-    consent =>
-      (
-        consent.status must be (BroadConsent.Status.Active) otherwise (
-          Warning(s"Unerwarteter Wert '${consent.status}', eigentlich '${BroadConsent.Status.Active}' erwartet") at "Consent.status"
-        ), 
-        consent.policyUri.replace("urn:oid:","") must be (in (BroadConsent.versions.keys)) otherwise (
-          Error(s"Ungültige OID '${consent.policyUri}', muss auf eine der zulässigen BC Versionen {${BroadConsent.versions.values.mkString(", ")}} verweisen.") at "Consent.policy.uri"
-        ),
-        option(consent.patient.map(_.id)) must be (patient) otherwise (
-          Error("Patient-Referenz entspricht nicht der Patient-Pseudonym-ID. Hinweis: Im Daten-Upload kann als Parameter gesetzt werden, dass der BroadConsent im DIP-System automatisch deidentifiziert werden soll") at "Consent.patient"
-        )
-      )
-      .errorsOr(consent) on "Broad-Consent"
-*/
 
   private val hexString64 = "[a-fA-F0-9]{64}".r
+
+
+  /**
+   * Date after which to enforce new/extended QC rules:
+   * 2026-05-31, as new rules must be enforced from 2026-06-01 on.
+   */
+  lazy val extendedQcEnforcementDate = LocalDate.of(2026,MAY,31)
+
+
+  private lazy val admissibleConsentMissingReasons =
+    (BroadConsent.ReasonMissing.values - TechnicalIssues - OrganizationalIssues)
+
 
   implicit val metadataValidator: Validator[Issue,Submission.Metadata] =
     metadata =>
@@ -447,25 +439,23 @@ trait Validators
         ),
         (metadata.researchConsents.filter(_.nonEmpty) orElse metadata.reasonResearchConsentMissing) must be (defined) otherwise (
           MissingValue("Es muss entweder MII Forschungs-/Broad-Consent oder der Grund für dessen Fehlen vorhanden sein")
-        )
-/*      
-  NOTE: Temporrary removal of BC validation until BC handling specs are finalized
-        ifDefined (metadata.researchConsents.filter(_.nonEmpty)){
-          _ must (have (size (1))) otherwise (
-            Error("Es kommen mehrere Consent-Ressourcen vor, aber es soll der Broad Consent des Index-Patient als 1 Consent-Ressource gebündelt übertragen werden") at "Broad Consent"
-          ) andThen (
-            consents => validate(consents.head).map(_ => consents)
+        ),
+        if (today isAfter extendedQcEnforcementDate)
+          valueIn (metadata.reasonResearchConsentMissing) must be (in (admissibleConsentMissingReasons)) otherwise (
+            Error(s"Unzulässiger Wert, ab 01.06.2026 nur noch folgende gültig: {${admissibleConsentMissingReasons.mkString(", ")}}")
+              at "Grund für fehlenden Broad Consent"
           )
-        }
-*/        
+        else None.validNel
       )
       .errorsOr(metadata) on "Metadaten"
+
 
   def SequencingTypeValidator(
     admissibleSequencingTypes: Set[NGSReport.Type.Value]
   ): Validator[Issue,NGSReport.Type.Value] =
     typ => typ must be (in (admissibleSequencingTypes)) otherwise (
-      Error(s"Unzulässige Sequenzier-Art $typ, es kann nur eine von {${admissibleSequencingTypes.mkString(", ")}} geltend gemacht werden") at "MVH-Sequenzier-Art"
+      Error(s"Unzulässige Sequenzier-Art $typ, ab 01.06.2026 noch folgende gültig: {${admissibleSequencingTypes.mkString(", ")}}")
+        at "MVH-Sequenzier-Art"
     ) 
 
 
@@ -501,7 +491,7 @@ trait Validators
                   .errorsOr(mvhCp)
               }, 
               record.mvhSequencingReports match {
-                case reports if reports.nonEmpty => validateEach(reports.map(_.`type`.code.enumValue))
+                case reports if (today isAfter extendedQcEnforcementDate) && reports.nonEmpty => validateEach(reports.map(_.`type`.code.enumValue))
                 case _ => Nil.validNel
               },
               metadata.`type` match {
@@ -511,7 +501,7 @@ trait Validators
                       at "Meldungs-Typ"
                   )
 
-                case _ => true.validNel
+                case _ => None.validNel
               }
             )
             .errorsOr(metadata)

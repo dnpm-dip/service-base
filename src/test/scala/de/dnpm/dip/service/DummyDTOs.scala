@@ -9,6 +9,7 @@ import de.dnpm.dip.model.{
   CarePlan,
   Diagnosis,
   EpisodeOfCare,
+  FollowUp,
   Id,
   NGSReport,
   Patient,
@@ -79,11 +80,11 @@ final case class DummyPatientRecord
   episodesOfCare: NonEmptyList[DummyEpisodeOfCare],
   diagnoses: NonEmptyList[DummyDiagnosis],
   carePlans: NonEmptyList[DummyCarePlan],
-  ngsReports: Option[List[DummyNGSReport]]
+  ngsReports: Option[List[DummyNGSReport]],
+  followUps: Option[List[FollowUp]]
 )
 extends PatientRecord
 {
-  override val followUps = None
   override def getCarePlans = carePlans.toList
   override val systemicTherapies = None
 }

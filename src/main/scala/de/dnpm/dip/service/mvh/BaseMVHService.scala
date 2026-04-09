@@ -131,6 +131,7 @@ with Logging
         } yield processingResult
 
 
+
       case ConfirmSubmitted(id) =>
         for {
           optReport <- repo ? id

@@ -16,6 +16,7 @@ import de.dnpm.dip.model.{
   Diagnosis,
   EpisodeOfCare,
   ExternalId,
+  FollowUp,
   NGSReport,
   Patient,
   Period,
@@ -145,6 +146,7 @@ object Gens
 
 
   def genDummyPatientRecord(
+    submissionType: Submission.Type.Value = Submission.Type.Initial,
     sequencingTypes: Set[NGSReport.Type.Value] = Set.empty
   ): Gen[DummyPatientRecord] =
     for { 
@@ -162,12 +164,29 @@ object Gens
             report <- genNGSReport(patient,sequencingTypes)
           } yield Some(List(report))
         else Gen.const(Option.empty[List[DummyNGSReport]])
+
+      followUps =
+        if (submissionType == Submission.Type.FollowUp)
+          Some(
+            List(
+              FollowUp(
+                LocalDate.now,
+                Reference.to(patient),
+                None,
+                None
+              )
+            )
+          )
+
+        else None
+
     } yield DummyPatientRecord(
       patient,
       NonEmptyList.of(episode),
       NonEmptyList.of(diagnosis),
       NonEmptyList.of(carePlan),
-      ngsReports
+      ngsReports,
+      followUps
     )
 
   implicit val genDummyPatientRecordWithoutNGS: Gen[DummyPatientRecord] =
@@ -232,7 +251,7 @@ object Gens
 
       (bc,noBcReason) =
         if (withBroadConsent) Some(List(broadConsent)) -> None
-        else None -> Some(BroadConsent.ReasonMissing.OrganizationalIssues)
+        else None -> Some(BroadConsent.ReasonMissing.OtherPatientReason)
 
     } yield Submission.Metadata(
       submissionType,
@@ -254,4 +273,15 @@ object Gens
       noBcReason
     )
 
+
+  def genDataUpload(
+    submissionType: Submission.Type.Value = Submission.Type.Initial,
+    sequencingTypes: Set[NGSReport.Type.Value] = Set.empty,
+    withBroadConsent: Boolean = true
+  ): Gen[DataUpload[DummyPatientRecord]] =
+    for {
+      record <- genDummyPatientRecord(submissionType,sequencingTypes)
+      metadata <- genMetadata(record,submissionType,withBroadConsent)
+    } yield DataUpload(record,Some(metadata))
+  
 }

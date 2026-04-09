@@ -23,6 +23,7 @@ import cats.syntax.applicative._
 import cats.syntax.either._
 import play.api.libs.json.{
   Json,
+  JsPath,
   Reads,
   Writes,
   OWrites
@@ -52,17 +53,40 @@ object TAN
 
 }
 
-
+/**
+ * Light-weight "header" version of a Submission,
+ * containing only the necessary data elements to perform filtering by Submission.Filter,
+ */
 private[mvh] final case class SubmissionHeader
 (
-  submittedAt: LocalDateTime,
-  metadata: Submission.Metadata
+  metadata: Submission.Metadata,
+  patient: Patient,
+  submittedAt: LocalDateTime
 )
 
 private[mvh] object SubmissionHeader
 {
-  implicit val reads: Reads[SubmissionHeader] = 
-    Json.reads[SubmissionHeader]
+  import play.api.libs.functional.syntax._
+
+  implicit def fromSubmission[T <: PatientRecord](sub: Submission[T]): SubmissionHeader =
+    SubmissionHeader(
+      sub.metadata,
+      sub.record.patient,
+      sub.submittedAt
+    )
+
+  // Explicit Reads to include tolerant Reads[Submission.Metadata],
+  // required for backwards compatibility with data sets potentially containing 
+  // strcutrally invalid Consent resources
+  implicit val reads: Reads[SubmissionHeader] =
+    (
+      (JsPath \ "metadata").read(Submission.tolerantReads.metadata) and
+      (JsPath \ "patient").read[Patient] and
+      (JsPath \ "submittedAt").read[LocalDateTime]
+    )(
+      SubmissionHeader(_,_,_)
+    )
+
 }
 
 
@@ -77,14 +101,18 @@ with Logging
 
   type Env = Monad[F]
 
-/*
+  /**
+   * Implicit conversion of Submission.Filter into a predicate function for SubmissionHeader,
+   * for filtering on cached SubmissionHeaders
+   */
   protected implicit def submissionHeaderPredicate(
     filter: Submission.Filter
   ): SubmissionHeader => Boolean =
-    record =>
-      filter.period.map(_ contains record.submittedAt).getOrElse(true) &&
-      filter.transferTAN.map(_ contains record.metadata.transferTAN).getOrElse(true)
-*/
+    submission =>
+      filter.period.map(_ contains submission.submittedAt).getOrElse(true) &&
+      filter.`type`.map(_ contains submission.metadata.`type`).getOrElse(true) &&
+      filter.transferTAN.map(_ contains submission.metadata.transferTAN).getOrElse(true)
+
 
   private val tolerantSubmissionReads = Submission.tolerantReads.submission[T]
 
@@ -119,7 +147,7 @@ with Logging
         .pipe(_.get)
         .tap(_ => in.close)
 
- 
+
   private val cachedReports: Map[Id[TransferTAN],Submission.Report] = {
 
     // Migrate persisted Submissions and SubmissionReports from the previous to the new file naming pattern
@@ -179,6 +207,21 @@ with Logging
     )
   }
 
+  /**
+   * Cache the SubmissionHeaders for rapid in-memory filtering 
+   */
+  private val cachedSubmissionHeaders: Map[Id[TransferTAN],SubmissionHeader] =
+    TrieMap.from(
+      dataDir.listFiles(
+        (_,name) => (name startsWith s"${SUBMISSION_PREFIX}_Patient") && (name endsWith ".json")
+      )
+      .to(Iterable)
+      .map(new FileInputStream(_))
+      .map(readAsJson[SubmissionHeader])
+      .map(sub => sub.metadata.transferTAN -> sub)
+    )
+
+
 
   override def alreadyUsed(id: Id[TransferTAN])(
     implicit env: Env
@@ -201,6 +244,7 @@ with Logging
         subWriter.write(toPrettyJson(submission))
 
         cachedReports += report.id -> report
+        cachedSubmissionHeaders += submission.metadata.transferTAN -> submission
 
         ().asRight[String]
     }
@@ -244,19 +288,22 @@ with Logging
       .pure
 
 
-  // TODO: refactor to only read a light-weight Submission, i.e. only the filterable data,
-  // to avoid expensive parsing of the whole submission MDAT, and apply filtering to these only
   override def ?(fltr: Submission.Filter)(
     implicit env: Env
-  ): F[Seq[Submission[T]]] =
-    dataDir.listFiles(
-      (_,name) => (name startsWith s"${SUBMISSION_PREFIX}_Patient") && (name endsWith ".json")
-    )
-    .to(Seq)
-    .map(new FileInputStream(_))
-    .map(readAsJson(tolerantSubmissionReads))
-    .filter(fltr)
-    .pure
+  ): F[Seq[Submission[T]]] = {
+
+    val filter: SubmissionHeader => Boolean = fltr
+
+    cachedSubmissionHeaders
+      .collect {
+        case (tan,sub) if filter(sub) => 
+          submissionFile(sub.patient.id,tan)
+            .pipe(new FileInputStream(_))
+            .pipe(readAsJson(tolerantSubmissionReads))
+      }
+      .toSeq
+      .pure
+  }
 
 
   override def submissionHistory(id: Id[Patient])(
