@@ -5,7 +5,7 @@ import cats.Monad
 import de.dnpm.dip.model.PatientRecord
 
 
-final class FakeMVHService[F[_],T <: PatientRecord] extends BaseMVHService[F,T](
+final class FakeMVHService[F[+_],T <: PatientRecord] extends BaseMVHService[F,T](
   UseCase.MTB,
   new InMemRepository[F,T]
 ){
