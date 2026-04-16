@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.3.0](https://github.com/dnpm-dip/service-base/compare/v1.2.3...v1.3.0) (2026-04-16)
+
+
+### Features
+
+* Added 'diagnosticExtent' to Submission.Report in order for it to contain all info necessary for quarter report compilation ([#30](https://github.com/dnpm-dip/service-base/issues/30)) ([d772a43](https://github.com/dnpm-dip/service-base/commit/d772a43d8fc64682b08324bb1e05e82e0ab5cb64))
+* Added info on consent revocation to Submission.Report  ([#31](https://github.com/dnpm-dip/service-base/issues/31)) ([a79d6f6](https://github.com/dnpm-dip/service-base/commit/a79d6f684386195588380f63982ca66af4c01c65))
+* Added Patient-ID als filter criterion for Submission.Report ([41f2a93](https://github.com/dnpm-dip/service-base/commit/41f2a93b6ca857a33a481f277ebc5edddfb3f628))
+* submission type check ([#26](https://github.com/dnpm-dip/service-base/issues/26)) ([ed2d8ea](https://github.com/dnpm-dip/service-base/commit/ed2d8ea5c07075624fca0cf7e77048706681209e))
+
+
+### Bug Fixes
+
+* Adapted queries by Submission.Filter to be executed on cached SubmissionHeaders (light-weight data object containing only the data necessary for filtering) ([1d49e52](https://github.com/dnpm-dip/service-base/commit/1d49e52ba5cfca443243df21bec174825ee43aae))
+* bump backend-core to 1.2.1 ([eaaf0ce](https://github.com/dnpm-dip/service-base/commit/eaaf0ced5e5f5b8dc3ae2abd822b0e6762bb2e58))
+* Bump check for presence of either Broad Consent or reason why missing to 'error'-level issue ([01ee922](https://github.com/dnpm-dip/service-base/commit/01ee922baea9b05218aeb897bcd1c5abdb4cc460))
+* bump core to 1.2.2 ([f935773](https://github.com/dnpm-dip/service-base/commit/f93577392f6ce328defae347354a5a66fe62265c))
+* qc specs 2026 06 01 ([#29](https://github.com/dnpm-dip/service-base/issues/29)) ([7cce0c7](https://github.com/dnpm-dip/service-base/commit/7cce0c7f6b59e70d061152775219cc8c0f155c9d))
+* Removed obsolete validation on base PatientRecordValidator, so that check for presence of either NGS-Reports or noSequencingPerformedReason is correctly applied only to MV submissions ([baf9875](https://github.com/dnpm-dip/service-base/commit/baf9875f1f53a62238adaddb83b68e7aa37c44b4))
+
 ## [1.2.3](https://github.com/dnpm-dip/service-base/compare/v1.2.2...v1.2.3) (2025-12-15)
 
 
