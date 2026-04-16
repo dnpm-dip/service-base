@@ -20,6 +20,11 @@ import play.api.libs.json.{
 
 
 sealed trait StatusInfo
+{
+  def validation: ValidationService.StatusInfo
+  def mvGenomSeq: MVHService.StatusInfo
+  def query: QueryService.StatusInfo
+}
 
 final case class LocalStatusInfo
 (
@@ -43,6 +48,9 @@ final case class AggregatedStatusInfo
   datetime: LocalDateTime,
   sites: List[Coding[Site]],
   criteria: StatusInfo.Criteria,
+  validation: ValidationService.StatusInfo,
+  mvGenomSeq: MVHService.StatusInfo,
+  query: QueryService.StatusInfo,
   components: List[LocalStatusInfo]
 )
 extends StatusInfo
