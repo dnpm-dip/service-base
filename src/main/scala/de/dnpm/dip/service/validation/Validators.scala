@@ -438,7 +438,7 @@ trait Validators
             .map(_ => d)
         ),
         (metadata.researchConsents.filter(_.nonEmpty) orElse metadata.reasonResearchConsentMissing) must be (defined) otherwise (
-          Error("Es muss entweder MII Forschungs-/Broad-Consent oder der Grund für dessen Fehlen vorhanden sein")
+          Error("Es muss entweder MII Forschungs-/Broad-Consent oder der Grund für dessen Fehlen vorhanden sein") at "Broad Consent"
         ),
         if (today isAfter extendedQcEnforcementDate)
           valueIn (metadata.reasonResearchConsentMissing) must be (in (admissibleConsentMissingReasons)) otherwise (
