@@ -88,6 +88,8 @@ with Logging
 
                 priorSubmissions <- repo.submissionReportHistory(record.patient.id).map(_.map(_.history))
 
+                currentEpisodeStart = record.currentEpisodeOfCare.period.start.atTime(LocalTime.MIN)
+
                 // Check acceptability of submission type for the given Patient
                 optSubmissionTypeError = metadata.`type` match {
 
@@ -96,14 +98,15 @@ with Logging
                     priorSubmissions match {
                       case None => None
                       case Some(submissions) => 
-                        if (record.episodesOfCare.size > submissions.toList.count(_.`type` == Initial)) None
-                        else Some(InvalidSubmissionType(s"Invalid submission: at most one ${Initial} submission allowed per EpisodeOfCare"))
+                        if (submissions.exists(sub => sub.createdAt.isAfter(currentEpisodeStart) && sub.`type` == Initial)) 
+                          Some(InvalidSubmissionType(s"Invalid submission: at most one ${Initial} submission allowed per EpisodeOfCare"))
+                        else 
+                          None
                     }
       
                   // Addition, Correction, FollowUp can only be appended to an existing submission history with an initial submission
                   case Addition | Correction | FollowUp =>
 
-                    val currentEpisodeStart = record.currentEpisodeOfCare.period.start.atTime(LocalTime.MIN)
 
                     priorSubmissions match {
                       case Some(submissions) if (submissions.exists(sub => sub.`type` == Initial && sub.createdAt.isAfter(currentEpisodeStart))) =>
