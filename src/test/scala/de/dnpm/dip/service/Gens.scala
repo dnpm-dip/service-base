@@ -133,7 +133,8 @@ object Gens
 
   def genCarePlan(
     patient: Patient,
-    sequencingRequested: Boolean = false
+    sequencingRequested: Boolean = false,
+    boardType: CarePlan.BoardType.Value = CarePlan.BoardType.IndicationBoard
   ): Gen[DummyCarePlan] =
     for { 
       id <- Gen.of[Id[DummyCarePlan]]
@@ -141,6 +142,7 @@ object Gens
       id,
       Reference.to(patient),
       LocalDate.now.minusDays(7),
+      Some(Coding(boardType)),
       Option.when(!sequencingRequested)(Coding(CarePlan.NoSequencingPerformedReason.Other))
     )
 

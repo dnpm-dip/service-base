@@ -29,16 +29,23 @@ object extensions
     def currentEpisodeOfCare: EpisodeOfCare =
       record.episodesOfCare.toList.maxBy(_.period.start)
 
-    // Get the MVH board "care plan" as the fisrt by date 
-    def mvhCarePlan: Option[CarePlan] = 
-      record.getCarePlans.minByOption(_.issuedOn)
+
+    def indicationCarePlan: Option[CarePlan] = 
+      // Get the indication board CarePlan as the latest with this boardType (if defined)
+      record.getCarePlans
+        .filter(_.boardType.exists(_.code.enumValue == CarePlan.BoardType.IndicationBoard))
+        .maxByOption(_.issuedOn)
+        // Fallback: Get the indication board CarePlan as the first by date 
+        .orElse(
+          record.getCarePlans.minByOption(_.issuedOn)
+        )
 
 
     // Get sequencing report(s) performed in context of the MVH
     // as those diagnostic reports with a "true" sequencing type
-    // and issued after the MVH inclusion conference
+    // and issued after the indication board
     def mvhSequencingReports: List[NGSReport] =
-      mvhCarePlan match {
+      indicationCarePlan match {
         case Some(cp) if !cp.noSequencingPerformedReason.isDefined =>
           record.ngsReports
             .getOrElse(List.empty)

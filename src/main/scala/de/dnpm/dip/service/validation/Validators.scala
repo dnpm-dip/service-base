@@ -474,7 +474,7 @@ trait Validators
           metadata =>
             (
               validate(metadata),
-              record.mvhCarePlan must be (defined) otherwise (Error("Kein Board-Beschluss zum MVH-Einschluss vorhanden") at "Board-Beschlüsse") map (_.get) andThen {
+              record.indicationCarePlan must be (defined) otherwise (Error("Kein Indikations-Board-Beschluss zum MVH-Einschluss vorhanden") at "Board-Beschlüsse") map (_.get) andThen {
                 mvhCp => 
                   (
                     metadata.modelProjectConsent.provisions

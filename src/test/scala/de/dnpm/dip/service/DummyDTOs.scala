@@ -62,6 +62,7 @@ final case class DummyCarePlan
   id: Id[CarePlan],
   patient: Reference[Patient],
   issuedOn: LocalDate,
+  boardType: Option[Coding[CarePlan.BoardType.Value]],
   noSequencingPerformedReason: Option[Coding[CarePlan.NoSequencingPerformedReason.Value]]
 )
 extends CarePlan
