@@ -103,10 +103,10 @@ with Logging
                   // Addition, Correction, FollowUp can only be appended to an existing submission history with an initial submission
                   case Addition | Correction | FollowUp =>
 
-                    val currentEpisodeOfCare = record.currentEpisodeOfCare
+                    val currentEpisodeStart = record.currentEpisodeOfCare.period.start.atTime(LocalTime.MIN)
 
                     priorSubmissions match {
-                      case Some(submissions) if (submissions.exists(sub => sub.`type` == Initial && sub.createdAt.isAfter(currentEpisodeOfCare.period.start.atTime(LocalTime.MIN)))) =>
+                      case Some(submissions) if (submissions.exists(sub => sub.`type` == Initial && sub.createdAt.isAfter(currentEpisodeStart))) =>
                         None
 
                       case _ =>
