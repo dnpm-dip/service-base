@@ -93,23 +93,19 @@ with Logging
                 // Check acceptability of submission type for the given Patient
                 optSubmissionTypeError = metadata.`type` match {
 
-                  // An Initial submission must be the first at all or follow only previous "test" submissions
+                  // An Initial submission must be the first at all for the current EpisoeOfCare
                   case Initial =>
                     priorSubmissions match {
-                      case None => None
-                      case Some(submissions) => 
-                        if (submissions.exists(sub => sub.createdAt.isAfter(currentEpisodeStart) && sub.`type` == Initial)) 
-                          Some(InvalidSubmissionType(s"Invalid submission: at most one ${Initial} submission allowed per EpisodeOfCare"))
-                        else 
-                          None
+                      case Some(submissions) if submissions.exists(sub => sub.createdAt.isAfter(currentEpisodeStart) && sub.`type` == Initial) =>
+                        Some(InvalidSubmissionType(s"Invalid submission: at most one ${Initial} submission allowed per EpisodeOfCare"))
+
+                      case _ => None
                     }
       
-                  // Addition, Correction, FollowUp can only be appended to an existing submission history with an initial submission
+                  // Conversely, Addition, Correction, FollowUp can only be appended if an initial submission exists in the current EpisoeOfCare
                   case Addition | Correction | FollowUp =>
-
-
                     priorSubmissions match {
-                      case Some(submissions) if (submissions.exists(sub => sub.`type` == Initial && sub.createdAt.isAfter(currentEpisodeStart))) =>
+                      case Some(submissions) if submissions.exists(sub => sub.createdAt.isAfter(currentEpisodeStart) && sub.`type` == Initial) =>
                         None
 
                       case _ =>
