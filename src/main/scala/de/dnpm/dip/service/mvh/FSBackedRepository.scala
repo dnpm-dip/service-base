@@ -138,7 +138,7 @@ with Logging
 
   private def submissionFile(tan: Id[TransferTAN]): Option[File] =
     dataDir.listFiles(
-      (_,name) => (name startsWith s"${SUBMISSION_PREFIX}") && (name contains tan.value)
+      (_,name) => (name startsWith s"${SUBMISSION_PREFIX}") && (name endsWith s"TAN_${tan.value}.json")
     )
     .toList
     .headOption
