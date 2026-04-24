@@ -110,8 +110,7 @@ with Logging
   ): SubmissionHeader => Boolean =
     submission =>
       filter.period.map(_ contains submission.submittedAt).getOrElse(true) &&
-      filter.`type`.map(_ contains submission.metadata.`type`).getOrElse(true) &&
-      filter.transferTAN.map(_ contains submission.metadata.transferTAN).getOrElse(true)
+      filter.`type`.map(_ contains submission.metadata.`type`).getOrElse(true)
 
 
   private val tolerantSubmissionReads = Submission.tolerantReads.submission[T]
@@ -136,6 +135,13 @@ with Logging
     dataDir.listFiles(
       (_,name) => name startsWith s"${SUBMISSION_PREFIX}_Patient_${id.value}"
     ) 
+
+  private def submissionFile(tan: Id[TransferTAN]): Option[File] =
+    dataDir.listFiles(
+      (_,name) => (name startsWith s"${SUBMISSION_PREFIX}") && (name contains tan.value)
+    )
+    .toList
+    .headOption
 
   private def toPrettyJson[A: Writes](a: A): String =
     Json.toJson(a) pipe Json.prettyPrint
@@ -251,7 +257,7 @@ with Logging
     .pure
 
 
-  override def ?(
+  override def submissionReport(
     id: Id[TransferTAN]
   )(
     implicit env: Env
@@ -304,6 +310,17 @@ with Logging
       .toSeq
       .pure
   }
+
+
+  override def submission(
+    id: Id[TransferTAN]
+  )(
+    implicit env: Env
+  ): F[Option[Submission[T]]] =
+    submissionFile(id)
+      .map(new FileInputStream(_))
+      .map(readAsJson(tolerantSubmissionReads))
+      .pure
 
 
   override def submissionHistory(id: Id[Patient])(

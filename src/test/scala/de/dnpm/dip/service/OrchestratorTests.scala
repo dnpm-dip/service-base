@@ -99,7 +99,7 @@ class OrchestratorTests extends AsyncFlatSpec
 
       _ = outcome.value mustBe Saved
 
-      submissionReport <- mvhService ? initialUpload.metadata.get.transferTAN
+      submissionReport <- mvhService submissionReport initialUpload.metadata.get.transferTAN
 
       _ = submissionReport.value.patient mustBe record.id
 
@@ -121,7 +121,7 @@ class OrchestratorTests extends AsyncFlatSpec
 
       _ = outcome.value mustBe Saved
 
-      submissionReport <- mvhService ? subsequentUpload.metadata.get.transferTAN
+      submissionReport <- mvhService submissionReport subsequentUpload.metadata.get.transferTAN
 
       _ = submissionReport.value.patient mustBe record.id
 
@@ -142,7 +142,7 @@ class OrchestratorTests extends AsyncFlatSpec
     
       _ = outcome.value mustBe a [Deleted]
 
-      submissionReport <- mvhService ? initialUpload.metadata.get.transferTAN
+      submissionReport <- mvhService submissionReport initialUpload.metadata.get.transferTAN
 
       _ = submissionReport must not be defined
     

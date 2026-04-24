@@ -134,7 +134,7 @@ with Logging
 
       case ConfirmSubmitted(id) =>
         for {
-          optReport <- repo ? id
+          optReport <- repo submissionReport id
 
           result <- optReport match {
             case Some(report) =>
@@ -238,16 +238,21 @@ with Logging
     repo ? filter
 
 
-  override def ?(id: Id[TransferTAN])(
+  override def submissionReport(id: Id[TransferTAN])(
     implicit env: Env
   ): F[Option[Submission.Report]] =
-    repo ? id
+    repo submissionReport id
 
 
   override def ?(filter: Submission.Filter)(
     implicit env: Env
   ): F[Seq[Submission[T]]] =
     repo ? filter
+
+  override def submission(id: Id[TransferTAN])(
+    implicit env: Env
+  ): F[Option[Submission[T]]] =
+    repo submission id
 
 
   // Create BaseReport for the criteria and return it together with the submissions it's based on,
@@ -267,9 +272,11 @@ with Logging
 
     for {
       submissions <- repo ? Submission.Filter(
-        period.copy(
-          start = period.start.atTime(LocalTime.MIN),
-          end   = period.end.atTime(LocalTime.MIDNIGHT),
+        period = Some(
+          period.copy(
+            start = period.start.atTime(LocalTime.MIN),
+            end   = period.end.atTime(LocalTime.MIDNIGHT),
+          )
         )
       )
 

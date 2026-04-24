@@ -35,7 +35,7 @@ trait MVHService[F[_],Env,T <: PatientRecord]
   ): F[Seq[Submission.Report]]
 
 
-  def ?(
+  def submissionReport(
     id: Id[TransferTAN]
   )(
     implicit env: Env
@@ -46,6 +46,13 @@ trait MVHService[F[_],Env,T <: PatientRecord]
     implicit env: Env
   ): F[Seq[Submission[T]]]
   
+  
+  def submission(
+    id: Id[TransferTAN]
+  )(
+    implicit env: Env
+  ): F[Option[Submission[T]]]
+
   
   def statusInfo(
     implicit env: Env

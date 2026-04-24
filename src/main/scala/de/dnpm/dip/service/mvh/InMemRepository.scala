@@ -61,13 +61,25 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
   }
 
 
-  override def ?(
+  override def submissionReport(
     id: Id[TransferTAN]
   )(
     implicit env: Env
   ): F[Option[Submission.Report]] =
     reports.collectFirst {
       case (_,rs) if rs contains id => rs
+    }
+    .flatMap(_ get id)
+    .pure
+
+
+  override def submission(
+    id: Id[TransferTAN]
+  )(
+    implicit env: Env
+  ): F[Option[Submission[T]]] =
+    submissions.collectFirst {
+      case (_,subs) if subs contains id => subs
     }
     .flatMap(_ get id)
     .pure
