@@ -22,8 +22,7 @@ trait Repository[F[_],Env,T <: PatientRecord]
   protected implicit def submissionPredicate(filter: Submission.Filter): Submission[T] => Boolean =
     submission =>
       filter.period.map(_ contains submission.submittedAt).getOrElse(true) &&
-      filter.`type`.map(_ contains submission.metadata.`type`).getOrElse(true) &&
-      filter.transferTAN.map(_ contains submission.metadata.transferTAN).getOrElse(true)
+      filter.`type`.map(_ contains submission.metadata.`type`).getOrElse(true) 
 
   
   def alreadyUsed(id: Id[TransferTAN])(
@@ -49,7 +48,7 @@ trait Repository[F[_],Env,T <: PatientRecord]
     implicit env: Env
   ): F[Seq[Submission.Report]]
 
-  def ?(
+  def submissionReport(
     id: Id[TransferTAN]
   )(
     implicit env: Env
@@ -59,6 +58,12 @@ trait Repository[F[_],Env,T <: PatientRecord]
   def ?(filter: Submission.Filter)(
     implicit env: Env
   ): F[Seq[Submission[T]]]
+
+  def submission(
+    id: Id[TransferTAN]
+  )(
+    implicit env: Env
+  ): F[Option[Submission[T]]]
 
 
   def submissionHistory(id: Id[Patient])(
