@@ -29,6 +29,7 @@ import de.dnpm.dip.model.{
   BaseVariant,
   ClosedInterval,
   Diagnosis,
+  EpisodeOfCare,
   GeneAlterationReference,
   Id,
   Interval,
@@ -115,6 +116,9 @@ trait Validators
 
   implicit val patientNode: Path.Node[Patient] =
     Path.Node("Patient")
+
+  implicit val episodeOfCareNode: Path.Node[EpisodeOfCare] =
+    Path.Node("Behandlungsepisode")
 
   implicit val baseVariantNode: Path.Node[BaseVariant] =
     Path.Node("Variante")
@@ -476,7 +480,12 @@ trait Validators
           metadata =>
             (
               validate(metadata),
-              record.mvhCarePlan must be (defined) otherwise (Error("Kein Board-Beschluss zum MVH-Einschluss vorhanden") at "Board-Beschlüsse") map (_.get) andThen {
+              ifDefined(metadata.episodeOfCare){
+                ref =>  
+                  implicit val episodes = record.episodesOfCare.toList
+                  validate(ref) at "MVH-Fall"
+              },
+              record.indicationCarePlan must be (defined) otherwise (Error("Kein Indikations-Board-Beschluss zum MVH-Einschluss vorhanden") at "Board-Beschlüsse") map (_.get) andThen {
                 mvhCp => 
                   (
                     metadata.modelProjectConsent.provisions

@@ -4,12 +4,14 @@ package de.dnpm.dip.service.mvh
 import java.time.LocalDateTime
 import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
+  EpisodeOfCare,
   HealthInsurance,
   Id,
   NGSReport,
   Period,
   Patient,
   PatientRecord,
+  Reference,
   Site
 }
 import play.api.libs.json.{
@@ -81,6 +83,7 @@ object Submission
     id: Id[TransferTAN],
     createdAt: LocalDateTime,
     patient: Id[Patient],
+    episodeOfCare: Option[Id[EpisodeOfCare]],  // Optional for backwards compatibility. Default would be the patient's chronologically first EpisodeOfCare
     status: Report.Status.Value,
     site: Coding[Site],
     useCase: UseCase.Value,
@@ -130,6 +133,7 @@ object Submission
   (
     `type`: Type.Value,
     transferTAN: Id[TransferTAN],
+    episodeOfCare: Option[Reference[EpisodeOfCare]],
     modelProjectConsent: ModelProjectConsent,
     researchConsents: Option[List[BroadConsent]],
     reasonResearchConsentMissing: Option[BroadConsent.ReasonMissing.Value]
@@ -191,11 +195,12 @@ object Submission
       (
         (JsPath \ "type").read[Submission.Type.Value] and
         (JsPath \ "transferTAN").read[Id[TransferTAN]] and
+        (JsPath \ "episodeOfCare").readNullable[Reference[EpisodeOfCare]] and
         (JsPath \ "modelProjectConsent").read[ModelProjectConsent] and
         (JsPath \ "researchConsents").readNullable(Reads.list(Json.valueReads[UnvalidatedBroadConsent])) and
         (JsPath \ "reasonResearchConsentMissing").readNullable[BroadConsent.ReasonMissing.Value]
       )(
-        Submission.Metadata(_,_,_,_,_)
+        Submission.Metadata(_,_,_,_,_,_)
       )
     
     def submission[T <: PatientRecord: Reads]: Reads[Submission[T]] =

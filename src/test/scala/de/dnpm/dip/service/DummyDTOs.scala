@@ -24,7 +24,7 @@ import play.api.libs.json.{
 
 final case class DummyEpisodeOfCare
 (
-  id: Id[EpisodeOfCare],
+  id: Id[DummyEpisodeOfCare],
   patient: Reference[Patient],
   period: Period[LocalDate],
   diagnoses: Option[List[Reference[Diagnosis]]] = None
@@ -62,6 +62,7 @@ final case class DummyCarePlan
   id: Id[CarePlan],
   patient: Reference[Patient],
   issuedOn: LocalDate,
+  boardType: Option[Coding[CarePlan.BoardType.Value]],
   noSequencingPerformedReason: Option[Coding[CarePlan.NoSequencingPerformedReason.Value]]
 )
 extends CarePlan
