@@ -24,7 +24,7 @@ import play.api.libs.json.{
 
 final case class DummyEpisodeOfCare
 (
-  id: Id[EpisodeOfCare],
+  id: Id[DummyEpisodeOfCare],
   patient: Reference[Patient],
   period: Period[LocalDate],
   diagnoses: Option[List[Reference[Diagnosis]]] = None

@@ -30,12 +30,12 @@ object extensions
       record.episodesOfCare.toList.maxBy(_.period.start)
 
 
+    // Get the indication board CarePlan as the latest with this boardType (if defined),
+    // else, by default, get the indication board CarePlan as the first by date 
     def indicationCarePlan: Option[CarePlan] = 
-      // Get the indication board CarePlan as the latest with this boardType (if defined)
       record.getCarePlans
         .filter(_.boardType.exists(_.code.enumValue == CarePlan.BoardType.IndicationBoard))
         .maxByOption(_.issuedOn)
-        // Fallback: Get the indication board CarePlan as the first by date 
         .orElse(
           record.getCarePlans.minByOption(_.issuedOn)
         )

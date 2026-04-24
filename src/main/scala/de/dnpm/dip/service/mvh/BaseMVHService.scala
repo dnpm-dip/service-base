@@ -6,6 +6,7 @@ import java.time.{
   LocalDateTime
 }
 import cats.Monad
+import cats.data.NonEmptyList
 import cats.syntax.either._
 import cats.syntax.functor._
 import cats.syntax.flatMap._
@@ -13,6 +14,7 @@ import de.dnpm.dip.util.Logging
 import de.dnpm.dip.service.Distribution
 import de.dnpm.dip.model.{
   ClosedPeriod,
+  EpisodeOfCare,
   Id,
   NGSReport,
   PatientRecord,
@@ -58,6 +60,32 @@ with Logging
   protected def sequenceTypes(record: T): Option[Set[Submission.SequenceType.Value]]
 
 
+  /**
+   * Check whether an 'initial' Submission.Report exists for the given EpisodeOfCare.
+   *
+   * Given that the EpisodeOfCare reference on Submission.Metadata is optional (for backwards compatibility)
+   * and may thus not be defined, fallback logic is required:
+   * If defined, check whether an 'initial' submission exists for this Id[EpisodeOfCare]
+   *
+   * Else assume the Submission to pertain to the current, i.e. latest declared EpisodeOfCare and
+   * check whether and 'initial' submissions exists after this EpisodeOfCare's start date 
+   */
+  private def initialSubmissionExistsForEpisode(
+    reports: NonEmptyList[Submission.Report],
+    episode: Option[EpisodeOfCare],
+    record: T
+  ): Boolean =
+    episode match {
+      case Some(episode) =>
+        reports.exists(sub => sub.episodeOfCare.exists(_ == episode.id) && sub.`type` == Initial)
+
+      case None => 
+        val episodeStart =  record.currentEpisodeOfCare.period.start.atTime(LocalTime.MIN)
+        reports.exists(sub => sub.createdAt.isAfter(episodeStart) && sub.`type` == Initial)
+    }
+
+
+
   override def !(cmd: Command[T])(
     implicit env: Env
   ): F[Either[Error,Outcome]] =
@@ -86,26 +114,28 @@ with Logging
             case None =>
               for {
 
-                priorSubmissions <- repo.submissionReportHistory(record.patient.id).map(_.map(_.history))
+                priorSubmissionReports <- repo.submissionReportHistory(record.patient.id).map(_.map(_.history))
 
-                currentEpisodeStart = record.currentEpisodeOfCare.period.start.atTime(LocalTime.MIN)
+                episode = metadata.episodeOfCare.flatMap(_ resolveOn record.episodesOfCare)
 
                 // Check acceptability of submission type for the given Patient
                 optSubmissionTypeError = metadata.`type` match {
 
-                  // An Initial submission must be the first at all for the current EpisodeOfCare
+                  // An Initial submission must be the first at all for the current EpisodeOfCare,
+                  // so report an error if one already exists, or for additional safety given the newly introduced
+                  // reference Submission.Metadata.episodeOfCare, there are not more EpisodesOfCare than 'initial' submissions
                   case Initial =>
-                    priorSubmissions match {
-                      case Some(submissions) if submissions.exists(sub => sub.createdAt.isAfter(currentEpisodeStart) && sub.`type` == Initial) =>
-                        Some(InvalidSubmissionType(s"Invalid submission: at most one ${Initial} submission allowed per EpisodeOfCare"))
+                    priorSubmissionReports match {
+                      case Some(reports) if initialSubmissionExistsForEpisode(reports,episode,record) || (record.episodesOfCare.size <= reports.toList.count(_.`type` == Initial)) =>
+                        Some(InvalidSubmissionType(s"Invalid submission: only one ${Initial} submission allowed per EpisodeOfCare"))
 
                       case _ => None
                     }
       
                   // Conversely, Addition, Correction, FollowUp can only be appended if an initial submission exists in the current EpisodeOfCare
                   case Addition | Correction | FollowUp =>
-                    priorSubmissions match {
-                      case Some(submissions) if submissions.exists(sub => sub.createdAt.isAfter(currentEpisodeStart) && sub.`type` == Initial) =>
+                    priorSubmissionReports match {
+                      case Some(reports) if initialSubmissionExistsForEpisode(reports,episode,record) =>
                         None
 
                       case _ =>
@@ -123,7 +153,7 @@ with Logging
                     processSubmission(
                       record,
                       metadata,
-                      priorSubmissions
+                      priorSubmissionReports
                         .map(_.filterNot(_.`type` == Test))  // Exclude 'test' SubmissionReports from processing (consent revocation check)
                         .flatMap(_.maxByOption(_.createdAt))
                     )
@@ -210,7 +240,7 @@ with Logging
           metadata.transferTAN,
           submittedAt,
           record.patient.id,
-          Some(record.currentEpisodeOfCare.id),
+          metadata.episodeOfCare.map(_.id).orElse(Some(record.currentEpisodeOfCare.id)),
           Unsubmitted,
           Site.local,
           useCase,

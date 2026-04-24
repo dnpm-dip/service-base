@@ -14,7 +14,6 @@ import de.dnpm.dip.model.{
   Address,
   CarePlan,
   Diagnosis,
-  EpisodeOfCare,
   ExternalId,
   FollowUp,
   NGSReport,
@@ -33,6 +32,7 @@ import de.dnpm.dip.service.mvh.{
   Submission,
   TransferTAN
 }
+import de.dnpm.dip.service.mvh.extensions._
 import play.api.libs.json.Json
 
 
@@ -107,7 +107,7 @@ object Gens
     patient: Patient
   ): Gen[DummyEpisodeOfCare] =
     for { 
-      id <- Gen.of[Id[EpisodeOfCare]]
+      id <- Gen.of[Id[DummyEpisodeOfCare]]
       period = Period(LocalDate.now.minusMonths(6))
     } yield DummyEpisodeOfCare(
       id,
@@ -217,6 +217,7 @@ object Gens
     } yield Submission.Metadata(
       submissionType,
       tan,
+      None,
       ModelProjectConsent(
         "Patient Info TE Consent MVGenomSeq vers01",
         Some(date),
@@ -258,6 +259,7 @@ object Gens
     } yield Submission.Metadata(
       submissionType,
       tan,
+      Some(Reference.to(record.currentEpisodeOfCare)),
       ModelProjectConsent(
         "Patient Info TE Consent MVGenomSeq vers01",
         Some(consentDate minusDays 1),
