@@ -216,7 +216,6 @@ trait Validators
       )
       .map(_.asInstanceOf[Coding[H :+: T]])
       
-
   
   implicit def terminalCoproductCodingValidator[H](
     implicit
@@ -239,9 +238,9 @@ trait Validators
   }
 
 
-  implicit def referenceValidator[T <: { def id: Id[_] }](
+  implicit def referenceValidator[T](
     implicit
-    ts: Iterable[T],
+    resolver: Reference.Resolver[T],
     node: Path.Node[T],
   ): NegatableValidator[Issue.Builder,Reference[T]] =
     ref => ref.resolve must be (defined) otherwise (
@@ -253,11 +252,14 @@ trait Validators
     implicit
     t: T,
     node: Path.Node[T],
-  ): NegatableValidator[Issue.Builder,Reference[T]] =
-    ref => ref.resolveOn(List(t)) must be (defined) otherwise (
+  ): NegatableValidator[Issue.Builder,Reference[T]] = {
+
+    import scala.language.reflectiveCalls
+
+    ref => ref.id == t.id must be (true) otherwise (
       Fatal(s"Nicht auflösbare Referenz-ID '${ref.id}' auf Objekt '${node.name}'")
     ) map (_ => ref)
-
+  }
 
   implicit def geneAlterationReferenceValidator[T <: BaseVariant: Path.Node](
     implicit
