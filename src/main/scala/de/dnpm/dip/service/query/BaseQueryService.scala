@@ -558,25 +558,21 @@ with Logging
     querier: Querier
   ): F[Either[String,Option[Snapshot[PatientRecord]]]] = {
 
+    // Explicit Reads[Option[_]] required here because apparently, implicit resolution of Reads[Option[_]]
+    // doesn't work at the top-level, which sort of makes sense:
+    // Reading an optional field on a top-level DTO-type T has a clear rationale.
+    // However, expecting/reading a Option[T] as top-level JSON structure is a bit unusual,
+    // but required here, in order to use PeerToPeerRequest.ResultType consistently
+    implicit lazy val readsOptPatRec = Reads.optionWithNull[Snapshot[PatientRecord]]
+
     log.info(
       s"Retrieving Patient Record $patient ${snapshot.map(snp => s"(Snapshot $snp)").getOrElse("")} from Site ${targetSite.code} for $querier"
     )
 
-    if (targetSite == Site.local){
-      (db ? (patient,snapshot)).map {
-        case snp: Some[Snapshot[PatientRecord]] => snp.asRight
-        case _ => s"Invalid Patient ID ${patient.value}${snapshot.map(snp => s" and/or Snapshot ID $snp")})".asLeft
-      }
+    if (targetSite == Site.local)
+      (db ? (patient,snapshot)).map(_.asRight)
 
-    } else {
-
-      // Explicit Reads[Option[_]] required here because apparently, implicit resolution of Reads[Option[_]]
-      // doesn't work at the top-level, which sort of makes sense:
-      // Reading an optional field on a top-level DTO T has a clear rationale.
-      // However, expecting/reading a Option[T] as top-level JSON structure is a bit unusual,
-      // but required here, in order to use PeerToPeerRequest.ResultType consistently
-      implicit val readsOptPatRec = Reads.optionNoError[Snapshot[PatientRecord]]
-
+    else
       connector ! (
         PatientRecordRequest[PatientRecord](
           Site.local,
@@ -586,7 +582,7 @@ with Logging
         ),
         targetSite
       )
-    }
+    
   }
 
 
@@ -630,38 +626,5 @@ with Logging
     } else {
       "Federated Queries not activated".asLeft.pure
     }
-
-
-/*
-  override def !(request: Request)(
-    implicit env: Monad[F]
-  ): F[Either[String,request.ResultType]] = 
-    if (federatedQueriesActive){
-      request match {
-        case query: FederatedQuery[Criteria,PatientRecord] =>
-
-          log.info(
-            s"""Processing peer-to-peer query from site ${query.origin.code.value}, Querier: ${query.querier} Criteria:\n${Json.prettyPrint(Json.toJson(query.criteria))}"""
-          )
-          
-          // Expand the query criteria
-          db ? query.criteria.map(CriteriaExpander)
-
-        case req: PatientRecordRequest[PatientRecord] =>
-
-          log.info(
-            s"""Processing PatientRecord from site ${req.origin.code}, Querier: ${req.querier}, Patient-ID ${req.patient} Snapshot-ID ${req.snapshot.getOrElse("-")}"""
-          )
-         
-          (db ? (req.patient,req.snapshot)).map {
-            case snp: Some[Snapshot[PatientRecord]] => snp.asRight[String]
-            case _ => s"Invalid Patient ID ${req.patient.value}${req.snapshot.map(snp => s" and/or Snapshot ID $snp")})".asLeft
-          }
-      }
-
-    } else {
-      "Federated Queries not activated".asLeft.pure
-    }
-*/
 
 }
