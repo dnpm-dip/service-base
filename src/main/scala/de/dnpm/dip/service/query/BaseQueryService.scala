@@ -33,6 +33,12 @@ import play.api.libs.json.{
   Reads
 }
 
+object BaseQueryService
+{
+  val federatedQueriesInactivated =
+    "Federated Queries not activated"
+}
+
 
 abstract class BaseQueryService[
   F[+_],
@@ -412,31 +418,6 @@ with Logging
 
   }
 
-/*
-  // Introduced as a (temporary) workaround:
-  // The current data protection concept doesn't allow federated queries.
-  // To avoid changing all components from the UI to here, just execute any query locally under the hood.
-  private def executeQuery(
-    id: Query.Id,
-    sites: Set[Coding[Site]],
-    criteria: Option[Criteria]
-  )(
-    implicit env: Monad[F]
-  ): F[Map[Coding[Site],Either[String,Seq[Query.Match[PatientRecord,Criteria]]]]] = {
-
-    // Expand the query criteria only here,
-    // to save bandwidth transmitting them to peers and
-    // to avoid "log pollution" with potentially very long expanded criteria 
-    sites.contains(Site.local) match {
-      case true =>
-        (db ? criteria.map(CriteriaExpander))
-          .map(results => Map(Site.local -> results))
-
-      case _ => Map.empty.pure[F]
-    }
-
-  }
-*/
 
   private def executeQuery(
     id: Query.Id,
@@ -449,8 +430,6 @@ with Logging
   ): F[Map[Coding[Site],Either[String,Seq[Query.Match[PatientRecord,Criteria]]]]] = {
 
     import cats.syntax.apply._
-
-    //TODO: Logging
 
     val externalResults =
       (sites - Site.local) match {
@@ -603,7 +582,7 @@ with Logging
       db ? req.criteria.map(CriteriaExpander)
 
     } else {
-      "Federated Queries not activated".asLeft.pure
+      BaseQueryService.federatedQueriesInactivated.asLeft.pure
     }
 
 
@@ -624,7 +603,7 @@ with Logging
       (db ? (req.patient,req.snapshot)).map(_.asRight)
 
     } else {
-      "Federated Queries not activated".asLeft.pure
+      BaseQueryService.federatedQueriesInactivated.asLeft.pure
     }
 
 }

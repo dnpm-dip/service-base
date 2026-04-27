@@ -3,6 +3,7 @@ package de.dnpm.dip.service.query
 
 import scala.concurrent.Future
 import org.scalatest.flatspec.AsyncFlatSpec
+import org.scalatest.matchers.must.Matchers._
 import de.dnpm.dip.model.{
   Id,
   Site
@@ -27,7 +28,8 @@ class QueryServiceTests extends AsyncFlatSpec
         None
       )
 
-    } yield assert(result.isLeft)
+    } yield result mustBe Left(BaseQueryService.federatedQueriesInactivated)
+
   }
 
 
@@ -41,7 +43,8 @@ class QueryServiceTests extends AsyncFlatSpec
         None
       )
 
-    } yield assert(result.isLeft)
+    } yield result mustBe Left(BaseQueryService.federatedQueriesInactivated)
+
   }
 
 }
