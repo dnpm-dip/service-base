@@ -43,7 +43,7 @@ class OrchestratorTests extends AsyncFlatSpec
 
   val mvhService = new FakeMVHService[Future,DummyPatientRecord]
 
-  val queryService = new FakeQueryService[Future,DummyPatientRecord]()
+  val queryService = new FakeQueryService[Future,DummyPatientRecord](true)
 
 
   val orchestrator =
@@ -106,7 +106,7 @@ class OrchestratorTests extends AsyncFlatSpec
       snapshot <- queryService ! retrievalRequest
 
       // The data mst have been saved in the queryService
-      _ = snapshot.value.data.id mustBe record.id
+      _ = snapshot.value.value.data.id mustBe record.id
 
     } yield succeed // If not failed before, test passed
 
@@ -128,7 +128,7 @@ class OrchestratorTests extends AsyncFlatSpec
       snapshot <- queryService ! retrievalRequest
 
       // Now the data mst have been deleted from the queryService
-      _ = snapshot must not be defined
+      _ = snapshot.value must not be defined
 
     } yield succeed // If not failed before, test passed
 
@@ -148,7 +148,7 @@ class OrchestratorTests extends AsyncFlatSpec
     
       snapshot <- queryService ! retrievalRequest
 
-     _ = snapshot must not be defined
+     _ = snapshot.value must not be defined
 
     } yield succeed // If not failed before, test passed
 

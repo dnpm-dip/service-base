@@ -6,12 +6,12 @@ import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
   Id,
   Patient,
-  Snapshot,
-  Site
+  Site,
+  Snapshot
 }
 import play.api.libs.json.{
   Json,
-  Writes
+  Writes,
 }
 
 
@@ -81,6 +81,7 @@ object QueryService
       querier: Querier
     ): F[Option[PatientRecord]]
     
+    
     def retrievePatientRecord(
       site: Coding[Site],
       patient: Id[Patient],
@@ -89,25 +90,23 @@ object QueryService
       implicit
       env: Env,
       querier: Querier
-    ): F[Either[Err,Snapshot[PatientRecord]]]
+    ): F[Either[Err,Option[Snapshot[PatientRecord]]]]
     
     
     // Peer-to-peer Ops
     def !(
-      req: PeerToPeerQuery[Criteria,PatientRecord]
+      req: FederatedQuery[Criteria,PatientRecord]
     )(
-      implicit
-      env: Env
-    ): F[Either[Err,Seq[Query.Match[PatientRecord,Criteria]]]]
+      implicit env: Env
+    ): F[Either[Err,req.ResultType]]
     
     
     def !(
       req: PatientRecordRequest[PatientRecord]
     )(
-      implicit
-      env: Env
-    ): F[Option[req.ResultType]]
-
+      implicit env: Env
+    ): F[Either[Err,req.ResultType]]
+    
   }
 
 
