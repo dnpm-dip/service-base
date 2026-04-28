@@ -31,12 +31,12 @@ object QueryService
     type Criteria      = UseCase#Criteria
     type Results       = UseCase#Results
    
+    def federatedQueriesActive: Boolean
 
     def sites(
       implicit env: Env
     ): F[Sites]
-    
-    
+   
     def !(
       cmd: Query.Command[Criteria]
     )(

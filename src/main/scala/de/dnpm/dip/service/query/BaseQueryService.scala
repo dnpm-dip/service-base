@@ -33,13 +33,6 @@ import play.api.libs.json.{
   Reads
 }
 
-object BaseQueryService
-{
-  val federatedQueriesInactivated =
-    "Federated Queries not activated"
-}
-
-
 abstract class BaseQueryService[
   F[+_],
   UseCase <: UseCaseConfig,
@@ -61,9 +54,9 @@ with Logging
   import cats.syntax.functor._
   import cats.syntax.flatMap._
   import de.dnpm.dip.util.Completer.syntax._
+  import BaseQueryService.FEDERATED_QUERIES_INACTIVE
 
   
-  protected val federatedQueriesActive: Boolean
   protected val preparedQueryDB: PreparedQueryDB[F,Monad[F],Criteria,String]
   protected val db: LocalDB[F,Monad[F],Criteria,PatientRecord]
   protected val connector: Connector[F,Monad[F]]
@@ -566,23 +559,21 @@ with Logging
 
 
   override def !(
-    req: FederatedQuery[Criteria,PatientRecord]
+    query: FederatedQuery[Criteria,PatientRecord]
   )(
     implicit env: Monad[F]
-  ): F[Either[String,req.ResultType]] = 
+  ): F[Either[String,query.ResultType]] = 
     if (federatedQueriesActive){
 
       log.info(
-        s"""Processing peer-to-peer query from site ${req.origin.code.value}
-            Querier: ${req.querier.value}
-            Criteria:\n${Json.prettyPrint(Json.toJson(req.criteria))}"""
+        s"""Processing peer-to-peer query from site ${query.origin.code.value}, Querier: ${query.querier.value}, Criteria:\n${Json.prettyPrint(Json.toJson(query.criteria))}"""
       )
       
       // Expand the query criteria
-      db ? req.criteria.map(CriteriaExpander)
+      db ? query.criteria.map(CriteriaExpander)
 
     } else {
-      BaseQueryService.federatedQueriesInactivated.asLeft.pure
+      FEDERATED_QUERIES_INACTIVE.asLeft.pure
     }
 
 
@@ -603,7 +594,13 @@ with Logging
       (db ? (req.patient,req.snapshot)).map(_.asRight)
 
     } else {
-      BaseQueryService.federatedQueriesInactivated.asLeft.pure
+      FEDERATED_QUERIES_INACTIVE.asLeft.pure
     }
 
+}
+
+
+object BaseQueryService
+{
+  val FEDERATED_QUERIES_INACTIVE = "Federated Queries not activated"
 }

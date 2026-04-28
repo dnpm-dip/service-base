@@ -9,7 +9,7 @@ import de.dnpm.dip.model.{
   Site
 }
 import de.dnpm.dip.service.DummyPatientRecord
-
+import BaseQueryService.FEDERATED_QUERIES_INACTIVE
 
 class QueryServiceTests extends AsyncFlatSpec
 { 
@@ -28,7 +28,7 @@ class QueryServiceTests extends AsyncFlatSpec
         None
       )
 
-    } yield result mustBe Left(BaseQueryService.federatedQueriesInactivated)
+    } yield result mustBe Left(FEDERATED_QUERIES_INACTIVE)
 
   }
 
@@ -43,7 +43,7 @@ class QueryServiceTests extends AsyncFlatSpec
         None
       )
 
-    } yield result mustBe Left(BaseQueryService.federatedQueriesInactivated)
+    } yield result mustBe Left(FEDERATED_QUERIES_INACTIVE)
 
   }
 
