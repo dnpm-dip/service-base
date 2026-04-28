@@ -27,6 +27,7 @@ import de.dnpm.dip.coding.hgnc.HGNC
 import de.dnpm.dip.coding.UnregisteredMedication
 import de.dnpm.dip.model.{
   BaseVariant,
+  CarePlan,
   ClosedInterval,
   Diagnosis,
   EpisodeOfCare,
@@ -125,6 +126,9 @@ trait Validators
 
   implicit def diagnosisNode[D <: Diagnosis]: Path.Node[D] =
     Path.Node("Diagnose")
+
+  implicit val carePlanNode: Path.Node[CarePlan] =
+    Path.Node("Board-Beschluss")
 
   implicit def therapyRecommendationNode[R <: TherapyRecommendation]: Path.Node[R] =
     Path.Node("Therapie-Empfehlung")
@@ -407,7 +411,13 @@ trait Validators
 
   def PatientRecordValidator[T <: PatientRecord]: Validator[Issue,T] = 
     record =>
-      validate(record.patient).map(_ => record)
+      (
+        validate(record.patient),
+        record.getCarePlans.validateEach(
+          carePlan => carePlan.boardType must be (defined) otherwise (MissingValue("Board-Typ")) map (_ => carePlan)
+        )
+      )
+      .errorsOr(record)
 
 
   private val hexString64 = "[a-fA-F0-9]{64}".r
