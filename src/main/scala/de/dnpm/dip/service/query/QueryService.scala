@@ -11,19 +11,14 @@ import de.dnpm.dip.model.{
 }
 import play.api.libs.json.{
   Json,
-  Writes,
+  OFormat
 }
 
 
 object QueryService
 {
 
-  trait Ops[
-    F[+_],
-    Env,
-    UseCase <: UseCaseConfig,
-    Err
-  ]
+  trait Ops[F[+_],Env,UseCase <: UseCaseConfig,Err]
   {
     self =>
     
@@ -124,37 +119,36 @@ object QueryService
 
   trait DataOps[F[_],Env,T]
   {
-    
     def !(cmd: DataCommand[T])(
       implicit env: Env
     ): F[Either[DataError,DataOutcome[T]]]
-    
-    def statusInfo(
-      implicit env: Env
-    ): F[StatusInfo]
-
   }
+
 
   final case class StatusInfo
   (
+    federatedQueriesActive: Boolean,
     total: Int
   )
 
   object StatusInfo
   {
-    implicit val format: Writes[StatusInfo] =
-      Json.writes[StatusInfo]
+    trait Ops[F[_],Env]
+    {
+      def statusInfo(
+        implicit env: Env
+      ): F[QueryService.StatusInfo]
+    }
+
+    implicit val format: OFormat[StatusInfo] =
+      Json.format[StatusInfo]
   }
 
 }
 
 
-trait QueryService[
-  F[+_],
-  Env,
-  UseCase <: UseCaseConfig,
-]
+trait QueryService[F[+_],Env,UseCase <: UseCaseConfig]
 extends QueryService.Ops[F,Env,UseCase,String]
 with QueryService.DataOps[F,Env,UseCase#PatientRecord]
 with PreparedQueryOps[F,Env,UseCase#Criteria,String]
-
+with QueryService.StatusInfo.Ops[F,Env]

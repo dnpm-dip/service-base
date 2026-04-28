@@ -9,7 +9,7 @@ import de.dnpm.dip.model.{
 import de.dnpm.dip.service.DataUpload
 import play.api.libs.json.{
   Json,
-  Writes
+  OFormat
 }
 
 object ValidationService
@@ -47,8 +47,8 @@ object ValidationService
 
   object StatusInfo
   {
-    implicit val format: Writes[StatusInfo] =
-      Json.writes[StatusInfo]
+    implicit val format: OFormat[StatusInfo] =
+      Json.format[StatusInfo]
   }
 
 }
