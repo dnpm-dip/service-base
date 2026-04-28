@@ -7,12 +7,18 @@ import scala.util.{
   Right
 }
 import cats.Monad
+import cats.data.{
+  EitherNel,
+  Ior
+}
 import cats.syntax.either._
+import cats.syntax.ior._
 import cats.syntax.applicative._
 import cats.syntax.functor._
 import cats.syntax.flatMap._
 import cats.syntax.traverse._
 import de.dnpm.dip.util.Completer
+import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
   Id,
   Patient,
@@ -94,7 +100,9 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
 (
   validationService: ValidationService[F,Monad[F],T],
   mvhService: MVHService[F,Monad[F],T],
-  queryService: QueryService.DataOps[F,Monad[F],T]
+  queryService: QueryService.DataOps[F,Monad[F],T] with QueryService.StatusInfo.Ops[F,Monad[F]]
+)(
+  connector: Connector[F,Monad[F]]
 )(
   implicit patientSetter: (T,Patient) => T
 )
@@ -240,6 +248,101 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
     }
 
 
+  def process(
+    request: LocalStatusInfo.Request
+  )(
+    implicit env: Monad[F]
+  ): F[request.ResultType] =
+    localStatusInfo(request.criteria)
+
+
+  private def localStatusInfo(
+    criteria: StatusInfo.Criteria
+  )(
+    implicit env: Monad[F]
+  ): F[LocalStatusInfo] = {
+
+    val mvhStatus = mvhService.statusInfo
+
+    val queryStatus = queryService.statusInfo
+
+    for {
+      mvh <- mvhStatus
+      query <- queryStatus
+    } yield LocalStatusInfo(
+      Site.local,
+      LocalDateTime.now,
+      mvh,
+      query
+    )
+  }
+
+
+  def aggregatedStatusInfo(
+    criteria: StatusInfo.Criteria,
+    optTargetSites: Option[Set[Coding[Site]]]
+  )(
+    implicit env: Monad[F]
+  ): F[EitherNel[String,AggregatedStatusInfo]] = { 
+
+    val targetSites =
+      optTargetSites.getOrElse(connector.otherSites + Site.local)
+
+    val localResult =
+      if (targetSites contains Site.local)
+        for { local <- localStatusInfo(criteria) } yield Some(local) 
+      else None.pure
+
+    val externalResultsBySite =
+      (targetSites - Site.local) match { 
+        case sites if sites.nonEmpty =>
+          for {
+            resultsBySite <- connector ! (LocalStatusInfo.Request(Site.local,criteria), sites)
+          } yield resultsBySite.foldLeft(
+            List.empty[LocalStatusInfo].rightIor[String].toIorNel
+          ){
+            case (acc,(site,result)) =>
+              acc combine result.bimap(err => s"Site ${site.code}: $err", List(_)).toIor.toIorNel
+          }
+
+        case _ => env.pure(List.empty.rightIor.toIorNel)
+      }
+
+    for { 
+      local <- localResult
+
+      external <- externalResultsBySite
+
+      result = external match {
+
+        case Ior.Right(parts) =>
+          AggregatedStatusInfo(
+            LocalDateTime.now,
+            targetSites.toList,
+            criteria,
+            parts ++ local,
+            None
+          )
+          .asRight
+
+        case Ior.Both(errors,parts) =>
+          AggregatedStatusInfo(
+            LocalDateTime.now,
+            targetSites.toList,
+            criteria,
+            parts ++ local,
+            Some(errors)
+          )
+          .asRight
+
+        case Ior.Left(errors) => errors.asLeft
+
+      }
+    
+    } yield result
+  }
+
+/*
   def statusInfo(
     implicit env: Monad[F]
   ): F[LocalStatusInfo] =
@@ -254,5 +357,5 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
       mvh,
       query
     )
-
+*/
 }

@@ -51,6 +51,8 @@ class OrchestratorTests extends AsyncFlatSpec
       validationService,
       mvhService,
       queryService
+    )(
+      FakeConnector[Future]
     )
 
   val record = Gen.of[DummyPatientRecord].next

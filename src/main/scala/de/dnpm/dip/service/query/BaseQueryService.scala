@@ -79,8 +79,7 @@ with Logging
 
   protected implicit val siteCompleter: Completer[Coding[Site]] = {
 
-    val sites =
-      Site.local :: connector.otherSites.toList
+    val sites = Site.local :: connector.otherSites.toList
 
     Completer.of(
       site =>
@@ -93,7 +92,7 @@ with Logging
     implicit env: Monad[F]
   ): F[QueryService.StatusInfo] =
     db.totalRecords
-      .map(QueryService.StatusInfo(_))
+      .map(QueryService.StatusInfo(federatedQueriesActive,_))
 
 
   override def sites(
