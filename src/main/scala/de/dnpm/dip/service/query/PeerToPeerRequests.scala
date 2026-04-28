@@ -1,7 +1,6 @@
 package de.dnpm.dip.service.query
 
 
-
 import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
   Id,
@@ -17,25 +16,27 @@ import play.api.libs.json.{
 }
 
 
-final case class PeerToPeerQuery[Criteria,PatientRecord]
+sealed trait Request extends PeerToPeerRequest
+
+final case class FederatedQuery[Criteria,PatientRecord]
 (
   origin: Coding[Site],
   querier: Querier,
   criteria: Option[Criteria]
 )
-extends PeerToPeerRequest
+extends Request
 {
   type ResultType = Seq[Query.Match[PatientRecord,Criteria]]
 }
 
 
-object PeerToPeerQuery
+object FederatedQuery
 {
-  implicit def reads[Criteria: Reads,PatientRecord: Reads]: Reads[PeerToPeerQuery[Criteria,PatientRecord]] =
-    Json.reads[PeerToPeerQuery[Criteria,PatientRecord]]
+  implicit def reads[Criteria: Reads,PatientRecord: Reads]: Reads[FederatedQuery[Criteria,PatientRecord]] =
+    Json.reads[FederatedQuery[Criteria,PatientRecord]]
 
-  implicit def writes[Criteria: Writes,PatientRecord: Writes]: Writes[PeerToPeerQuery[Criteria,PatientRecord]] =
-    Json.writes[PeerToPeerQuery[Criteria,PatientRecord]]
+  implicit def writes[Criteria: Writes,PatientRecord: Writes]: Writes[FederatedQuery[Criteria,PatientRecord]] =
+    Json.writes[FederatedQuery[Criteria,PatientRecord]]
 }
 
 
@@ -47,9 +48,9 @@ final case class PatientRecordRequest[PatientRecord]
   patient: Id[Patient],
   snapshot: Option[Long]
 )
-extends PeerToPeerRequest
+extends Request
 {
-  type ResultType = Snapshot[PatientRecord]
+  type ResultType = Option[Snapshot[PatientRecord]]
 }
 
 object PatientRecordRequest
@@ -60,4 +61,3 @@ object PatientRecordRequest
   implicit def writes[PatientRecord: Writes]: Writes[PatientRecordRequest[PatientRecord]] =
     Json.writes[PatientRecordRequest[PatientRecord]]
 }
-

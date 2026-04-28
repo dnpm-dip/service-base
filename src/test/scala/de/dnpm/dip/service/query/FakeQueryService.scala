@@ -90,10 +90,12 @@ final class FakeConnector[F[_]] extends Connector[F,Monad[F]]
 
 final class FakeQueryService[F[+_],T <: PatientRecord: Format]
 (
+  override val federatedQueriesActive: Boolean,
   override val connector: Connector[F,Monad[F]] = new FakeConnector[F]
 )
 extends BaseQueryService[F,FakeConfig[T]]
 {
+
 
   override val preparedQueryDB =
     new InMemPreparedQueryDB[F,Monad,Criteria]

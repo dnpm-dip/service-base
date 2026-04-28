@@ -65,9 +65,9 @@ object Query
 
     override val display =
       Map(
-        Local     -> "Lokal",
-        Federated -> "Föderiert (Standort-übergreifend)",
-        Custom    -> "Nutzer-definiert (gezielte Standort-Auswahl)"
+        Local     -> "Lokal: eigener Standort",
+        Federated -> "Föderiert: alle Standorte",
+        Custom    -> "Nutzer-definiert: gezielte Standort-Auswahl"
       )
 
     final class ProviderSPI extends CodeSystemProviderSPI
