@@ -34,8 +34,9 @@ object StatusInfo
 {
   final case class Criteria
   (
-    episodeOfCarePeriod: Option[Period[LocalDate]]
+    episodeOfCarePeriod: Option[Period[LocalDate]] = None
   )
+
 
   implicit val formatCriteria: OFormat[Criteria] =
     Json.format[Criteria]
@@ -71,7 +72,7 @@ object LocalStatusInfo
     Json.format[LocalStatusInfo]
 }
 
-final case class AggregatedStatusInfo
+final case class FederatedStatusInfo
 (
   compiledAt: LocalDateTime,
   sites: List[Coding[Site]],
@@ -80,10 +81,10 @@ final case class AggregatedStatusInfo
   errors: Option[NonEmptyList[String]]
 )
 
-object AggregatedStatusInfo
+object FederatedStatusInfo
 { 
   import de.dnpm.dip.util.json.writesNel
 
-  implicit val format: OWrites[AggregatedStatusInfo] =
-    Json.writes[AggregatedStatusInfo]
+  implicit val format: OWrites[FederatedStatusInfo] =
+    Json.writes[FederatedStatusInfo]
 }

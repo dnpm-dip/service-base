@@ -256,7 +256,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
     localStatusInfo(request.criteria)
 
 
-  private def localStatusInfo(
+  private[service] def localStatusInfo(
     criteria: StatusInfo.Criteria
   )(
     implicit env: Monad[F]
@@ -278,12 +278,12 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
   }
 
 
-  def aggregatedStatusInfo(
+  def federatedStatusInfo(
     criteria: StatusInfo.Criteria,
     optTargetSites: Option[Set[Coding[Site]]]
   )(
     implicit env: Monad[F]
-  ): F[EitherNel[String,AggregatedStatusInfo]] = { 
+  ): F[EitherNel[String,FederatedStatusInfo]] = { 
 
     val targetSites =
       optTargetSites.getOrElse(connector.otherSites + Site.local)
@@ -316,7 +316,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
       result = external match {
 
         case Ior.Right(parts) =>
-          AggregatedStatusInfo(
+          FederatedStatusInfo(
             LocalDateTime.now,
             targetSites.toList,
             criteria,
@@ -326,7 +326,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
           .asRight
 
         case Ior.Both(errors,parts) =>
-          AggregatedStatusInfo(
+          FederatedStatusInfo(
             LocalDateTime.now,
             targetSites.toList,
             criteria,
@@ -341,6 +341,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
     
     } yield result
   }
+
 
 /*
   def statusInfo(
