@@ -154,50 +154,7 @@ with Logging
         .tap(_ => in.close)
 
 
-  private val cachedReports: Map[Id[TransferTAN],Submission.Report] = {
-
-    // Migrate persisted Submissions and SubmissionReports from the previous to the new file naming pattern
-    // TODO: Remove when ensured all sites have successfully migrated
-    @annotation.unused val oldFileMigration = {
-      val failedReportMigrations =
-        dataDir.listFiles(
-          (_,name) =>
-            (name startsWith REPORT_PREFIX) &&
-            !(name contains "_Patient_") && !(name contains "_TAN_") &&
-            (name endsWith ".json")
-        )
-        .foldLeft(List.empty[String]){
-          (acc,src) =>
-            val report = new FileInputStream(src) pipe readAsJson[Submission.Report]
-            val target = reportFile(report.patient,report.id)
-        
-            if (!src.renameTo(target)) s"Failed to migrate/rename $REPORT_PREFIX file $src to $target, consider performing this manually" :: acc
-            else acc
-        }
-   
-      val failedMigrations =
-        dataDir.listFiles(
-          (_,name) =>
-            (name startsWith SUBMISSION_PREFIX) &&
-            !(name contains "_Patient_") && !(name contains "_TAN_") &&
-            (name endsWith ".json")
-        )
-        .foldLeft(failedReportMigrations){
-          (acc,src) =>
-            val submission = new FileInputStream(src) pipe readAsJson(tolerantSubmissionReads)
-            val target = submissionFile(submission.record.id,submission.metadata.transferTAN)
-
-            if (!src.renameTo(target)) s"Failed to migrate/rename $SUBMISSION_PREFIX file $src to $target, consider performing this manually" :: acc
-            else acc
-        }
-      
-      if (failedMigrations.nonEmpty)
-        failedMigrations.tapEach(msg => log.error(s"FATAL - $msg"))
-          .mkString("\n")
-          .pipe(new RuntimeException(_))
-    }
-    // End of migration code
-
+  private val cachedReports: Map[Id[TransferTAN],Submission.Report] =
     TrieMap.from(
       dataDir.listFiles(
         (_,name) =>
@@ -211,7 +168,7 @@ with Logging
       .map(readAsJson[Submission.Report])
       .map(r => r.id -> r)
     )
-  }
+  
 
   // Cache the SubmissionHeaders for rapid in-memory filtering 
   private val cachedSubmissionHeaders: Map[Id[TransferTAN],SubmissionHeader] =
@@ -367,29 +324,30 @@ with Logging
       submissionDeletionErrors =
         subFiles.foldLeft(List.empty[String]){
           (acc,file) => 
-            if (file.delete) acc
-            else s"Failed to delete $SUBMISSION_PREFIX file $file" :: acc
+            if (file.delete){
+              val TAN(tan) = file
+              cachedSubmissionHeaders -= tan
+              acc
+            }
+            else s"Failed to delete $SUBMISSION_PREFIX file $file".tap(log.error) :: acc
         }
 
       deletionErrors =
         repFiles.foldLeft(submissionDeletionErrors){
           (acc,file) =>
-        
-            val TAN(tan) = file
-        
             if (file.delete){
+              val TAN(tan) = file
               cachedReports -= tan 
-              cachedSubmissionHeaders -= tan
               acc
             }
-            else s"Failed to delete $REPORT_PREFIX file $file" :: acc
+            else s"Failed to delete $REPORT_PREFIX file $file".tap(log.error) :: acc
         }
 
       result =
         if (deletionErrors.isEmpty) ().asRight
-        else deletionErrors.tapEach(log.error).mkString("; ").asLeft
+        else deletionErrors.mkString("; ").asLeft
 
     } yield result
-     
+
 }
 

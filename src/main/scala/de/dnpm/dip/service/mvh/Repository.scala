@@ -9,7 +9,7 @@ import de.dnpm.dip.model.{
 }
 
 
-trait Repository[F[_],Env,T <: PatientRecord]
+trait Repository[F[+_],Env,T <: PatientRecord]
 {
 
   protected implicit def submissionReportPredicate(filter: Submission.Report.Filter): Submission.Report => Boolean =

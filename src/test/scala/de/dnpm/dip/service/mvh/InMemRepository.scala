@@ -18,7 +18,7 @@ import de.dnpm.dip.model.{
 
 
 
-class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
+class InMemRepository[F[+_],T <: PatientRecord] extends Repository[F,Monad[F],T]
 {
 
   type Env = Monad[F]
