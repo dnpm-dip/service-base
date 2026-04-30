@@ -107,7 +107,7 @@ class OrchestratorTests extends AsyncFlatSpec
 
       snapshot <- queryService ! retrievalRequest
 
-      // The data mst have been saved in the queryService
+      // The data must have been saved in the queryService
       _ = snapshot.value.value.data.id mustBe record.id
 
     } yield succeed // If not failed before, test passed
@@ -129,7 +129,7 @@ class OrchestratorTests extends AsyncFlatSpec
 
       snapshot <- queryService ! retrievalRequest
 
-      // Now the data mst have been deleted from the queryService
+      // Now the data must have been deleted from the queryService
       _ = snapshot.value must not be defined
 
     } yield succeed // If not failed before, test passed
@@ -153,6 +153,43 @@ class OrchestratorTests extends AsyncFlatSpec
      _ = snapshot.value must not be defined
 
     } yield succeed // If not failed before, test passed
+
+  }
+
+
+  "LocalStatusInfo" must "have been correctly compiled" in { 
+
+    for {
+
+      statusInfo <- orchestrator.localStatusInfo(StatusInfo.Criteria())
+
+//      _ = statusInfo.mvGenomSeq.total mustBe 0
+      _ = statusInfo.query.total mustBe 0
+
+    } yield succeed
+
+  }
+
+  "FederatedStatusInfo" must "have been correctly compiled" in { 
+
+    val noCriteria = StatusInfo.Criteria()
+
+    for {
+
+      result <- orchestrator.federatedStatusInfo(
+        noCriteria,
+        Some(Set(Site.local))
+      )
+
+      FederatedStatusInfo(_,sites,criteria,components,errors) = result.value
+
+      _ = criteria mustBe noCriteria
+
+      _ = sites must have size 1 
+
+      _ = errors must not be (defined)
+
+    } yield succeed
 
   }
 
