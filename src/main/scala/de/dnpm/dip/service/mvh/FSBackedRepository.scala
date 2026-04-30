@@ -379,6 +379,7 @@ with Logging
         
             if (file.delete){
               cachedReports -= tan 
+              cachedSubmissionHeaders -= tan
               acc
             }
             else s"Failed to delete $REPORT_PREFIX file $file" :: acc
