@@ -41,7 +41,7 @@ class OrchestratorTests extends AsyncFlatSpec
    
   val validationService = new FakeValidationService[Future,DummyPatientRecord]
 
-  val mvhService = new FakeMVHService[Future,DummyPatientRecord]
+  val mvhService = new FakeMVHService[Future,DummyPatientRecord]()
 
   val queryService = new FakeQueryService[Future,DummyPatientRecord](true)
 

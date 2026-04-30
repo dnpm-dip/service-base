@@ -152,6 +152,4 @@ class MVHServiceTests extends AsyncFlatSpec
 
   }
 
-
-
 }

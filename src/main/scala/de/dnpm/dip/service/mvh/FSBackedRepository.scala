@@ -25,8 +25,8 @@ import play.api.libs.json.{
   Json,
   JsPath,
   Reads,
-  Writes,
-  OWrites
+  OFormat,
+  Writes
 }
 import de.dnpm.dip.util.Logging
 import de.dnpm.dip.model.{
@@ -77,7 +77,7 @@ private[mvh] object SubmissionHeader
 
   // Explicit Reads to include tolerant Reads[Submission.Metadata],
   // required for backwards compatibility with data sets potentially containing 
-  // strcutrally invalid Consent resources
+  // structurally invalid Consent resources
   implicit val reads: Reads[SubmissionHeader] =
     (
       (JsPath \ "metadata").read(Submission.tolerantReads.metadata) and
@@ -90,7 +90,7 @@ private[mvh] object SubmissionHeader
 }
 
 
-class FSBackedRepository[F[_],T <: PatientRecord: Reads: OWrites](
+class FSBackedRepository[F[+_],T <: PatientRecord: OFormat](
   dataDir: File
 )(
   implicit classTag: ClassTag[T]
@@ -213,15 +213,13 @@ with Logging
     )
   }
 
-  /**
-   * Cache the SubmissionHeaders for rapid in-memory filtering 
-   */
+  // Cache the SubmissionHeaders for rapid in-memory filtering 
   private val cachedSubmissionHeaders: Map[Id[TransferTAN],SubmissionHeader] =
     TrieMap.from(
       dataDir.listFiles(
         (_,name) => (name startsWith s"${SUBMISSION_PREFIX}_Patient") && (name endsWith ".json")
       )
-      .to(Iterable)
+      .to(LazyList)
       .map(new FileInputStream(_))
       .map(readAsJson[SubmissionHeader])
       .map(sub => sub.metadata.transferTAN -> sub)
@@ -294,20 +292,20 @@ with Logging
       .pure
 
 
-  override def ?(fltr: Submission.Filter)(
+  override def ?(filter: Submission.Filter)(
     implicit env: Env
-  ): F[Seq[Submission[T]]] = {
+  ): F[LazyList[Submission[T]]] = {
 
-    val filter: SubmissionHeader => Boolean = fltr
+    val predicate: SubmissionHeader => Boolean = filter
+
+    val reader = readAsJson(tolerantSubmissionReads)
 
     cachedSubmissionHeaders
       .collect {
-        case (tan,sub) if filter(sub) => 
-          submissionFile(sub.patient.id,tan)
-            .pipe(new FileInputStream(_))
-            .pipe(readAsJson(tolerantSubmissionReads))
+        case (tan,sub) if predicate(sub) => submissionFile(sub.patient.id,tan)
       }
-      .toSeq
+      .to(LazyList)
+      .map(file => reader(new FileInputStream(file)))
       .pure
   }
 
