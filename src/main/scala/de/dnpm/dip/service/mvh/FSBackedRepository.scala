@@ -35,6 +35,7 @@ import de.dnpm.dip.model.{
 }
 import de.dnpm.dip.service.DataCounts
 
+
 // Extractor for TANs according to file naming pattern below
 object TAN
 {
@@ -51,48 +52,6 @@ object TAN
 
 }
 
-/**
- * Light-weight "header" version of a Submission,
- * containing only the necessary data elements to perform filtering by Submission.Filter,
- */
-/*
-private[mvh] final case class PartialSubmission
-(
-  metadata: Submission.Metadata,
-  submittedAt: LocalDateTime,
-  patient: Patient,
-  episodesOfCare: NonEmptyList[EpisodeOfCare]
-)
-
-private[mvh] object PartialSubmission
-{
-  import play.api.libs.functional.syntax._
-
-  implicit def fromSubmission[T <: PatientRecord](sub: Submission[T]): PartialSubmission =
-    PartialSubmission(
-      sub.metadata,
-      sub.submittedAt,
-      sub.record.patient,
-      sub.record.episodesOfCare
-    )
-
-  import de.dnpm.dip.util.json.readsNel
-
-  // Explicit Reads to include tolerant Reads[Submission.Metadata],
-  // required for backwards compatibility with data sets potentially containing 
-  // structurally invalid Consent resources
-  implicit val reads: Reads[PartialSubmission] =
-    (
-      (JsPath \ "metadata").read(Submission.tolerantReads.metadata) and
-      (JsPath \ "submittedAt").read[LocalDateTime] and
-      (JsPath \ "patient").read[Patient] and
-      (JsPath \ "episodesOfCare").read[NonEmptyList[EpisodeOfCare]]
-    )(
-      PartialSubmission(_,_,_,_)
-    )
-
-}
-*/
 
 class FSBackedRepository[F[+_],T <: PatientRecord: OFormat](
   dataDir: File
