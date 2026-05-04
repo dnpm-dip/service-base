@@ -11,10 +11,6 @@ trait UseCaseConfig
 
   type Criteria
 
-//  type Filter <: Filters[PatientRecord]
-
-//  type Results <: ResultSet[PatientRecord,Criteria,Filter]
-
   type Results <: ResultSet[PatientRecord,Criteria]
 
   type Filter = Results#Filter

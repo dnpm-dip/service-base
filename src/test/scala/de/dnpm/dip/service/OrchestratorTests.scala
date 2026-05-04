@@ -157,33 +157,30 @@ class OrchestratorTests extends AsyncFlatSpec
   }
 
 
-  "LocalStatusInfo" must "have been correctly compiled" in { 
+
+  "LocalDataCounts" must "have been correctly compiled" in { 
 
     for {
 
-      statusInfo <- orchestrator.localStatusInfo(StatusInfo.Criteria())
+      statusInfo <- orchestrator.localDataCounts(criteria = None)
 
-//      _ = statusInfo.mvGenomSeq.total mustBe 0
-      _ = statusInfo.query.total mustBe 0
+      _ = statusInfo.mvGenomSeq.totalPatients mustBe 0
+      _ = statusInfo.query.totalPatients mustBe 0
 
     } yield succeed
 
   }
 
-  "FederatedStatusInfo" must "have been correctly compiled" in { 
-
-    val noCriteria = StatusInfo.Criteria()
+  "FederatedDataCounts" must "have been correctly compiled" in { 
 
     for {
 
-      result <- orchestrator.federatedStatusInfo(
-        noCriteria,
+      result <- orchestrator.federatedDataCounts(
+        None,
         Some(Set(Site.local))
       )
 
-      FederatedStatusInfo(_,sites,criteria,components,errors) = result.value
-
-      _ = criteria mustBe noCriteria
+      FederatedDataCounts(_,sites,criteria,components,errors) = result.value
 
       _ = sites must have size 1 
 

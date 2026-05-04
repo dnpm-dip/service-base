@@ -5,26 +5,25 @@ import scala.util.Either
 import de.dnpm.dip.model.{
   Id,
   Patient,
+  PatientRecord,
   Snapshot
 }
 import QueryService.{
   Saved,
   Deleted
 }
+import de.dnpm.dip.service.DataCounts
 
 
-trait LocalDB[
-  F[_],
-  Env,
-  Criteria,
-  PatientRecord
-]{
+
+trait LocalDB[F[_], Env, Criteria, T <: PatientRecord] extends DataCounts.Ops[F,Env]
+{
 
   def save(
-    dataSet: PatientRecord
+    dataSet: T
   )(
     implicit env: Env
-  ): F[Either[String,Saved[PatientRecord]]]
+  ): F[Either[String,Saved[T]]]
 
 
   def delete(
@@ -38,7 +37,7 @@ trait LocalDB[
     criteria: Option[Criteria]
   )(
     implicit env: Env
-  ): F[Either[String,Seq[Query.Match[PatientRecord,Criteria]]]]
+  ): F[Either[String,Seq[Query.Match[T,Criteria]]]]
 
 
   def ?(
@@ -46,11 +45,6 @@ trait LocalDB[
     snapshot: Option[Long] = None
   )(
     implicit env: Env
-  ): F[Option[Snapshot[PatientRecord]]]
-
-
-  def totalRecords(
-    implicit env: Env
-  ): F[Int]
+  ): F[Option[Snapshot[T]]]
 
 }

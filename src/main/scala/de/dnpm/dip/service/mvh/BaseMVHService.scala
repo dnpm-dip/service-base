@@ -11,7 +11,11 @@ import cats.syntax.either._
 import cats.syntax.functor._
 import cats.syntax.flatMap._
 import de.dnpm.dip.util.Logging
-import de.dnpm.dip.service.Distribution
+import de.dnpm.dip.service.{
+  DataCounts,
+  Distribution
+//  StatusInfo
+}
 import de.dnpm.dip.model.{
   ClosedPeriod,
   EpisodeOfCare,
@@ -333,12 +337,16 @@ with Logging
   }
 
 
-  override def statusInfo(
+  override def dataCounts(
+    criteria: Option[DataCounts.Criteria]
+  )(
     implicit env: Env
-  ): F[StatusInfo] =
-    (repo ? Submission.Report.Filter())
-      .map(_.map(_.status))
-      .map(Distribution.of(_))
-      .map(MVHService.StatusInfo(_))
+  ): F[DataCounts] = {
+
+    log.info(s"MVH: compiling DataCounts, criteria: ${criteria.map(_.toString).getOrElse("-")}")
+
+    repo.dataCounts(criteria)
+
+  }
 
 }

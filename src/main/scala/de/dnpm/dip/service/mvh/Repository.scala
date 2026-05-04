@@ -7,9 +7,10 @@ import de.dnpm.dip.model.{
   Patient,
   PatientRecord,
 }
+import de.dnpm.dip.service.DataCounts
 
 
-trait Repository[F[_],Env,T <: PatientRecord]
+trait Repository[F[_],Env,T <: PatientRecord] extends DataCounts.Ops[F,Env]
 {
 
   protected implicit def submissionReportPredicate(filter: Submission.Report.Filter): Submission.Report => Boolean =

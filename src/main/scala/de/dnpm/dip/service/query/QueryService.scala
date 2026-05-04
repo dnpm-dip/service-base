@@ -9,10 +9,7 @@ import de.dnpm.dip.model.{
   Site,
   Snapshot
 }
-import play.api.libs.json.{
-  Json,
-  OFormat
-}
+import de.dnpm.dip.service.DataCounts
 
 
 object QueryService
@@ -117,14 +114,14 @@ object QueryService
   final case class GenericError(msg: String) extends DataError
 
 
-  trait DataOps[F[_],Env,T]
+  trait DataOps[F[_],Env,T] extends DataCounts.Ops[F,Env]
   {
     def !(cmd: DataCommand[T])(
       implicit env: Env
     ): F[Either[DataError,DataOutcome[T]]]
   }
 
-
+/*
   final case class StatusInfo
   (
     federatedQueriesActive: Boolean,
@@ -143,7 +140,7 @@ object QueryService
     implicit val format: OFormat[StatusInfo] =
       Json.format[StatusInfo]
   }
-
+*/
 }
 
 
@@ -151,4 +148,3 @@ trait QueryService[F[+_],Env,UseCase <: UseCaseConfig]
 extends QueryService.Ops[F,Env,UseCase,String]
 with QueryService.DataOps[F,Env,UseCase#PatientRecord]
 with PreparedQueryOps[F,Env,UseCase#Criteria,String]
-with QueryService.StatusInfo.Ops[F,Env]
