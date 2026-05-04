@@ -236,37 +236,17 @@ with Logging
   )(
     implicit env: Env
   ): F[DataCounts] =
-    env.pure {
-      cachedPartialSubmissions.foldLeft(
-        (Set.empty[Id[Patient]],0,criteria.map(_ => 0))
-      ){ 
-        case ((patIds,totalEpisodes,criteriaMatches),(_ -> submission)) =>
-          (
-            patIds + submission.patient.id,
-            totalEpisodes + submission.episodesOfCare.size,
-            criteria.flatMap {
-              crit => criteriaMatches.map(
-                _ + submission.episodesOfCare.toList.count(eoc => crit.episodeOfCarePeriod contains eoc.period.start)
-              )
-            }
-          )
+    for {
+      submissionsByPatient <- env.pure {
+        cachedPartialSubmissions.values
+          .groupBy(_.patient.id)
+          .map { case (_,subs) => subs.maxBy(_.submittedAt) }
       }
-    }
-    .map {
-      case (patIds,episodes,matching) => DataCounts(patIds.size,episodes,matching)
-    }
-
-/*
-  override def dataCounts(
-    criteria: Option[StatusInfo.Criteria]
-  )(
-    implicit env: Env
-  ): F[MVHService.DataCounts] =
-    env.pure {
-      cachedPartialSubmissions.foldLeft(
-        0 -> criteria.map(_ => 0)
+      
+      (episodes,matching) = submissionsByPatient.foldLeft(
+        (0,criteria.map(_ => 0))
       ){ 
-        case ((totalEpisodes -> criteriaMatches),(_ -> submission)) =>
+        case (totalEpisodes -> criteriaMatches,submission) =>
           (
             totalEpisodes + submission.episodesOfCare.size,
             criteria.flatMap {
@@ -276,11 +256,8 @@ with Logging
             }
           )
       }
-    }
-    .map {
-      case (total,matching) => MVHService.DataCounts(total,matching)
-    }
-*/
+    } yield DataCounts(submissionsByPatient.size,episodes,matching)
+    
 
   override def submission(
     id: Id[TransferTAN]
