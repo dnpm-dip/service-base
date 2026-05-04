@@ -81,15 +81,18 @@ with Logging
 
 
   private def readJson[A: Reads](file: File): A =
-    Json.parse(new FileInputStream(file))
-      .pipe(Json.fromJson[A](_))
-      .tap(
-        _.fold(
-          errs => log.error(s"Error(s) occurred parsing file $file: \n${errs.toString}"),
-          _ => ()
-        )
-      )
-      .pipe(_.get)
+    Using.resource(new FileInputStream(file)){
+      input =>
+       Json.parse(input)
+         .pipe(Json.fromJson[A](_))
+         .tap(
+           _.fold(
+             errs => log.error(s"Error(s) occurred parsing file $file: \n${errs.toString}"),
+             _ => ()
+           )
+         )
+         .pipe(_.get)
+    }
 
 
   private val cache: Map[Id[Patient],Snapshot[T]] = {
