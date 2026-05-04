@@ -335,8 +335,17 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
           )
           .asRight
 
-        case Ior.Left(errors) => errors.asLeft
+        case Ior.Left(errors) if local.isDefined =>
+          FederatedDataCounts(
+            LocalDateTime.now,
+            targetSites.toList,
+            criteria,
+            local.toList,
+            Some(errors)
+          )
+          .asRight
 
+        case Ior.Left(errors) => errors.asLeft
       }
     
     } yield result
