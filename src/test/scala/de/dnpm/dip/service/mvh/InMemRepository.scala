@@ -149,7 +149,7 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
     implicit env: Env
   ): F[DataCounts] =
     env.pure {
-      submissions.flatMap(_._2.values).foldLeft(
+      submissions.map(_._2.values.maxBy(_.submittedAt)).foldLeft(
         0 -> criteria.map(_ => 0)
       ){ 
         case ((totalEpisodes -> criteriaMatches),submission) =>
@@ -164,7 +164,7 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
       }
     }
     .map {
-      case (total,matching) => DataCounts(reports.size,total,matching)
+      case (total,matching) => DataCounts(submissions.size,total,matching)
     }
 
 
