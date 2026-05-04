@@ -21,8 +21,10 @@ import de.dnpm.dip.util.Logging
 import de.dnpm.dip.model.{
   Id,
   Patient,
+  PatientRecord,
   Snapshot
 }
+import de.dnpm.dip.service.DataCounts
 import QueryService.{
   Saved,
   Deleted
@@ -39,18 +41,18 @@ class FSBackedLocalDB[
   F[_],
   C[M[_]] <: Applicative[M],
   Criteria,
-  PatientRecord <: { val patient: Patient } : Format
+  T <: PatientRecord: Format
 ](
   val dataDir: File,
-  val criteriaMatcher: Criteria => (PatientRecord => Option[Criteria]),
+  val criteriaMatcher: Criteria => (T => Option[Criteria]),
 )(
-  implicit classTag: ClassTag[PatientRecord]
+  implicit classTag: ClassTag[T]
 )
-extends LocalDB[F,C[F],Criteria,PatientRecord]
+extends LocalDB[F,C[F],Criteria,T]
 with Logging
 {
 
-  import scala.language.reflectiveCalls
+//  import scala.language.reflectiveCalls
   import scala.util.Using
   import scala.util.chaining._
   import cats.syntax.functor._
@@ -73,14 +75,14 @@ with Logging
     s"${fileStart(patId)}_Snapshot_${snpId}.json"
 
   private def fileOf(
-    snp: Snapshot[PatientRecord]
+    snp: Snapshot[T]
   ): File =
     new File(dataDir,fileName(snp.data.patient.id,snp.timestamp))
 
 
-  private def readJson[T: Reads](file: File): T =
+  private def readJson[A: Reads](file: File): A =
     Json.parse(new FileInputStream(file))
-      .pipe(Json.fromJson[T](_))
+      .pipe(Json.fromJson[A](_))
       .tap(
         _.fold(
           errs => log.error(s"Error(s) occurred parsing file $file: \n${errs.toString}"),
@@ -90,7 +92,7 @@ with Logging
       .pipe(_.get)
 
 
-  private val cache: Map[Id[Patient],Snapshot[PatientRecord]] = {
+  private val cache: Map[Id[Patient],Snapshot[T]] = {
 
     log.debug(s"Setting up file-system persistence to directory ${dataDir.getAbsolutePath}")
 
@@ -108,12 +110,12 @@ with Logging
       (_,name) => (name startsWith prefix) && (name endsWith ".json")
     )
     .to(LazyList)
-    .map(readJson[Snapshot[PatientRecord]])
+    .map(readJson[Snapshot[T]])
     // Lazily accumulate only the latest snapshot of each patient record,
     // instead of using groupyBy(patientId) and then picking the latest snapshot,
     // which requires all to be loaded into memory, whereas with this 
     // implementation, elements can be garbage-collected along the way
-    .foldLeft(TrieMap.empty[Id[Patient],Snapshot[PatientRecord]]){ 
+    .foldLeft(TrieMap.empty[Id[Patient],Snapshot[T]]){ 
       (acc,snp) =>
         acc.updateWith(snp.data.patient.id){
           case Some(s) =>
@@ -129,10 +131,10 @@ with Logging
 
 
   override def save(
-    dataSet: PatientRecord
+    dataSet: T
   )(
     implicit env: C[F]
-  ): F[Either[String,Saved[PatientRecord]]] = {
+  ): F[Either[String,Saved[T]]] = {
   
     //TODO: Logging
    
@@ -145,7 +147,7 @@ with Logging
     }
     .map(_ => cache update (dataSet.patient.id,snp))
     .fold(
-      _.getMessage.asLeft[Saved[PatientRecord]],
+      _.getMessage.asLeft[Saved[T]],
       _ => Saved(snp).asRight[String]
     )
     .pure
@@ -193,7 +195,7 @@ with Logging
     criteria: Option[Criteria]
   )(
     implicit env: C[F]
-  ): F[Either[String,Seq[Query.Match[PatientRecord,Criteria]]]] = {
+  ): F[Either[String,Seq[Query.Match[T,Criteria]]]] = {
 
     criteria.fold(
       cache.values
@@ -202,8 +204,7 @@ with Logging
     ){
       crit =>
 
-        val matcher =
-          criteriaMatcher(crit)
+        val matcher = criteriaMatcher(crit)
               
         cache.values
           .map(snp => Query.Match(snp,matcher(snp.data)))
@@ -221,7 +222,7 @@ with Logging
     snapshot: Option[Long] = None
   )(
     implicit env: C[F]
-  ): F[Option[Snapshot[PatientRecord]]] = {
+  ): F[Option[Snapshot[T]]] = {
 
     //TODO: Logging
 
@@ -233,7 +234,7 @@ with Logging
             (_,name) => name == fileName(patient,snpId)
           )
           .headOption
-          .map(readJson[Snapshot[PatientRecord]])
+          .map(readJson[Snapshot[T]])
 
         case None =>
           cache.get(patient)
@@ -244,9 +245,29 @@ with Logging
 
   }
 
-  override def totalRecords(
+
+  override def dataCounts(
+    criteria: Option[DataCounts.Criteria]
+  )(
     implicit env: C[F]
-  ): F[Int] =
-    cache.size.pure
+  ): F[DataCounts] =
+    env.pure {
+      cache.foldLeft(
+        0 -> criteria.map(_ => 0)
+      ){
+        case (totalEpisodes -> criteriaMatches, _ -> snapshot) =>
+          (
+            totalEpisodes + snapshot.data.episodesOfCare.size,
+            criteria.flatMap {
+              crit => criteriaMatches.map(
+                _ + snapshot.data.episodesOfCare.toList.count(eoc => crit.episodeOfCarePeriod contains eoc.period.start)
+              )
+            }
+          )
+      }
+    }
+    .map {
+      case (total,matching) => DataCounts(cache.size,total,matching)
+    }
 
 }

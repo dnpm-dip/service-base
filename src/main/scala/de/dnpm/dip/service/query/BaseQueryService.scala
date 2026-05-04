@@ -26,6 +26,7 @@ import de.dnpm.dip.model.{
 import de.dnpm.dip.service.{
   Connector,
   ConnectionStatus,
+  DataCounts
 }
 import play.api.libs.json.{
   Json,
@@ -70,7 +71,6 @@ with Logging
   protected val CriteriaExpander: Completer[Criteria]
 
 
-
   protected def ResultSetFrom(
     query: Query[Criteria],
     results: Seq[Query.Match[PatientRecord,Criteria]]
@@ -88,11 +88,12 @@ with Logging
   }
 
 
-  override def statusInfo(
+  override def dataCounts(
+    criteria: Option[DataCounts.Criteria]
+  )(
     implicit env: Monad[F]
-  ): F[QueryService.StatusInfo] =
-    db.totalRecords
-      .map(QueryService.StatusInfo(federatedQueriesActive,_))
+  ): F[DataCounts] =
+    db.dataCounts(criteria)
 
 
   override def sites(

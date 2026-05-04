@@ -9,13 +9,14 @@ import cats.Monad
 import cats.data.NonEmptyList
 import cats.syntax.applicative._
 import cats.syntax.either._
+import cats.syntax.functor._
 import de.dnpm.dip.model.{
   History,
   Id,
   Patient,
   PatientRecord,
 }
-
+import de.dnpm.dip.service.DataCounts
 
 
 class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
@@ -140,6 +141,31 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
       .flatMap(NonEmptyList.fromList(_))
       .map(History(_))
       .pure
+
+
+  override def dataCounts(
+    criteria: Option[DataCounts.Criteria]
+  )(
+    implicit env: Env
+  ): F[DataCounts] =
+    env.pure {
+      submissions.flatMap(_._2.values).foldLeft(
+        0 -> criteria.map(_ => 0)
+      ){ 
+        case ((totalEpisodes -> criteriaMatches),submission) =>
+          (
+            totalEpisodes + submission.record.episodesOfCare.size,
+            criteria.flatMap {
+              crit => criteriaMatches.map(
+                _ + submission.record.episodesOfCare.toList.count(eoc => crit.episodeOfCarePeriod contains eoc.period.start)
+              )
+            }
+          )
+      }
+    }
+    .map {
+      case (total,matching) => DataCounts(reports.size,total,matching)
+    }
 
 
   override def delete(id: Id[Patient])(

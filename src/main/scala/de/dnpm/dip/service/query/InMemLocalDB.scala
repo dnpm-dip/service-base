@@ -11,47 +11,43 @@ import de.dnpm.dip.util.Logging
 import de.dnpm.dip.model.{
   Id,
   Patient,
+  PatientRecord,
   Snapshot
 }
 import QueryService.{
   Saved,
   Deleted
 }
+import de.dnpm.dip.service.DataCounts
 
 
 class InMemLocalDB[
   F[_],
   C[M[_]] <: Applicative[M],
   Criteria,
-  PatientRecord <: { val patient: Patient }
+  T <: PatientRecord
 ](
   val criteriaMatcher: Criteria => (PatientRecord => Option[Criteria]),
 )
-extends LocalDB[
-  F,
-  C[F],
-  Criteria,
-  PatientRecord
-]
+extends LocalDB[F,C[F],Criteria,T]
 with Logging
 {
 
-  import scala.language.reflectiveCalls
   import cats.syntax.functor._
   import cats.syntax.applicative._
   import cats.syntax.either._
 
 
-  private val cache: Map[Id[Patient],List[Snapshot[PatientRecord]]] =
+  private val cache: Map[Id[Patient],List[Snapshot[T]]] =
     TrieMap.empty
 
 
 
   override def save(
-    dataSet: PatientRecord
+    dataSet: T
   )(
     implicit env: C[F]
-  ): F[Either[String,Saved[PatientRecord]]] = {
+  ): F[Either[String,Saved[T]]] = {
   
     //TODO: Logging
    
@@ -90,7 +86,7 @@ with Logging
     criteria: Option[Criteria]
   )(
     implicit env: C[F]
-  ): F[Either[String,Seq[Query.Match[PatientRecord,Criteria]]]] = {
+  ): F[Either[String,Seq[Query.Match[T,Criteria]]]] = {
 
     criteria.fold(
       cache.values
@@ -120,7 +116,7 @@ with Logging
     timestamp: Option[Long] = None
   )(
     implicit env: C[F]
-  ): F[Option[Snapshot[PatientRecord]]] = 
+  ): F[Option[Snapshot[T]]] = 
     cache.get(patient)
       .flatMap {
         snps =>
@@ -132,9 +128,32 @@ with Logging
       .pure
 
 
-   def totalRecords(
+  override def dataCounts(
+    criteria: Option[DataCounts.Criteria]
+  )(
     implicit env: C[F]
-  ): F[Int] =
-    cache.size.pure
+  ): F[DataCounts] =
+    env.pure {
+      cache.collect { 
+        case (_,history) if history.nonEmpty => history.head.data
+      }
+      .foldLeft(
+        0 -> criteria.map(_ => 0)
+      ){
+        case ((totalEpisodes -> criteriaMatches),record) =>
+          (
+            totalEpisodes + record.episodesOfCare.size,
+            criteria.flatMap {
+              crit => criteriaMatches.map(
+                _ + record.episodesOfCare.toList.count(eoc => crit.episodeOfCarePeriod contains eoc.period.start)
+              )
+            }
+          )
+      }
+    }
+    .map {
+      case (total,matching) => DataCounts(cache.size,total,matching)
+    }
+
 
 }
