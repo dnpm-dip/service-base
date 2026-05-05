@@ -3,6 +3,7 @@ package de.dnpm.dip.service
 
 import scala.concurrent.Future
 import scala.util.Random
+import cats.syntax.traverse._
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.must.Matchers._
 import org.scalatest.EitherValues._
@@ -56,33 +57,26 @@ class OrchestratorTests extends AsyncFlatSpec
       FakeConnector[Future]
     )
 
-  val record = Gen.of[DummyPatientRecord].next
 
-  val initialUpload =
-    DataUpload(
+  val dataUpload: Gen[DataUpload[DummyPatientRecord]] =
+    for {
+      record <- Gen.of[DummyPatientRecord]
+      metadata <- genMetadata(record,Submission.Type.Initial,true)
+    } yield DataUpload(
       record,
-      Some(
-        genMetadata(
-          record,
-          Submission.Type.Initial,
-          true
-        )
-        .next
-      )
+      Some(metadata)
     )
+
+  val initialUpload = dataUpload.next
+
+  val record = initialUpload.record
 
   val subsequentUpload =
     initialUpload.copy(
       metadata = Some(
-        genMetadata(
-          record,
-          Submission.Type.Addition,
-          false
-        )
-        .next
+        genMetadata(record, Submission.Type.Addition,false).next
       )
     )
-
 
   lazy val retrievalRequest =
     PatientRecordRequest[DummyPatientRecord](
@@ -91,7 +85,6 @@ class OrchestratorTests extends AsyncFlatSpec
       record.id,
       None
     )
-
 
 
   "Data Upload" must "have worked as expected on initial submission with Research Consent" in { 
@@ -159,18 +152,33 @@ class OrchestratorTests extends AsyncFlatSpec
 
 
 
+
   "LocalControllingInfo" must "have been correctly compiled" in { 
+
+    val n = 42
 
     for {
 
-      statusInfo <- orchestrator.localControllingInfo(criteria = None)
+      initialInfo <- orchestrator.localControllingInfo(criteria = None)
 
-      _ = statusInfo.mvGenomSeq.total mustBe 0
-      _ = statusInfo.query.total mustBe 0
+      _ = initialInfo.mvGenomSeq.total mustBe 0
+      _ = initialInfo.query.total mustBe 0
+
+      dataUploads = List.fill(n)(dataUpload.next)
+
+      uploadOutcomes <- dataUploads.traverse(orchestrator ! Process(_))
+
+      _ = all (uploadOutcomes) must matchPattern { case Right(Saved) => }
+
+      postUploadInfo <- orchestrator.localControllingInfo(criteria = None)
+
+      _ = postUploadInfo.mvGenomSeq.total mustBe n
+      _ = postUploadInfo.query.total mustBe n
 
     } yield succeed
 
   }
+
 
   "FederatedDataCounts" must "have been correctly compiled" in { 
 
@@ -181,7 +189,7 @@ class OrchestratorTests extends AsyncFlatSpec
         Some(Set(Site.local))
       )
 
-      FederatedControllingInfo(_,sites,criteria,components,errors) = result.value
+      FederatedControllingInfo(_,sites,criteria,_,_,components,errors) = result.value
 
       _ = sites must have size 1 
 
