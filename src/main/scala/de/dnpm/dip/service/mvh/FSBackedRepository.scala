@@ -258,22 +258,6 @@ with Logging
       matchingCriteria
     )
  
-/*
-  override def patientDataCounts(
-    optCriteria: Option[Controlling.Criteria]
-  )(
-    implicit env: Env
-  ): F[PatientDataCounts] =
-    env.pure {
-      PatientDataCounts.fromEpisodesOfCare(
-        cachedPartialSubmissions
-          .values
-          .groupBy(_.patient.id)
-          .map { case (_,subs) => subs.maxBy(_.submittedAt).episodesOfCare },
-        optCriteria
-      )
-    }
-*/
 
   override def submission(
     id: Id[TransferTAN]
