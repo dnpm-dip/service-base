@@ -313,6 +313,8 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
         case _ => env.pure(List.empty.rightIor.toIorNel)
       }
 
+    lazy val orderedSites = targetSites.toList.sortBy(_.code.value)
+
     for { 
       local <- localResult
 
@@ -323,9 +325,9 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
         case Ior.Right(parts) =>
           FederatedControllingInfo(
             LocalDateTime.now,
-            targetSites.toList,
+            orderedSites,
             criteria,
-            parts ++ local,
+            (parts ++ local).sortBy(_.site.code.value),
             None
           )
           .asRight
@@ -333,9 +335,9 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
         case Ior.Both(errors,parts) =>
           FederatedControllingInfo(
             LocalDateTime.now,
-            targetSites.toList,
+            orderedSites,
             criteria,
-            parts ++ local,
+            (parts ++ local).sortBy(_.site.code.value),
             Some(errors)
           )
           .asRight
@@ -343,7 +345,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
         case Ior.Left(errors) if local.isDefined =>
           FederatedControllingInfo(
             LocalDateTime.now,
-            targetSites.toList,
+            orderedSites,
             criteria,
             local.toList,
             Some(errors)
