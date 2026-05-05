@@ -24,7 +24,10 @@ import de.dnpm.dip.model.{
   PatientRecord,
   Snapshot
 }
-import de.dnpm.dip.service.DataCounts
+import de.dnpm.dip.service.controlling.{
+  Controlling,
+  PatientDataCounts
+}
 import QueryService.{
   Saved,
   Deleted
@@ -52,7 +55,6 @@ extends LocalDB[F,C[F],Criteria,T]
 with Logging
 {
 
-//  import scala.language.reflectiveCalls
   import scala.util.Using
   import scala.util.chaining._
   import cats.syntax.functor._
@@ -249,28 +251,16 @@ with Logging
   }
 
 
-  override def dataCounts(
-    criteria: Option[DataCounts.Criteria]
+  override def patientDataCounts(
+    optCriteria: Option[Controlling.Criteria]
   )(
     implicit env: C[F]
-  ): F[DataCounts] =
+  ): F[PatientDataCounts] =
     env.pure {
-      cache.foldLeft(
-        0 -> criteria.map(_ => 0)
-      ){
-        case (totalEpisodes -> criteriaMatches, _ -> snapshot) =>
-          (
-            totalEpisodes + snapshot.data.episodesOfCare.size,
-            criteria.flatMap {
-              crit => criteriaMatches.map(
-                _ + snapshot.data.episodesOfCare.toList.count(eoc => crit.episodeOfCarePeriod contains eoc.period.start)
-              )
-            }
-          )
-      }
-    }
-    .map {
-      case (total,matching) => DataCounts(cache.size,total,matching)
+      PatientDataCounts.from(
+        cache.map(_._2.data),
+        optCriteria
+      )
     }
 
 }

@@ -18,7 +18,10 @@ import QueryService.{
   Saved,
   Deleted
 }
-import de.dnpm.dip.service.DataCounts
+import de.dnpm.dip.service.controlling.{
+  Controlling,
+  PatientDataCounts
+}
 
 
 class InMemLocalDB[
@@ -128,32 +131,16 @@ with Logging
       .pure
 
 
-  override def dataCounts(
-    criteria: Option[DataCounts.Criteria]
+  override def patientDataCounts(
+    optCriteria: Option[Controlling.Criteria]
   )(
     implicit env: C[F]
-  ): F[DataCounts] =
-    env.pure {
-      cache.collect { 
-        case (_,history) if history.nonEmpty => history.head.data
-      }
-      .foldLeft(
-        0 -> criteria.map(_ => 0)
-      ){
-        case ((totalEpisodes -> criteriaMatches),record) =>
-          (
-            totalEpisodes + record.episodesOfCare.size,
-            criteria.flatMap {
-              crit => criteriaMatches.map(
-                _ + record.episodesOfCare.toList.count(eoc => crit.episodeOfCarePeriod contains eoc.period.start)
-              )
-            }
-          )
-      }
+  ): F[PatientDataCounts] =
+    env.pure { 
+      PatientDataCounts.from(
+        cache.collect { case (_,history) if history.nonEmpty => history.head.data },
+        optCriteria
+      )
     }
-    .map {
-      case (total,matching) => DataCounts(cache.size,total,matching)
-    }
-
 
 }

@@ -33,7 +33,10 @@ import de.dnpm.dip.model.{
   Patient,
   PatientRecord,
 }
-import de.dnpm.dip.service.DataCounts
+import de.dnpm.dip.service.controlling.{
+  Controlling,
+  PatientDataCounts
+}
 
 
 // Extractor for TANs according to file naming pattern below
@@ -223,41 +226,54 @@ with Logging
     val reader = readAsJson(tolerantSubmissionReads)
 
     cachedPartialSubmissions
-      .collect {
-        case (tan,sub) if predicate(sub) => submissionFile(sub.patient.id,tan)
-      }
+      .collect { case (tan,sub) if predicate(sub) => submissionFile(sub.patient.id,tan) }
       .to(LazyList)
       .map(file => reader(new FileInputStream(file)))
       .pure
   }
 
-  override def dataCounts(
-    criteria: Option[DataCounts.Criteria]
+
+  override def patientDataCounts(
+    optCriteria: Option[Controlling.Criteria]
   )(
     implicit env: Env
-  ): F[DataCounts] =
+  ): F[PatientDataCounts] =
     for {
       submissionsByPatient <- env.pure {
-        cachedPartialSubmissions.values
+        cachedPartialSubmissions
+          .values
           .groupBy(_.patient.id)
           .map { case (_,subs) => subs.maxBy(_.submittedAt) }
       }
       
-      (episodes,matching) = submissionsByPatient.foldLeft(
-        (0,criteria.map(_ => 0))
-      ){ 
-        case (totalEpisodes -> criteriaMatches,submission) =>
-          (
-            totalEpisodes + submission.episodesOfCare.size,
-            criteria.flatMap {
-              crit => criteriaMatches.map(
-                _ + submission.episodesOfCare.toList.count(eoc => crit.episodeOfCarePeriod contains eoc.period.start)
-              )
-            }
+      matchingCriteria =
+        optCriteria.map(criteria =>
+          submissionsByPatient.count(
+            _.episodesOfCare.exists(eoc => criteria.episodeOfCarePeriod contains eoc.period.start)
           )
-      }
-    } yield DataCounts(submissionsByPatient.size,episodes,matching)
-    
+        )
+
+    } yield PatientDataCounts(
+      submissionsByPatient.size,
+      matchingCriteria
+    )
+ 
+/*
+  override def patientDataCounts(
+    optCriteria: Option[Controlling.Criteria]
+  )(
+    implicit env: Env
+  ): F[PatientDataCounts] =
+    env.pure {
+      PatientDataCounts.fromEpisodesOfCare(
+        cachedPartialSubmissions
+          .values
+          .groupBy(_.patient.id)
+          .map { case (_,subs) => subs.maxBy(_.submittedAt).episodesOfCare },
+        optCriteria
+      )
+    }
+*/
 
   override def submission(
     id: Id[TransferTAN]

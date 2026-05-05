@@ -9,14 +9,16 @@ import cats.Monad
 import cats.data.NonEmptyList
 import cats.syntax.applicative._
 import cats.syntax.either._
-import cats.syntax.functor._
 import de.dnpm.dip.model.{
   History,
   Id,
   Patient,
   PatientRecord,
 }
-import de.dnpm.dip.service.DataCounts
+import de.dnpm.dip.service.controlling.{
+  Controlling,
+  PatientDataCounts
+}
 
 
 class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
@@ -143,28 +145,21 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
       .pure
 
 
-  override def dataCounts(
-    criteria: Option[DataCounts.Criteria]
+  override def patientDataCounts(
+    optCriteria: Option[Controlling.Criteria]
   )(
     implicit env: Env
-  ): F[DataCounts] =
+  ): F[PatientDataCounts] =
     env.pure {
-      submissions.map(_._2.values.maxBy(_.submittedAt)).foldLeft(
-        0 -> criteria.map(_ => 0)
-      ){ 
-        case ((totalEpisodes -> criteriaMatches),submission) =>
-          (
-            totalEpisodes + submission.record.episodesOfCare.size,
-            criteria.flatMap {
-              crit => criteriaMatches.map(
-                _ + submission.record.episodesOfCare.toList.count(eoc => crit.episodeOfCarePeriod contains eoc.period.start)
-              )
-            }
-          )
-      }
-    }
-    .map {
-      case (total,matching) => DataCounts(submissions.size,total,matching)
+      PatientDataCounts(
+        submissions.size,
+        optCriteria.map(
+          criteria =>
+            submissions
+              .map(_._2.values.maxBy(_.submittedAt))
+              .count(_.record.episodesOfCare.exists(eoc => criteria.episodeOfCarePeriod contains eoc.period.start))
+        )
+      )
     }
 
 

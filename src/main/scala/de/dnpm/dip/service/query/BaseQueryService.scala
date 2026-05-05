@@ -26,7 +26,10 @@ import de.dnpm.dip.model.{
 import de.dnpm.dip.service.{
   Connector,
   ConnectionStatus,
-  DataCounts
+}
+import de.dnpm.dip.service.controlling.{
+  Controlling,
+  PatientDataCounts
 }
 import play.api.libs.json.{
   Json,
@@ -88,13 +91,16 @@ with Logging
   }
 
 
-  override def dataCounts(
-    criteria: Option[DataCounts.Criteria]
+  override def patientDataCounts(
+    criteria: Option[Controlling.Criteria]
   )(
     implicit env: Monad[F]
-  ): F[DataCounts] =
-    db.dataCounts(criteria)
+  ): F[PatientDataCounts] = {
 
+    log.info(s"Query: compiling PatientDataCounts, criteria: ${criteria.map(_.toString).getOrElse("-")}")
+
+    db.patientDataCounts(criteria)
+  }
 
   override def sites(
     implicit

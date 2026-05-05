@@ -1,14 +1,14 @@
 package de.dnpm.dip.service.mvh
 
 
-import de.dnpm.dip.service.DataCounts
+import de.dnpm.dip.service.controlling.Controlling
 import de.dnpm.dip.model.{
   Id,
   Patient,
   PatientRecord,
 }
 
-trait MVHService[F[_],Env,T <: PatientRecord] extends DataCounts.Ops[F,Env]
+trait MVHService[F[_],Env,T <: PatientRecord] extends Controlling.Ops[F,Env]
 {
   import MVHService.{
     Command,

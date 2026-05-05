@@ -21,6 +21,7 @@ import de.dnpm.dip.service.query.{
   PatientRecordRequest,
   Querier
 }
+import de.dnpm.dip.service.controlling.FederatedControllingInfo
 import de.ekut.tbi.generators.Gen
 import Gens._
 import Orchestrator._
@@ -158,14 +159,14 @@ class OrchestratorTests extends AsyncFlatSpec
 
 
 
-  "LocalDataCounts" must "have been correctly compiled" in { 
+  "LocalControllingInfo" must "have been correctly compiled" in { 
 
     for {
 
-      statusInfo <- orchestrator.localDataCounts(criteria = None)
+      statusInfo <- orchestrator.localControllingInfo(criteria = None)
 
-      _ = statusInfo.mvGenomSeq.totalPatients mustBe 0
-      _ = statusInfo.query.totalPatients mustBe 0
+      _ = statusInfo.mvGenomSeq.total mustBe 0
+      _ = statusInfo.query.total mustBe 0
 
     } yield succeed
 
@@ -175,12 +176,12 @@ class OrchestratorTests extends AsyncFlatSpec
 
     for {
 
-      result <- orchestrator.federatedDataCounts(
+      result <- orchestrator.federatedControllingInfo(
         None,
         Some(Set(Site.local))
       )
 
-      FederatedDataCounts(_,sites,criteria,components,errors) = result.value
+      FederatedControllingInfo(_,sites,criteria,components,errors) = result.value
 
       _ = sites must have size 1 
 

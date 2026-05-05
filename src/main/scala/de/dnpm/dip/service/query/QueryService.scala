@@ -9,7 +9,7 @@ import de.dnpm.dip.model.{
   Site,
   Snapshot
 }
-import de.dnpm.dip.service.DataCounts
+import de.dnpm.dip.service.controlling.Controlling
 
 
 object QueryService
@@ -114,33 +114,13 @@ object QueryService
   final case class GenericError(msg: String) extends DataError
 
 
-  trait DataOps[F[_],Env,T] extends DataCounts.Ops[F,Env]
+  trait DataOps[F[_],Env,T] extends Controlling.Ops[F,Env]
   {
     def !(cmd: DataCommand[T])(
       implicit env: Env
     ): F[Either[DataError,DataOutcome[T]]]
   }
 
-/*
-  final case class StatusInfo
-  (
-    federatedQueriesActive: Boolean,
-    total: Int
-  )
-
-  object StatusInfo
-  {
-    trait Ops[F[_],Env]
-    {
-      def statusInfo(
-        implicit env: Env
-      ): F[QueryService.StatusInfo]
-    }
-
-    implicit val format: OFormat[StatusInfo] =
-      Json.format[StatusInfo]
-  }
-*/
 }
 
 

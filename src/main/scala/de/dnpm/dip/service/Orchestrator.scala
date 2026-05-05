@@ -25,6 +25,11 @@ import de.dnpm.dip.model.{
   PatientRecord,
   Site
 }
+import de.dnpm.dip.service.controlling.{ 
+  Controlling,
+  LocalControllingInfo,
+  FederatedControllingInfo
+}
 import de.dnpm.dip.service.validation.{
   ValidationService,
   ValidationReport
@@ -100,7 +105,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
 (
   validationService: ValidationService[F,Monad[F],T],
   mvhService: MVHService[F,Monad[F],T],
-  queryService: QueryService.DataOps[F,Monad[F],T]// with QueryService.DataCounts.Ops[F,Monad[F]]
+  queryService: QueryService.DataOps[F,Monad[F],T]
 )(
   connector: Connector[F,Monad[F]]
 )(
@@ -249,27 +254,27 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
 
 
   def process(
-    request: LocalDataCounts.Request
+    request: LocalControllingInfo.Request
   )(
     implicit env: Monad[F]
   ): F[request.ResultType] =
-    localDataCounts(request.criteria)
+    localControllingInfo(request.criteria)
 
 
-  private[service] def localDataCounts(
-    criteria: Option[DataCounts.Criteria]
+  private[service] def localControllingInfo(
+    criteria: Option[Controlling.Criteria]
   )(
     implicit env: Monad[F]
-  ): F[LocalDataCounts] = {
+  ): F[LocalControllingInfo] = {
 
-    val mvhCounts = mvhService.dataCounts(criteria)
+    val mvhCounts = mvhService.patientDataCounts(criteria)
 
-    val queryCounts = queryService.dataCounts(criteria)
+    val queryCounts = queryService.patientDataCounts(criteria)
 
     for {
       mvh <- mvhCounts
       query <- queryCounts
-    } yield LocalDataCounts(
+    } yield LocalControllingInfo(
       Site.local,
       LocalDateTime.now,
       mvh,
@@ -278,28 +283,28 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
   }
 
 
-  def federatedDataCounts(
-    criteria: Option[DataCounts.Criteria],
+  def federatedControllingInfo(
+    criteria: Option[Controlling.Criteria],
     optTargetSites: Option[Set[Coding[Site]]]
   )(
     implicit env: Monad[F]
-  ): F[EitherNel[String,FederatedDataCounts]] = { 
+  ): F[EitherNel[String,FederatedControllingInfo]] = { 
 
     val targetSites =
       optTargetSites.getOrElse(connector.otherSites + Site.local)
 
     val localResult =
       if (targetSites contains Site.local)
-        for { local <- localDataCounts(criteria) } yield Some(local) 
+        for { local <- localControllingInfo(criteria) } yield Some(local) 
       else None.pure
 
     val externalResultsBySite =
       (targetSites - Site.local) match { 
         case sites if sites.nonEmpty =>
           for {
-            resultsBySite <- connector ! (LocalDataCounts.Request(Site.local,criteria), sites)
+            resultsBySite <- connector ! (LocalControllingInfo.Request(Site.local,criteria), sites)
           } yield resultsBySite.foldLeft(
-            List.empty[LocalDataCounts].rightIor[String].toIorNel
+            List.empty[LocalControllingInfo].rightIor[String].toIorNel
           ){
             case (acc,(site,result)) =>
               acc combine result.bimap(err => s"Site ${site.code}: $err", List(_)).toIor.toIorNel
@@ -316,7 +321,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
       result = external match {
 
         case Ior.Right(parts) =>
-          FederatedDataCounts(
+          FederatedControllingInfo(
             LocalDateTime.now,
             targetSites.toList,
             criteria,
@@ -326,7 +331,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
           .asRight
 
         case Ior.Both(errors,parts) =>
-          FederatedDataCounts(
+          FederatedControllingInfo(
             LocalDateTime.now,
             targetSites.toList,
             criteria,
@@ -336,7 +341,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
           .asRight
 
         case Ior.Left(errors) if local.isDefined =>
-          FederatedDataCounts(
+          FederatedControllingInfo(
             LocalDateTime.now,
             targetSites.toList,
             criteria,
@@ -351,21 +356,4 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
     } yield result
   }
 
-
-/*
-  def statusInfo(
-    implicit env: Monad[F]
-  ): F[LocalDataCounts] =
-    for {
-      validation <- validationService.statusInfo
-      mvh <- mvhService.statusInfo
-      query <- queryService.statusInfo
-    } yield LocalDataCounts(
-      Site.local,
-      LocalDateTime.now,
-      validation,
-      mvh,
-      query
-    )
-*/
 }

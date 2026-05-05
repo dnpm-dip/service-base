@@ -12,11 +12,11 @@ import QueryService.{
   Saved,
   Deleted
 }
-import de.dnpm.dip.service.DataCounts
+import de.dnpm.dip.service.controlling.Controlling
 
 
 
-trait LocalDB[F[_], Env, Criteria, T <: PatientRecord] extends DataCounts.Ops[F,Env]
+trait LocalDB[F[_], Env, Criteria, T <: PatientRecord] extends Controlling.Ops[F,Env]
 {
 
   def save(

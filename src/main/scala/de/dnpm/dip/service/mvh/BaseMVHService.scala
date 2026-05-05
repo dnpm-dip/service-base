@@ -11,11 +11,6 @@ import cats.syntax.either._
 import cats.syntax.functor._
 import cats.syntax.flatMap._
 import de.dnpm.dip.util.Logging
-import de.dnpm.dip.service.{
-  DataCounts,
-  Distribution
-//  StatusInfo
-}
 import de.dnpm.dip.model.{
   ClosedPeriod,
   EpisodeOfCare,
@@ -23,6 +18,11 @@ import de.dnpm.dip.model.{
   NGSReport,
   PatientRecord,
   Site
+}
+import de.dnpm.dip.service.Distribution
+import de.dnpm.dip.service.controlling.{
+  Controlling,
+  PatientDataCounts
 }
 import MVHService._
 import Submission.Type._
@@ -337,15 +337,15 @@ with Logging
   }
 
 
-  override def dataCounts(
-    criteria: Option[DataCounts.Criteria]
+  override def patientDataCounts(
+    criteria: Option[Controlling.Criteria]
   )(
     implicit env: Env
-  ): F[DataCounts] = {
+  ): F[PatientDataCounts] = {
 
-    log.info(s"MVH: compiling DataCounts, criteria: ${criteria.map(_.toString).getOrElse("-")}")
+    log.info(s"MVH: compiling PatientDataCounts, criteria: ${criteria.map(_.toString).getOrElse("-")}")
 
-    repo.dataCounts(criteria)
+    repo.patientDataCounts(criteria)
 
   }
 
