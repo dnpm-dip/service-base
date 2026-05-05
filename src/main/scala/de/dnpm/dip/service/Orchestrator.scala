@@ -290,6 +290,9 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
     implicit env: Monad[F]
   ): F[EitherNel[String,FederatedControllingInfo]] = { 
 
+//    import cats.syntax.reducible._
+    import cats.syntax.semigroup._
+
     val targetSites =
       optTargetSites.getOrElse(connector.otherSites + Site.local)
 
@@ -322,22 +325,32 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
 
       result = external match {
 
-        case Ior.Right(parts) =>
+        case Ior.Right(externalParts) =>
+
+          val parts = (externalParts ++ local).sortBy(_.site.code.value)
+
           FederatedControllingInfo(
             LocalDateTime.now,
             orderedSites,
             criteria,
-            (parts ++ local).sortBy(_.site.code.value),
+            parts.map(_.mvGenomSeq).reduce(_ combine _),
+            parts.map(_.query).reduce(_ combine _),
+            parts,
             None
           )
           .asRight
 
-        case Ior.Both(errors,parts) =>
+        case Ior.Both(errors,externalParts) =>
+
+          val parts = (externalParts ++ local).sortBy(_.site.code.value)
+
           FederatedControllingInfo(
             LocalDateTime.now,
             orderedSites,
             criteria,
-            (parts ++ local).sortBy(_.site.code.value),
+            parts.map(_.mvGenomSeq).reduce(_ combine _),
+            parts.map(_.query).reduce(_ combine _),
+            parts,
             Some(errors)
           )
           .asRight
@@ -347,6 +360,8 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
             LocalDateTime.now,
             orderedSites,
             criteria,
+            local.get.mvGenomSeq,
+            local.get.query,
             local.toList,
             Some(errors)
           )

@@ -5,6 +5,7 @@ import java.time.{
   LocalDate,
   LocalDateTime
 }
+import cats.Semigroup
 import cats.data.NonEmptyList
 import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
@@ -56,6 +57,17 @@ object PatientDataCounts
 
   implicit val format: OFormat[PatientDataCounts] =
     Json.format[PatientDataCounts]
+
+
+  import cats.syntax.semigroup._
+
+  implicit val semigroup: Semigroup[PatientDataCounts] =
+    Semigroup.instance(
+      (l,r) => PatientDataCounts(
+        l.total + r.total,
+        l.matchingCriteria combine r.matchingCriteria
+      )
+    )
 }
 
 
@@ -81,6 +93,11 @@ object Controlling
     Json.format[Criteria]
 }
 
+sealed trait ControllingInfo
+{
+  val mvGenomSeq: PatientDataCounts
+  val query: PatientDataCounts
+}
 
 final case class LocalControllingInfo
 (
@@ -89,6 +106,7 @@ final case class LocalControllingInfo
   mvGenomSeq: PatientDataCounts,
   query: PatientDataCounts
 )
+extends ControllingInfo
 
 object LocalControllingInfo
 {
@@ -116,9 +134,12 @@ final case class FederatedControllingInfo
   compiledAt: LocalDateTime,
   sites: List[Coding[Site]],
   criteria: Option[Controlling.Criteria],
+  mvGenomSeq: PatientDataCounts,
+  query: PatientDataCounts,
   components: List[LocalControllingInfo],
   errors: Option[NonEmptyList[String]]
 )
+extends ControllingInfo
 
 object FederatedControllingInfo
 { 
