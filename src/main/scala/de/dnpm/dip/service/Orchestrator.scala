@@ -293,7 +293,8 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
     import cats.syntax.semigroup._
 
     val targetSites =
-      sites.getOrElse(connector.otherSites + Site.local)
+      sites.filter(_.nonEmpty)
+        .getOrElse(connector.otherSites + Site.local)
 
     val localResult =
       if (targetSites contains Site.local)
