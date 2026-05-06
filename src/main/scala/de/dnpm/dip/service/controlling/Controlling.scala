@@ -95,16 +95,16 @@ object Controlling
 
 sealed trait ControllingInfo
 {
-  val mvGenomSeq: PatientDataCounts
-  val query: PatientDataCounts
+  val mvGenomSeqCounts: PatientDataCounts
+  val queryCounts: PatientDataCounts
 }
 
 final case class LocalControllingInfo
 (
   site: Coding[Site],
   datetime: LocalDateTime,
-  mvGenomSeq: PatientDataCounts,
-  query: PatientDataCounts
+  mvGenomSeqCounts: PatientDataCounts,
+  queryCounts: PatientDataCounts
 )
 extends ControllingInfo
 
@@ -134,8 +134,8 @@ final case class FederatedControllingInfo
   compiledAt: LocalDateTime,
   sites: List[Coding[Site]],
   criteria: Option[Controlling.Criteria],
-  mvGenomSeq: PatientDataCounts,
-  query: PatientDataCounts,
+  mvGenomSeqCounts: PatientDataCounts,
+  queryCounts: PatientDataCounts,
   components: List[LocalControllingInfo],
   errors: Option[NonEmptyList[String]]
 )

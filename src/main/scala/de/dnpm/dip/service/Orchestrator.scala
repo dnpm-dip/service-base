@@ -285,16 +285,15 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
 
   def federatedControllingInfo(
     criteria: Option[Controlling.Criteria],
-    optTargetSites: Option[Set[Coding[Site]]]
+    sites: Option[Set[Coding[Site]]]
   )(
     implicit env: Monad[F]
   ): F[EitherNel[String,FederatedControllingInfo]] = { 
 
-//    import cats.syntax.reducible._
     import cats.syntax.semigroup._
 
     val targetSites =
-      optTargetSites.getOrElse(connector.otherSites + Site.local)
+      sites.getOrElse(connector.otherSites + Site.local)
 
     val localResult =
       if (targetSites contains Site.local)
@@ -333,8 +332,8 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
             LocalDateTime.now,
             orderedSites,
             criteria,
-            parts.map(_.mvGenomSeq).reduce(_ combine _),
-            parts.map(_.query).reduce(_ combine _),
+            parts.map(_.mvGenomSeqCounts).reduce(_ combine _),
+            parts.map(_.queryCounts).reduce(_ combine _),
             parts,
             None
           )
@@ -348,8 +347,8 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
             LocalDateTime.now,
             orderedSites,
             criteria,
-            parts.map(_.mvGenomSeq).reduce(_ combine _),
-            parts.map(_.query).reduce(_ combine _),
+            parts.map(_.mvGenomSeqCounts).reduce(_ combine _),
+            parts.map(_.queryCounts).reduce(_ combine _),
             parts,
             Some(errors)
           )
@@ -360,8 +359,8 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
             LocalDateTime.now,
             orderedSites,
             criteria,
-            local.get.mvGenomSeq,
-            local.get.query,
+            local.get.mvGenomSeqCounts,
+            local.get.queryCounts,
             local.toList,
             Some(errors)
           )

@@ -161,8 +161,8 @@ class OrchestratorTests extends AsyncFlatSpec
 
       initialInfo <- orchestrator.localControllingInfo(criteria = None)
 
-      _ = initialInfo.mvGenomSeq.total mustBe 0
-      _ = initialInfo.query.total mustBe 0
+      _ = initialInfo.mvGenomSeqCounts.total mustBe 0
+      _ = initialInfo.queryCounts.total mustBe 0
 
       dataUploads = List.fill(n)(dataUpload.next)
 
@@ -172,8 +172,8 @@ class OrchestratorTests extends AsyncFlatSpec
 
       postUploadInfo <- orchestrator.localControllingInfo(criteria = None)
 
-      _ = postUploadInfo.mvGenomSeq.total mustBe n
-      _ = postUploadInfo.query.total mustBe n
+      _ = postUploadInfo.mvGenomSeqCounts.total mustBe n
+      _ = postUploadInfo.queryCounts.total mustBe n
 
     } yield succeed
 
@@ -185,15 +185,17 @@ class OrchestratorTests extends AsyncFlatSpec
     for {
 
       result <- orchestrator.federatedControllingInfo(
-        None,
-        Some(Set(Site.local))
+        criteria = None,
+        sites = Some(Set(Site.local))
       )
 
-      FederatedControllingInfo(_,sites,criteria,_,_,components,errors) = result.value
+      FederatedControllingInfo(_,sites,criteria,mvCounts,queryCounts,components,errors) = result.value
 
       _ = sites must have size 1 
-
       _ = errors must not be (defined)
+
+      _ = mvCounts.total mustBe components.map(_.mvGenomSeqCounts.total).sum
+      _ = queryCounts.total mustBe components.map(_.queryCounts.total).sum
 
     } yield succeed
 
