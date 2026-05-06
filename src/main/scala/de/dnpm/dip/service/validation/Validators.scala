@@ -62,6 +62,7 @@ import BroadConsent.ReasonMissing.{
 }
 import Issue.{
   Error,
+  Warning,
   Fatal,
   Path,
 }
@@ -461,7 +462,11 @@ trait Validators
             Error(s"Unzulässiger Wert, ab 01.06.2026 nur noch folgende gültig: {${admissibleConsentMissingReasons.mkString(", ")}}")
               at "Grund für fehlenden Broad Consent"
           )
-        else None.validNel
+        else
+          valueIn (metadata.reasonResearchConsentMissing) must be (in (admissibleConsentMissingReasons)) otherwise (
+            Warning(s"Der angegebene Wert ist ab dem 01.06.2026 ungültig und es können nur noch folgende Werte angegeben werden: {${admissibleConsentMissingReasons.mkString(", ")}}")
+              at "Grund für fehlenden Broad Consent"
+            )
       )
       .errorsOr(metadata) on "Metadaten"
 
