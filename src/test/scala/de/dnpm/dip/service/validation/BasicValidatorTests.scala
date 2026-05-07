@@ -67,6 +67,8 @@ class BasicValidatorTests extends AnyFlatSpec with Validators
     val proteinChanges =
       Seq(
         "p.Gly12Cys",
+        "p.Gly12Ter",
+        "p.Gly12*",
         "p.?",
         "p.0?",
         "p.(=)"
