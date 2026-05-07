@@ -136,7 +136,7 @@ final case class FederatedControllingInfo
   criteria: Option[Controlling.Criteria],
   mvGenomSeqCounts: PatientDataCounts,
   queryCounts: PatientDataCounts,
-  components: List[LocalControllingInfo],
+  components: NonEmptyList[LocalControllingInfo],
   errors: Option[NonEmptyList[String]]
 )
 extends ControllingInfo

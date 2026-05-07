@@ -194,8 +194,8 @@ class OrchestratorTests extends AsyncFlatSpec
       _ = sites must have size 1 
       _ = errors must not be (defined)
 
-      _ = mvCounts.total mustBe components.map(_.mvGenomSeqCounts.total).sum
-      _ = queryCounts.total mustBe components.map(_.queryCounts.total).sum
+      _ = mvCounts.total mustBe components.map(_.mvGenomSeqCounts.total).reduce
+      _ = queryCounts.total mustBe components.map(_.queryCounts.total).reduce
 
     } yield succeed
 

@@ -9,10 +9,11 @@ import scala.util.{
 import cats.Monad
 import cats.data.{
   EitherNel,
-  Ior
+  Ior,
+  NonEmptyList
 }
 import cats.syntax.either._
-import cats.syntax.ior._
+import cats.syntax.apply._
 import cats.syntax.applicative._
 import cats.syntax.functor._
 import cats.syntax.flatMap._
@@ -265,22 +266,19 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
     criteria: Option[Controlling.Criteria]
   )(
     implicit env: Monad[F]
-  ): F[LocalControllingInfo] = {
-
-    val mvhCounts = mvhService.patientDataCounts(criteria)
-
-    val queryCounts = queryService.patientDataCounts(criteria)
-
-    for {
-      mvh <- mvhCounts
-      query <- queryCounts
-    } yield LocalControllingInfo(
-      Site.local,
-      LocalDateTime.now,
-      mvh,
-      query
+  ): F[LocalControllingInfo] =
+    (
+      mvhService.patientDataCounts(criteria),
+      queryService.patientDataCounts(criteria)
     )
-  }
+    .mapN(
+      (mvh,query) => LocalControllingInfo(
+        Site.local,
+        LocalDateTime.now,
+        mvh,
+        query
+      )
+    )
 
 
   def federatedControllingInfo(
@@ -289,8 +287,6 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
   )(
     implicit env: Monad[F]
   ): F[EitherNel[String,FederatedControllingInfo]] = { 
-
-    import cats.syntax.semigroup._
 
     val targetSites =
       sites.filter(_.nonEmpty)
@@ -301,76 +297,67 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
         for { local <- localControllingInfo(criteria) } yield Some(local) 
       else None.pure
 
-    val externalResultsBySite =
+    val externalResults =
       (targetSites - Site.local) match { 
         case sites if sites.nonEmpty =>
-          for {
-            resultsBySite <- connector ! (LocalControllingInfo.Request(Site.local,criteria), sites)
-          } yield resultsBySite.foldLeft(
-            List.empty[LocalControllingInfo].rightIor[String].toIorNel
-          ){
-            case (acc,(site,result)) =>
-              acc combine result.bimap(err => s"Site ${site.code}: $err", List(_)).toIor.toIorNel
-          }
+          (connector ! (LocalControllingInfo.Request(Site.local,criteria), sites)).map(
+            _.map {
+              case (site,result) =>
+                result.bimap(
+                  err => s"Site ${site.code}: $err",
+                  List(_)
+                )
+                .toIor.toIorNel
+            }
+            .reduce(_ combine _)
+          )
+          .map(Some(_))
 
-        case _ => env.pure(List.empty.rightIor.toIorNel)
+        case _ => None.pure
       }
 
     lazy val orderedSites = targetSites.toList.sortBy(_.code.value)
 
-    for { 
-      local <- localResult
+    (
+      localResult,
+      externalResults
+    )
+    .mapN(
+      (localInfo,external) => external match {
+        case Some(externalIor) =>
+          externalIor match { 
+            case Ior.Right(externalInfos) =>
+              NonEmptyList.fromList((externalInfos ++ localInfo).sortBy(_.site.code.value)) -> None
 
-      external <- externalResultsBySite
+            case Ior.Both(errors,externalInfos) =>
+              NonEmptyList.fromList((externalInfos ++ localInfo).sortBy(_.site.code.value)) -> Some(errors)
 
-      result = external match {
+            case Ior.Left(errors) =>
+              localInfo.map(NonEmptyList.of(_)) -> Some(errors)
+          }
 
-        case Ior.Right(externalParts) =>
-
-          val parts = (externalParts ++ local).sortBy(_.site.code.value)
-
-          FederatedControllingInfo(
-            LocalDateTime.now,
-            orderedSites,
-            criteria,
-            parts.map(_.mvGenomSeqCounts).reduce(_ combine _),
-            parts.map(_.queryCounts).reduce(_ combine _),
-            parts,
-            None
-          )
-          .asRight
-
-        case Ior.Both(errors,externalParts) =>
-
-          val parts = (externalParts ++ local).sortBy(_.site.code.value)
-
-          FederatedControllingInfo(
-            LocalDateTime.now,
-            orderedSites,
-            criteria,
-            parts.map(_.mvGenomSeqCounts).reduce(_ combine _),
-            parts.map(_.queryCounts).reduce(_ combine _),
-            parts,
-            Some(errors)
-          )
-          .asRight
-
-        case Ior.Left(errors) if local.isDefined =>
-          FederatedControllingInfo(
-            LocalDateTime.now,
-            orderedSites,
-            criteria,
-            local.get.mvGenomSeqCounts,
-            local.get.queryCounts,
-            local.toList,
-            Some(errors)
-          )
-          .asRight
-
-        case Ior.Left(errors) => errors.asLeft
+        case None => localInfo.map(NonEmptyList.of(_)) -> None
       }
-    
-    } yield result
+    )
+    .map {
+      case Some(components) -> errors =>
+        FederatedControllingInfo(
+          LocalDateTime.now,
+          orderedSites,
+          criteria,
+          components.map(_.mvGenomSeqCounts).reduce,
+          components.map(_.queryCounts).reduce,
+          components,
+          errors
+        )
+        .asRight
+
+      case None -> Some(errors) => errors.asLeft
+
+      case None -> None => "No LocalControllingInfo components available".asLeft.toEitherNel
+
+    }
+
   }
 
 }
