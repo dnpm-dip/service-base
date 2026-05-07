@@ -237,7 +237,7 @@ trait Validators
   implicit val proteinChangeValidator: Validator[Issue,Code[HGVS.Protein]] = {
 
     val threeLetterCode =
-      "(Ala|Asx|Cys|Asp|Glu|Phe|Gly|His|Ile|Lys|Leu|Met|Asn|Pro|Gln|Arg|Ser|Thr|Sec|Val|Trp|Xaa|Tyr|Glx|Ter|\\*)".r.unanchored
+      "(Ala|Asx|Cys|Asp|Glu|Phe|Gly|His|Ile|Lys|Leu|Met|Asn|Pro|Gln|Arg|Ser|Thr|Sec|Val|Trp|Xaa|Tyr|Glx|Ter)".r.unanchored
 
     // https://hgvs-nomenclature.org/stable/recommendations/uncertain/#protein
     val uncertain = "p.(0?\\?|\\(=\\))".r.unanchored
