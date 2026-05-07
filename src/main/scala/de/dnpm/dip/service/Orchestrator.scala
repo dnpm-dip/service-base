@@ -7,17 +7,29 @@ import scala.util.{
   Right
 }
 import cats.Monad
+import cats.data.{
+  EitherNel,
+  Ior,
+  NonEmptyList
+}
 import cats.syntax.either._
+import cats.syntax.apply._
 import cats.syntax.applicative._
 import cats.syntax.functor._
 import cats.syntax.flatMap._
 import cats.syntax.traverse._
 import de.dnpm.dip.util.Completer
+import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.model.{
   Id,
   Patient,
   PatientRecord,
   Site
+}
+import de.dnpm.dip.service.controlling.{ 
+  Controlling,
+  LocalControllingInfo,
+  FederatedControllingInfo
 }
 import de.dnpm.dip.service.validation.{
   ValidationService,
@@ -95,6 +107,8 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
   validationService: ValidationService[F,Monad[F],T],
   mvhService: MVHService[F,Monad[F],T],
   queryService: QueryService.DataOps[F,Monad[F],T]
+)(
+  connector: Connector[F,Monad[F]]
 )(
   implicit patientSetter: (T,Patient) => T
 )
@@ -240,19 +254,109 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
     }
 
 
-  def statusInfo(
+  def process(
+    request: LocalControllingInfo.Request
+  )(
     implicit env: Monad[F]
-  ): F[StatusInfo] =
-    for {
-      validation <- validationService.statusInfo
-      mvh <- mvhService.statusInfo
-      query <- queryService.statusInfo
-    } yield StatusInfo(
-      Site.local,
-      LocalDateTime.now,
-      validation,
-      mvh,
-      query
+  ): F[request.ResultType] =
+    localControllingInfo(request.criteria)
+
+
+  private[service] def localControllingInfo(
+    criteria: Option[Controlling.Criteria]
+  )(
+    implicit env: Monad[F]
+  ): F[LocalControllingInfo] =
+    (
+      mvhService.patientDataCounts(criteria),
+      queryService.patientDataCounts(criteria)
     )
+    .mapN(
+      (mvh,query) => LocalControllingInfo(
+        Site.local,
+        LocalDateTime.now,
+        mvh,
+        query
+      )
+    )
+
+
+  def federatedControllingInfo(
+    criteria: Option[Controlling.Criteria],
+    sites: Option[Set[Coding[Site]]]
+  )(
+    implicit env: Monad[F]
+  ): F[EitherNel[String,FederatedControllingInfo]] = { 
+
+    val targetSites =
+      sites.filter(_.nonEmpty)
+        .getOrElse(connector.otherSites + Site.local)
+
+    val localResult =
+      if (targetSites contains Site.local)
+        for { local <- localControllingInfo(criteria) } yield Some(local) 
+      else None.pure
+
+    val externalResults =
+      (targetSites - Site.local) match { 
+        case sites if sites.nonEmpty =>
+          (connector ! (LocalControllingInfo.Request(Site.local,criteria), sites)).map(
+            _.map {
+              case (site,result) =>
+                result.bimap(
+                  err => s"Site ${site.code}: $err",
+                  List(_)
+                )
+                .toIor.toIorNel
+            }
+            .reduceOption(_ combine _)
+          )
+
+        case _ => None.pure
+      }
+
+    lazy val orderedSites = targetSites.toList.sortBy(_.code.value)
+
+    (
+      localResult,
+      externalResults
+    )
+    .mapN(
+      (localInfo,external) => external match {
+        case Some(externalIor) =>
+          externalIor match { 
+            case Ior.Right(externalInfos) =>
+              NonEmptyList.fromList((externalInfos ++ localInfo).sortBy(_.site.code.value)) -> None
+
+            case Ior.Both(errors,externalInfos) =>
+              NonEmptyList.fromList((externalInfos ++ localInfo).sortBy(_.site.code.value)) -> Some(errors)
+
+            case Ior.Left(errors) =>
+              localInfo.map(NonEmptyList.of(_)) -> Some(errors)
+          }
+
+        case None => localInfo.map(NonEmptyList.of(_)) -> None
+      }
+    )
+    .map {
+      case Some(components) -> errors =>
+        FederatedControllingInfo(
+          LocalDateTime.now,
+          orderedSites,
+          criteria,
+          components.map(_.mvGenomSeqCounts).reduce,
+          components.map(_.queryCounts).reduce,
+          components,
+          errors
+        )
+        .asRight
+
+      case None -> Some(errors) => errors.asLeft
+
+      case None -> None => "No LocalControllingInfo components available".asLeft.toEitherNel
+
+    }
+
+  }
 
 }

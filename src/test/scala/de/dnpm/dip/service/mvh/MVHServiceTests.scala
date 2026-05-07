@@ -45,7 +45,6 @@ class MVHServiceTests extends AsyncFlatSpec
   }
 
 
-
   val service = new FakeMVHService[Future,DummyPatientRecord]
 
 

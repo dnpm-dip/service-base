@@ -7,7 +7,6 @@ import java.io.{
   FileWriter,
   InputStream
 }
-import java.time.LocalDateTime
 import scala.reflect.ClassTag
 import scala.util.chaining._
 import scala.util.Using
@@ -23,7 +22,6 @@ import cats.syntax.applicative._
 import cats.syntax.either._
 import play.api.libs.json.{
   Json,
-  JsPath,
   Reads,
   OFormat,
   Writes
@@ -34,6 +32,10 @@ import de.dnpm.dip.model.{
   Id,
   Patient,
   PatientRecord,
+}
+import de.dnpm.dip.service.controlling.{
+  Controlling,
+  PatientDataCounts
 }
 
 
@@ -53,42 +55,6 @@ object TAN
 
 }
 
-/**
- * Light-weight "header" version of a Submission,
- * containing only the necessary data elements to perform filtering by Submission.Filter,
- */
-private[mvh] final case class SubmissionHeader
-(
-  metadata: Submission.Metadata,
-  patient: Patient,
-  submittedAt: LocalDateTime
-)
-
-private[mvh] object SubmissionHeader
-{
-  import play.api.libs.functional.syntax._
-
-  implicit def fromSubmission[T <: PatientRecord](sub: Submission[T]): SubmissionHeader =
-    SubmissionHeader(
-      sub.metadata,
-      sub.record.patient,
-      sub.submittedAt
-    )
-
-  // Explicit Reads to include tolerant Reads[Submission.Metadata],
-  // required for backwards compatibility with data sets potentially containing 
-  // structurally invalid Consent resources
-  implicit val reads: Reads[SubmissionHeader] =
-    (
-      (JsPath \ "metadata").read(Submission.tolerantReads.metadata) and
-      (JsPath \ "patient").read[Patient] and
-      (JsPath \ "submittedAt").read[LocalDateTime]
-    )(
-      SubmissionHeader(_,_,_)
-    )
-
-}
-
 
 class FSBackedRepository[F[+_],T <: PatientRecord: OFormat](
   dataDir: File
@@ -102,12 +68,12 @@ with Logging
   type Env = Monad[F]
 
   /**
-   * Implicit conversion of Submission.Filter into a predicate function for SubmissionHeader,
-   * for filtering on cached SubmissionHeaders
+   * Implicit conversion of Submission.Filter into a predicate function for PartialSubmission,
+   * for filtering on cached PartialSubmissions
    */
-  protected implicit def submissionHeaderPredicate(
+  protected implicit def partialSubmissionPredicate(
     filter: Submission.Filter
-  ): SubmissionHeader => Boolean =
+  ): PartialSubmission => Boolean =
     submission =>
       filter.period.map(_ contains submission.submittedAt).getOrElse(true) &&
       filter.`type`.map(_ contains submission.metadata.`type`).getOrElse(true)
@@ -170,15 +136,17 @@ with Logging
     )
   
 
-  // Cache the SubmissionHeaders for rapid in-memory filtering 
-  private val cachedSubmissionHeaders: Map[Id[TransferTAN],SubmissionHeader] =
+  /**
+   * Cache the PartialSubmissions for rapid in-memory filtering 
+   */
+  private val cachedPartialSubmissions: Map[Id[TransferTAN],PartialSubmission] =
     TrieMap.from(
       dataDir.listFiles(
         (_,name) => (name startsWith s"${SUBMISSION_PREFIX}_Patient") && (name endsWith ".json")
       )
       .to(LazyList)
       .map(new FileInputStream(_))
-      .map(readAsJson[SubmissionHeader])
+      .map(readAsJson[PartialSubmission])
       .map(sub => sub.metadata.transferTAN -> sub)
     )
 
@@ -205,7 +173,7 @@ with Logging
         subWriter.write(toPrettyJson(submission))
 
         cachedReports += report.id -> report
-        cachedSubmissionHeaders += submission.metadata.transferTAN -> submission
+        cachedPartialSubmissions += submission.metadata.transferTAN -> submission
 
         ().asRight[String]
     }
@@ -253,19 +221,43 @@ with Logging
     implicit env: Env
   ): F[LazyList[Submission[T]]] = {
 
-    val predicate: SubmissionHeader => Boolean = filter
+    val predicate: PartialSubmission => Boolean = filter
 
     val reader = readAsJson(tolerantSubmissionReads)
 
-    cachedSubmissionHeaders
-      .collect {
-        case (tan,sub) if predicate(sub) => submissionFile(sub.patient.id,tan)
-      }
+    cachedPartialSubmissions
+      .collect { case (tan,sub) if predicate(sub) => submissionFile(sub.patient.id,tan) }
       .to(LazyList)
       .map(file => reader(new FileInputStream(file)))
       .pure
   }
 
+
+  override def patientDataCounts(
+    optCriteria: Option[Controlling.Criteria]
+  )(
+    implicit env: Env
+  ): F[PatientDataCounts] =
+    for {
+      submissionsByPatient <- env.pure {
+        cachedPartialSubmissions
+          .values
+          .groupBy(_.patient.id)
+          .map { case (_,subs) => subs.maxBy(_.submittedAt) }
+      }
+      
+      matchingCriteria =
+        optCriteria.map(criteria =>
+          submissionsByPatient.count(
+            _.episodesOfCare.exists(eoc => criteria.episodeOfCarePeriod contains eoc.period.start)
+          )
+        )
+
+    } yield PatientDataCounts(
+      submissionsByPatient.size,
+      matchingCriteria
+    )
+ 
 
   override def submission(
     id: Id[TransferTAN]
@@ -326,7 +318,7 @@ with Logging
           (acc,file) => 
             if (file.delete){
               val TAN(tan) = file
-              cachedSubmissionHeaders -= tan
+              cachedPartialSubmissions -= tan
               acc
             }
             else s"Failed to delete $SUBMISSION_PREFIX file $file".tap(log.error) :: acc

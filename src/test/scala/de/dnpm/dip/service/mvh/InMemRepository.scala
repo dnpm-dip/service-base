@@ -15,7 +15,10 @@ import de.dnpm.dip.model.{
   Patient,
   PatientRecord,
 }
-
+import de.dnpm.dip.service.controlling.{
+  Controlling,
+  PatientDataCounts
+}
 
 
 class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
@@ -140,6 +143,24 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
       .flatMap(NonEmptyList.fromList(_))
       .map(History(_))
       .pure
+
+
+  override def patientDataCounts(
+    optCriteria: Option[Controlling.Criteria]
+  )(
+    implicit env: Env
+  ): F[PatientDataCounts] =
+    env.pure {
+      PatientDataCounts(
+        submissions.size,
+        optCriteria.map(
+          criteria =>
+            submissions
+              .map(_._2.values.maxBy(_.submittedAt))
+              .count(_.record.episodesOfCare.exists(eoc => criteria.episodeOfCarePeriod contains eoc.period.start))
+        )
+      )
+    }
 
 
   override def delete(id: Id[Patient])(

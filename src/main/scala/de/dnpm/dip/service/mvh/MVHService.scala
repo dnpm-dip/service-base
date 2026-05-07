@@ -1,27 +1,27 @@
 package de.dnpm.dip.service.mvh
 
 
-import de.dnpm.dip.service.Distribution
+import de.dnpm.dip.service.controlling.Controlling
 import de.dnpm.dip.model.{
   Id,
   Patient,
   PatientRecord,
 }
-import play.api.libs.json.{ 
-  Json,
-  OFormat
-}
 
-trait MVHService[F[_],Env,T <: PatientRecord]
+trait MVHService[F[_],Env,T <: PatientRecord] extends Controlling.Ops[F,Env]
 {
-  import MVHService._
+  import MVHService.{
+    Command,
+    Error,
+    Outcome
+  }
 
   type ReportType <: Report
 
   val useCase: UseCase.Value
 
   /**
-   * Operator: process a command, hence exclamation mark.
+   * Process a command, hence exclamation mark operator
    *
    * @param cmd The Command to be processed
    */
@@ -52,11 +52,6 @@ trait MVHService[F[_],Env,T <: PatientRecord]
   )(
     implicit env: Env
   ): F[Option[Submission[T]]]
-
-  
-  def statusInfo(
-    implicit env: Env
-  ): F[StatusInfo]
 
   
   def report(
@@ -90,17 +85,5 @@ object MVHService
   final case class InvalidTAN(msg: String) extends Error
   final case class InvalidSubmissionType(msg: String) extends Error
   final case class GenericError(msg: String) extends Error
-
-
-  final case class StatusInfo
-  (
-    submissionReports: Distribution[Submission.Report.Status.Value]
-  )
-
-  object StatusInfo
-  {
-    implicit val format: OFormat[StatusInfo] =
-      Json.format[StatusInfo]
-  }
 
 }

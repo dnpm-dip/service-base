@@ -27,6 +27,10 @@ import de.dnpm.dip.service.{
   Connector,
   ConnectionStatus,
 }
+import de.dnpm.dip.service.controlling.{
+  Controlling,
+  PatientDataCounts
+}
 import play.api.libs.json.{
   Json,
   Format,
@@ -70,7 +74,6 @@ with Logging
   protected val CriteriaExpander: Completer[Criteria]
 
 
-
   protected def ResultSetFrom(
     query: Query[Criteria],
     results: Seq[Query.Match[PatientRecord,Criteria]]
@@ -79,8 +82,7 @@ with Logging
 
   protected implicit val siteCompleter: Completer[Coding[Site]] = {
 
-    val sites =
-      Site.local :: connector.otherSites.toList
+    val sites = Site.local :: connector.otherSites.toList
 
     Completer.of(
       site =>
@@ -89,12 +91,16 @@ with Logging
   }
 
 
-  override def statusInfo(
+  override def patientDataCounts(
+    criteria: Option[Controlling.Criteria]
+  )(
     implicit env: Monad[F]
-  ): F[QueryService.StatusInfo] =
-    db.totalRecords
-      .map(QueryService.StatusInfo(_))
+  ): F[PatientDataCounts] = {
 
+    log.info(s"Query: compiling PatientDataCounts, criteria: ${criteria.map(_.toString).getOrElse("-")}")
+
+    db.patientDataCounts(criteria)
+  }
 
   override def sites(
     implicit

@@ -9,21 +9,13 @@ import de.dnpm.dip.model.{
   Site,
   Snapshot
 }
-import play.api.libs.json.{
-  Json,
-  Writes,
-}
+import de.dnpm.dip.service.controlling.Controlling
 
 
 object QueryService
 {
 
-  trait Ops[
-    F[+_],
-    Env,
-    UseCase <: UseCaseConfig,
-    Err
-  ]
+  trait Ops[F[+_],Env,UseCase <: UseCaseConfig,Err]
   {
     self =>
     
@@ -122,39 +114,17 @@ object QueryService
   final case class GenericError(msg: String) extends DataError
 
 
-  trait DataOps[F[_],Env,T]
+  trait DataOps[F[_],Env,T] extends Controlling.Ops[F,Env]
   {
-    
     def !(cmd: DataCommand[T])(
       implicit env: Env
     ): F[Either[DataError,DataOutcome[T]]]
-    
-    def statusInfo(
-      implicit env: Env
-    ): F[StatusInfo]
-
-  }
-
-  final case class StatusInfo
-  (
-    total: Int
-  )
-
-  object StatusInfo
-  {
-    implicit val format: Writes[StatusInfo] =
-      Json.writes[StatusInfo]
   }
 
 }
 
 
-trait QueryService[
-  F[+_],
-  Env,
-  UseCase <: UseCaseConfig,
-]
+trait QueryService[F[+_],Env,UseCase <: UseCaseConfig]
 extends QueryService.Ops[F,Env,UseCase,String]
 with QueryService.DataOps[F,Env,UseCase#PatientRecord]
 with PreparedQueryOps[F,Env,UseCase#Criteria,String]
-
