@@ -236,11 +236,14 @@ trait Validators
 
   implicit val proteinChangeValidator: Validator[Issue,Code[HGVS.Protein]] = {
 
+    val threeLetterCode =
+      "(Ala|Asx|Cys|Asp|Glu|Phe|Gly|His|Ile|Lys|Leu|Met|Asn|Pro|Gln|Arg|Ser|Thr|Sec|Val|Trp|Xaa|Tyr|Glx|Ter|\\*)".r.unanchored
+
     // https://hgvs-nomenclature.org/stable/recommendations/uncertain/#protein
     val uncertain = "p.(0?\\?|\\(=\\))".r.unanchored
 
     code =>
-      code.value must (matchRegex (HGVS.Protein.threeLetterCode) or matchRegex (uncertain)) otherwise (
+      code.value must (matchRegex (threeLetterCode) or matchRegex (uncertain)) otherwise (
         Error(s"Ungültiger Code '${code}', erwarte 3-Buchstaben-Format für Amino-Säure") at "Amino-Säure-Austausch"
       ) map (_ => code)
   }
