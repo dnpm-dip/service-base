@@ -309,9 +309,8 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
                 )
                 .toIor.toIorNel
             }
-            .reduce(_ combine _)
+            .reduceOption(_ combine _)
           )
-          .map(Some(_))
 
         case _ => None.pure
       }
