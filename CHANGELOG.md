@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.3.0](https://github.com/dnpm-dip/service-base/compare/v1.2.3...v1.3.0) (2026-05-08)
+
+
+### Features
+
+* add validation warning for future invalid values ([#40](https://github.com/dnpm-dip/service-base/issues/40)) ([9e92224](https://github.com/dnpm-dip/service-base/commit/9e92224c927d05c69c88c80932835d89ef093916))
+* Added 'diagnosticExtent' to Submission.Report in order for it to contain all info necessary for quarter report compilation ([#30](https://github.com/dnpm-dip/service-base/issues/30)) ([d772a43](https://github.com/dnpm-dip/service-base/commit/d772a43d8fc64682b08324bb1e05e82e0ab5cb64))
+* Added flag to allow (de)activating federated queries on BaseQue… ([#36](https://github.com/dnpm-dip/service-base/issues/36)) ([69d1bad](https://github.com/dnpm-dip/service-base/commit/69d1badb351966aa083a31cb5008b6fd00dc4378))
+* Added info on consent revocation to Submission.Report  ([#31](https://github.com/dnpm-dip/service-base/issues/31)) ([a79d6f6](https://github.com/dnpm-dip/service-base/commit/a79d6f684386195588380f63982ca66af4c01c65))
+* Added Patient-ID als filter criterion for Submission.Report ([41f2a93](https://github.com/dnpm-dip/service-base/commit/41f2a93b6ca857a33a481f277ebc5edddfb3f628))
+* DataCount adaptations ([#39](https://github.com/dnpm-dip/service-base/issues/39)) ([2bf8483](https://github.com/dnpm-dip/service-base/commit/2bf84834e7b8c78a7cd00eecab527545962ea092))
+* submission type check ([#26](https://github.com/dnpm-dip/service-base/issues/26)) ([ed2d8ea](https://github.com/dnpm-dip/service-base/commit/ed2d8ea5c07075624fca0cf7e77048706681209e))
+
+
+### Bug Fixes
+
+* Adapted queries by Submission.Filter to be executed on cached SubmissionHeaders (light-weight data object containing only the data necessary for filtering) ([1d49e52](https://github.com/dnpm-dip/service-base/commit/1d49e52ba5cfca443243df21bec174825ee43aae))
+* Adapted regex for protein change validation ([#41](https://github.com/dnpm-dip/service-base/issues/41)) ([c37e50f](https://github.com/dnpm-dip/service-base/commit/c37e50fb8ff524a3f592678b09cec245e73ca4a4))
+* Added a dedicated access method for Submission by TAN ([#35](https://github.com/dnpm-dip/service-base/issues/35)) ([89d5174](https://github.com/dnpm-dip/service-base/commit/89d51747d72bc9646b78196b8e0fb442ba8583f2))
+* Added warning-level validation rule for CarePlan.boardType to be defined ([#37](https://github.com/dnpm-dip/service-base/issues/37)) ([eba124e](https://github.com/dnpm-dip/service-base/commit/eba124ee9bddcd235c169f239226e060eeed4ff1))
+* bump backend-core to 1.2.1 ([eaaf0ce](https://github.com/dnpm-dip/service-base/commit/eaaf0ced5e5f5b8dc3ae2abd822b0e6762bb2e58))
+* Bump check for presence of either Broad Consent or reason why missing to 'error'-level issue ([01ee922](https://github.com/dnpm-dip/service-base/commit/01ee922baea9b05218aeb897bcd1c5abdb4cc460))
+* bump core to 1.2.2 ([f935773](https://github.com/dnpm-dip/service-base/commit/f93577392f6ce328defae347354a5a66fe62265c))
+* handle multiple mv inclusions ([#33](https://github.com/dnpm-dip/service-base/issues/33)) ([ee0ac2e](https://github.com/dnpm-dip/service-base/commit/ee0ac2e2b90fab84a7fe64cdf5b03729e4b2a81c))
+* qc specs 2026 06 01 ([#29](https://github.com/dnpm-dip/service-base/issues/29)) ([7cce0c7](https://github.com/dnpm-dip/service-base/commit/7cce0c7f6b59e70d061152775219cc8c0f155c9d))
+* Removed obsolete validation on base PatientRecordValidator, so that check for presence of either NGS-Reports or noSequencingPerformedReason is correctly applied only to MV submissions ([baf9875](https://github.com/dnpm-dip/service-base/commit/baf9875f1f53a62238adaddb83b68e7aa37c44b4))
+
 ## [1.2.3](https://github.com/dnpm-dip/service-base/compare/v1.2.2...v1.2.3) (2025-12-15)
 
 
