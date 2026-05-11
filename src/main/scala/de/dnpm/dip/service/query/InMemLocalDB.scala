@@ -30,7 +30,7 @@ class InMemLocalDB[
   Criteria,
   T <: PatientRecord
 ](
-  val criteriaMatcher: Criteria => (PatientRecord => Option[Criteria]),
+  val criteriaMatcher: Criteria => (T => Option[Criteria])
 )
 extends LocalDB[F,C[F],Criteria,T]
 with Logging
