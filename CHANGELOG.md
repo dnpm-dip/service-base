@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/dnpm-dip/service-base/compare/v1.3.0...v1.3.1) (2026-05-11)
+
+
+### Bug Fixes
+
+* Corrected signature of 'criteria matcher' in query/InMemLocalDB ([6f661e8](https://github.com/dnpm-dip/service-base/commit/6f661e80cd5c3ea9d084bb07171e19fe45273710))
+
 ## [1.3.0](https://github.com/dnpm-dip/service-base/compare/v1.2.3...v1.3.0) (2026-05-08)
 
 
