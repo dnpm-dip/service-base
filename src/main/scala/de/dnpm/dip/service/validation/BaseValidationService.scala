@@ -2,11 +2,6 @@ package de.dnpm.dip.service.validation
 
 
 import java.time.Instant
-import scala.util.{
-  Either,
-  Left,
-  Right
-}
 import cats.Monad
 import cats.data.Validated
 import de.dnpm.dip.util.Logging
@@ -33,6 +28,7 @@ private object FatalIssues
   def unapply(report: ValidationReport): Boolean =
     report.issues.exists(_.severity == Severity.Fatal)
 }
+
 
 class BaseValidationService[
   F[+_],
@@ -65,7 +61,7 @@ with Logging
     SeverityMatcher(maxSeverity)
 
 
-  override def validate(
+  private def validate(
     data: DataUpload[T]
   )(
     implicit env: Monad[F]
@@ -76,26 +72,26 @@ with Logging
     for {
       validationResult <- validator(data).pure
 
-      result =
-        validationResult match { 
-          case Validated.Valid(_) =>
-            DataValid(data).asRight
-          
-          case Validated.Invalid(issues) =>
-            val report =
-              ValidationReport(
-                data.record.patient.id,
-                issues,
-                Instant.now
-              )          
-          
-            report match {
-              case Acceptable()  => DataAcceptableWithIssues(data,report).asRight
-              case FatalIssues() => FatalIssuesDetected(report).asLeft
-              case _             => UnacceptableIssuesDetected(report).asLeft
-            }
-          
-        }
+      result = validationResult match { 
+
+        case Validated.Valid(_) =>
+          DataValid(data).asRight
+        
+        case Validated.Invalid(issues) =>
+          val report =
+            ValidationReport(
+              data.record.patient.id,
+              issues,
+              Instant.now
+            )          
+        
+          report match {
+            case Acceptable()  => DataAcceptableWithIssues(data,report).asRight
+            case FatalIssues() => FatalIssuesDetected(report).asLeft
+            case _             => UnacceptableIssuesDetected(report).asLeft
+          }
+        
+      }
 
     } yield result
   }
@@ -108,12 +104,13 @@ with Logging
   ): F[Either[Error,Outcome[T]]] =
     cmd match {
 
-      case Validate(data) =>
+      case Validate(data,persist) =>
         log.info(s"Processing PatientRecord upload ${data.record.id}")
         for {
           outcome <- validate(data)
 
           result <- outcome match { 
+
             case Right(DataValid(_)) =>
               log.debug(s"Data valid: deleting previously saved validation reports")
               // In case this were a consecutive export which now turns out valid,
@@ -121,7 +118,7 @@ with Logging
               repo.delete(data.record.patient.id)
               outcome.pure
             
-            case Right(DataAcceptableWithIssues(_,report)) =>
+            case Right(DataAcceptableWithIssues(_,report)) if persist =>
               log.debug(s"Data acceptable but with with issues: Saving record set and validation report")
               repo.save(data,report)
                 .map {
@@ -129,7 +126,7 @@ with Logging
                   case Left(err) => GenericError(err).asLeft
                 }
 
-            case Left(UnacceptableIssuesDetected(report)) =>
+            case Left(UnacceptableIssuesDetected(report)) if persist =>
               log.debug(s"Unacceptable issues: Saving record set and validation report")
               repo.save(data,report)
                 .map {
@@ -137,11 +134,8 @@ with Logging
                   case Left(err) => GenericError(err).asLeft
                 }
 
-            case Left(_) => outcome.pure
+            case _ => outcome.pure
 
-            // Won't occur but required for exhaustive pattern match
-            case Right(Deleted(_)) =>
-              GenericError("Unexpected validation outcome").asLeft.pure
           }
 
         } yield result
@@ -195,12 +189,5 @@ with Logging
     implicit env: Monad[F]
   ): F[Option[DataUpload[T]]] =
     (repo ? patId).map(_.map(_._1))
-
-  override def statusInfo(
-    implicit env: Monad[F]
-  ): F[StatusInfo] =
-    (repo ? Filter())
-      .map(_.size)
-      .map(StatusInfo(_))
 
 }
