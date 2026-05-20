@@ -66,7 +66,7 @@ object Orchestrator
   final case class Process[T <: PatientRecord]
   (
     upload: DataUpload[T],
-    persistValidationReport: Option[Boolean] = None
+    persistValidationOutcome: Option[Boolean] = None
   )
   extends Command[T]
 
@@ -146,7 +146,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
   ): F[Either[List[Error],Orchestrator.Outcome]] =
     cmd match {
 
-      case Process(rawData,persistValidationReport) =>
+      case Process(rawData,persistValidationOutcome) =>
 
         for { 
 
@@ -156,7 +156,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
           )
           .pure // Load pre-processed data into Monad
 
-          validationResult <- validationService ! Validate(dataUpload,persistValidationReport.getOrElse(true))
+          validationResult <- validationService ! Validate(dataUpload,persistValidationOutcome.getOrElse(true))
 
           finalResult <- validationResult match {
             
