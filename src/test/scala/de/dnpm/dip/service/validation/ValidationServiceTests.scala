@@ -99,4 +99,26 @@ class ValidationServiceTests extends AsyncFlatSpec with Matchers with Validators
 
   }
 
+
+  "Validation outcomes" must "have been persisted" in {
+
+    val upload = incorrectFollowUpUploads.next
+
+    for { 
+      outcome <- service ! Validate(upload,true)
+
+      _ = outcome must matchPattern { case Left(_: UnacceptableIssuesDetected) => }
+
+      validationReport <- service.validationReport(upload.record.id)
+
+      patientRecord <- service.patientRecord(upload.record.id)
+
+      _ = validationReport must be (defined)
+
+      _ = patientRecord must be (defined)
+
+    } yield succeed
+
+  }
+
 }

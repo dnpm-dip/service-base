@@ -178,7 +178,7 @@ with Logging
     )
 
 
-  override def dataQualityReport(
+  override def validationReport(
     patId: Id[Patient]
   )(
     implicit env: Monad[F]

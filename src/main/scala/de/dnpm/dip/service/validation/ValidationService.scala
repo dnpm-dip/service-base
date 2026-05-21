@@ -58,7 +58,7 @@ trait ValidationService[F[_],Env,PatientRecord]{
   ): F[Seq[ValidationInfo]]
 
 
-  def dataQualityReport(
+  def validationReport(
     patId: Id[Patient]
   )(
     implicit env: Env
