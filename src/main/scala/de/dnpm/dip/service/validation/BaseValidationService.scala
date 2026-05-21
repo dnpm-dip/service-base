@@ -114,7 +114,10 @@ with Logging
             case Right(DataValid(_)) =>
               log.debug(s"Data valid: deleting previously saved validation reports")
               // In case this were a consecutive export which now turns out valid,
-              // delete the patient's previously saved validationReport and record
+              // delete the patient's previously saved validationReport and record.
+              // This deletion takes place irrespectively of the newly introduced flag
+              // whether to persist validation outcomes, precisely because hitherto the
+              // outcomes were saved anyway, and should be deleted if some are present.
               repo.delete(data.record.patient.id)
               outcome.pure
             
