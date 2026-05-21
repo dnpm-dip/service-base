@@ -4,7 +4,7 @@ import scala.util.Properties.envOrElse
 name := "service-base"
 ThisBuild / organization := "de.dnpm.dip"
 ThisBuild / scalaVersion := "2.13.18"
-ThisBuild / version      := envOrElse("VERSION","1.3.0-SNAPSHOT")
+ThisBuild / version      := envOrElse("VERSION","1.4.0-SNAPSHOT")
 
 val ownerRepo  = envOrElse("REPOSITORY","dnpm-dip/service-base").split("/")
 ThisBuild / githubOwner      := ownerRepo(0)

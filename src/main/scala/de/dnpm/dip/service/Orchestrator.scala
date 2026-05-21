@@ -65,7 +65,8 @@ object Orchestrator
   sealed trait Command[+T]
   final case class Process[T <: PatientRecord]
   (
-    upload: DataUpload[T]
+    upload: DataUpload[T],
+    persistValidationOutcome: Option[Boolean] = None
   )
   extends Command[T]
 
@@ -145,7 +146,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
   ): F[Either[List[Error],Orchestrator.Outcome]] =
     cmd match {
 
-      case Process(rawData) =>
+      case Process(rawData,persistValidationOutcome) =>
 
         for { 
 
@@ -155,7 +156,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
           )
           .pure // Load pre-processed data into Monad
 
-          validationResult <- validationService ! Validate(dataUpload)
+          validationResult <- validationService ! Validate(dataUpload,persistValidationOutcome.getOrElse(true))
 
           finalResult <- validationResult match {
             
@@ -220,14 +221,13 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
 
       case Orchestrator.Delete(id,optScopes) =>
 
-        val scopes =
-          optScopes match { 
-            case Some(scopes) if scopes.nonEmpty => scopes
+        val scopes = optScopes match { 
+          case Some(scopes) if scopes.nonEmpty => scopes
 
-            // In order to retain the same behaviour as previously, i.e. to delete the patient's data from every module/scope
-            // default to all scopes when none is specified...
-            case _                               => UsageScope.values.toSet
-          }
+          // In order to retain the same behaviour as previously, i.e. to delete the patient's data from every module/scope
+          // default to all scopes when none is specified...
+          case _ => UsageScope.values.toSet
+        }
 
         for {
           results <- scopes.toList.traverse {

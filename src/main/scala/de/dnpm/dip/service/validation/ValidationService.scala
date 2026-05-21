@@ -7,16 +7,13 @@ import de.dnpm.dip.model.{
   Patient
 }
 import de.dnpm.dip.service.DataUpload
-import play.api.libs.json.{
-  Json,
-  OFormat
-}
+
 
 object ValidationService
 {
 
   sealed abstract class Command[+T]
-  final case class Validate[T](data: DataUpload[T]) extends Command[T]
+  final case class Validate[T](data: DataUpload[T], persist: Boolean) extends Command[T]
   final case class Delete(patient: Id[Patient]) extends Command[Nothing]
 
   sealed abstract class Outcome[+T]
@@ -40,37 +37,12 @@ object ValidationService
     val empty = Filter(None)
   }
 
-  final case class StatusInfo
-  (
-    total: Int
-  )
-
-  object StatusInfo
-  {
-    implicit val format: OFormat[StatusInfo] =
-      Json.format[StatusInfo]
-  }
-
 }
 
 
-trait ValidationService[
-  F[_],
-  Env,
-  PatientRecord
-]{
-  self =>
+trait ValidationService[F[_],Env,PatientRecord]{
 
   import ValidationService._
-
-  // For use with mere validation,
-  // i.e. without the 'side-effect' of actually processing/importing the data set
-  def validate(
-    data: DataUpload[PatientRecord]
-  )(
-    implicit env: Env
-  ): F[Either[Error,Outcome[PatientRecord]]]
-
 
   def !(
     cmd: Command[PatientRecord]
@@ -86,7 +58,7 @@ trait ValidationService[
   ): F[Seq[ValidationInfo]]
 
 
-  def dataQualityReport(
+  def validationReport(
     patId: Id[Patient]
   )(
     implicit env: Env
@@ -98,10 +70,5 @@ trait ValidationService[
   )(
     implicit env: Env
   ): F[Option[DataUpload[PatientRecord]]]
-
-
-  def statusInfo(
-    implicit env: Env
-  ): F[StatusInfo]
 
 }
