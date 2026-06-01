@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.4.0](https://github.com/dnpm-dip/service-base/compare/v1.3.1...v1.4.0) (2026-06-01)
+
+
+### Features
+
+* flag to selectively save validation outcome  ([#44](https://github.com/dnpm-dip/service-base/issues/44)) ([d4c14bb](https://github.com/dnpm-dip/service-base/commit/d4c14bbac16f05d90c675bdba68c84677e259813))
+
+
+### Bug Fixes
+
+* Fixed resolution of MVH report/submission files by Patient ID to ensure full match of the ID ([#47](https://github.com/dnpm-dip/service-base/issues/47)) ([83bc139](https://github.com/dnpm-dip/service-base/commit/83bc1399834fb5bcef67d76086dcc65f63809488))
+* Removed conditional application of extended validations ([#46](https://github.com/dnpm-dip/service-base/issues/46)) ([171a7b8](https://github.com/dnpm-dip/service-base/commit/171a7b86466323a18fcb892717da2fd760fb087f))
+
 ## [1.3.1](https://github.com/dnpm-dip/service-base/compare/v1.3.0...v1.3.1) (2026-05-11)
 
 
