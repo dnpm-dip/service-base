@@ -1,7 +1,6 @@
 package de.dnpm.dip.service.validation
 
 
-import java.time.LocalDate.{now => today}
 import scala.util.Random
 import scala.concurrent.Future
 import org.scalatest.flatspec.AsyncFlatSpec
@@ -25,7 +24,7 @@ import ValidationService.{
 import Submission.Type.FollowUp
 
 
-class ValidationServiceTests extends AsyncFlatSpec with Matchers with Validators
+class ValidationServiceTests extends AsyncFlatSpec with Matchers// with Validators
 {
 
   implicit val rnd: Random = new Random(42)
@@ -59,16 +58,11 @@ class ValidationServiceTests extends AsyncFlatSpec with Matchers with Validators
     )
 
 
-  "Validation" must "have succeeded or failed for PatientRecord with inadmissible sequencing types depending on execution date" in { 
+  "Validation" must "have succeeded or failed for PatientRecord with inadmissible sequencing types" in { 
 
     for { 
       outcome <- service ! Validate(nonAdmissibleUploads.next,false)
-      result =
-        if (today isAfter extendedQcEnforcementDate)
-          outcome must matchPattern { case Left(_: UnacceptableIssuesDetected) => }
-        else
-          outcome must matchPattern { case Right(_: DataValid[_]) => }
-    } yield result
+    } yield outcome must matchPattern { case Left(_: UnacceptableIssuesDetected) => }
 
   }
 
