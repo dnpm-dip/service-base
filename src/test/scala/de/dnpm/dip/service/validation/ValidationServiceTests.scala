@@ -58,7 +58,7 @@ class ValidationServiceTests extends AsyncFlatSpec with Matchers// with Validato
     )
 
 
-  "Validation" must "have succeeded or failed for PatientRecord with inadmissible sequencing types depending on execution date" in { 
+  "Validation" must "have succeeded or failed for PatientRecord with inadmissible sequencing types" in { 
 
     for { 
       outcome <- service ! Validate(nonAdmissibleUploads.next,false)
