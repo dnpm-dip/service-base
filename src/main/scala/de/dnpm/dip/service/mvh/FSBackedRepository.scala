@@ -94,12 +94,12 @@ with Logging
 
   private def reportFiles(id: Id[Patient]): Array[File] =
     dataDir.listFiles(
-      (_,name) => name startsWith s"${REPORT_PREFIX}_Patient_${id.value}"
+      (_,name) => name startsWith s"${REPORT_PREFIX}_Patient_${id.value}_TAN"
     ) 
 
   private def submissionFiles(id: Id[Patient]): Array[File] =
     dataDir.listFiles(
-      (_,name) => name startsWith s"${SUBMISSION_PREFIX}_Patient_${id.value}"
+      (_,name) => name startsWith s"${SUBMISSION_PREFIX}_Patient_${id.value}_TAN"
     ) 
 
   private def submissionFile(tan: Id[TransferTAN]): Option[File] =
