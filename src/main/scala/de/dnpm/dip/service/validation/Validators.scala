@@ -2,9 +2,6 @@ package de.dnpm.dip.service.validation
 
 
 import java.net.URI
-import java.time.LocalDate
-import java.time.LocalDate.{now => today}
-import java.time.Month.MAY
 import scala.util.matching.Regex
 import scala.util.chaining._
 import cats.Applicative
@@ -62,7 +59,6 @@ import BroadConsent.ReasonMissing.{
 }
 import Issue.{
   Error,
-  Warning,
   Fatal,
   Path,
 }
@@ -427,13 +423,6 @@ trait Validators
   private val hexString64 = "[a-fA-F0-9]{64}".r
 
 
-  /**
-   * Date after which to enforce new/extended QC rules:
-   * 2026-05-31, as new rules must be enforced from 2026-06-01 on.
-   */
-  lazy val extendedQcEnforcementDate = LocalDate.of(2026,MAY,31)
-
-
   private lazy val admissibleConsentMissingReasons =
     (BroadConsent.ReasonMissing.values - TechnicalIssues - OrganizationalIssues)
 
@@ -460,16 +449,10 @@ trait Validators
         (metadata.researchConsents.filter(_.nonEmpty) orElse metadata.reasonResearchConsentMissing) must be (defined) otherwise (
           Error("Es muss entweder MII Forschungs-/Broad-Consent oder der Grund für dessen Fehlen vorhanden sein") at "Broad Consent"
         ),
-        if (today isAfter extendedQcEnforcementDate)
-          valueIn (metadata.reasonResearchConsentMissing) must be (in (admissibleConsentMissingReasons)) otherwise (
-            Error(s"Unzulässiger Wert, ab 01.06.2026 nur noch folgende gültig: {${admissibleConsentMissingReasons.mkString(", ")}}")
-              at "Grund für fehlenden Broad Consent"
-          )
-        else
-          valueIn (metadata.reasonResearchConsentMissing) must be (in (admissibleConsentMissingReasons)) otherwise (
-            Warning(s"Der angegebene Wert ist ab dem 01.06.2026 ungültig und es können nur noch folgende Werte angegeben werden: {${admissibleConsentMissingReasons.mkString(", ")}}")
-              at "Grund für fehlenden Broad Consent"
-            )
+        valueIn (metadata.reasonResearchConsentMissing) must be (in (admissibleConsentMissingReasons)) otherwise (
+          Error(s"Unzulässiger Wert, ab 01.06.2026 nur noch folgende gültig: {${admissibleConsentMissingReasons.mkString(", ")}}")
+            at "Grund für fehlenden Broad Consent"
+        )
       )
       .errorsOr(metadata) on "Metadaten"
 
@@ -520,7 +503,7 @@ trait Validators
                   .errorsOr(mvhCp)
               }, 
               record.mvhSequencingReports match {
-                case reports if (today isAfter extendedQcEnforcementDate) && reports.nonEmpty => validateEach(reports.map(_.`type`.code.enumValue))
+                case reports if reports.nonEmpty => validateEach(reports.map(_.`type`.code.enumValue))
                 case _ => Nil.validNel
               },
               metadata.`type` match {
