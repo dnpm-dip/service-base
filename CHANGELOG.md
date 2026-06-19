@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/dnpm-dip/service-base/compare/v1.4.0...v1.4.1) (2026-06-19)
+
+
+### Bug Fixes
+
+* Made check whether an initial submission exists more robust; Adapted validation accordingly to ensure at most 1 open EpisodeOfCare occurs ([#48](https://github.com/dnpm-dip/service-base/issues/48)) ([4885c1f](https://github.com/dnpm-dip/service-base/commit/4885c1f0235ddee4c7b74fe9b7369103e4f9ab26))
+
 ## [1.4.0](https://github.com/dnpm-dip/service-base/compare/v1.3.1...v1.4.0) (2026-06-01)
 
 
