@@ -75,19 +75,25 @@ with Logging
    * check whether and 'initial' submissions exists after this EpisodeOfCare's start date 
    */
   private def initialSubmissionExistsForEpisode(
-    reports: NonEmptyList[Submission.Report],
+    submissionReports: NonEmptyList[Submission.Report],
     episode: Option[EpisodeOfCare],
     record: T
   ): Boolean =
     episode match {
       case Some(episode) =>
-        reports.exists(sub => sub.episodeOfCare.exists(_ == episode.id) && sub.`type` == Initial)
+        submissionReports.exists(
+          sr =>
+            sr.episodeOfCare
+              // In case EoC-Id is not explicitly defined, look up the pertaining
+              // EpisodeOfCare as that in whose period the submission was made
+              .orElse(record.episodesOfCare.find(_.period contains sr.createdAt.toLocalDate).map(_.id))
+              .exists(_ == episode.id) && sr.`type` == Initial
+        )
 
       case None => 
-        val episodeStart =  record.currentEpisodeOfCare.period.start.atTime(LocalTime.MIN)
-        reports.exists(sub => sub.createdAt.isAfter(episodeStart) && sub.`type` == Initial)
+        val episodeStart = record.currentEpisodeOfCare.period.start.atTime(LocalTime.MIN)
+        submissionReports.exists(sr => sr.createdAt.isAfter(episodeStart) && sr.`type` == Initial)
     }
-
 
 
   override def !(cmd: Command[T])(
