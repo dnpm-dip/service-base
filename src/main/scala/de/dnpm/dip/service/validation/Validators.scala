@@ -415,6 +415,9 @@ trait Validators
         validate(record.patient),
         record.getCarePlans.validateEach(
           carePlan => carePlan.boardType must be (defined) otherwise (MissingValue("Board-Typ")) map (_ => carePlan)
+        ),
+        record.episodesOfCare.toList.count(_.period.endOption.isEmpty) must be (lessThanOrEqual (1)) otherwise (
+          Error("Es darf höchstens 1 offene/laufende Behandlungs-Episode vorkommen, d.h. ohne Enddatum") at "Behandlungs-Episoden"
         )
       )
       .errorsOr(record)
