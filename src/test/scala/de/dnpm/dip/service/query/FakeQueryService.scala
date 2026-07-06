@@ -2,11 +2,13 @@ package de.dnpm.dip.service.query
 
 
 import cats.Monad
+import cats.syntax.either._
 import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.util.Completer
 import de.dnpm.dip.model.PatientRecord
 import de.dnpm.dip.model.Site
 import de.dnpm.dip.service.{
+  Cache,
   Connector,
   PeerToPeerRequest
 }
@@ -103,16 +105,17 @@ extends BaseQueryService[F,FakeConfig[T]]
   override val db =
     new InMemLocalDB[F,Monad,Criteria,T](criteria => (t => Some(criteria)))
 
-  override lazy val cache =
-    new BaseQueryCache[Criteria,Results,T]
-
+  override lazy val querySessions =
+    Cache.empty()
 
   override implicit val criteriaCompleter: Completer[Criteria] =
     identity[Criteria]
 
-  protected val CriteriaExpander: Completer[Criteria] =
+  override protected val CriteriaExpander: Completer[Criteria] =
     identity[Criteria]
 
+  override protected def validate(criteria: Criteria) =
+    criteria.asRight
 
   protected def ResultSetFrom(
     query: Query[Criteria],

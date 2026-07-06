@@ -127,4 +127,4 @@ object QueryService
 trait QueryService[F[+_],Env,UseCase <: UseCaseConfig]
 extends QueryService.Ops[F,Env,UseCase,String]
 with QueryService.DataOps[F,Env,UseCase#PatientRecord]
-with PreparedQueryOps[F,Env,UseCase#Criteria,String]
+with PreparedQueryOps[F,Env,UseCase#Criteria]
