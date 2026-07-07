@@ -260,7 +260,7 @@ with Logging
 
 
 
-  private val sessionTimeout = 10 minutes
+  protected val sessionTimeout = 10 minutes
 
   override def !(
     cmd: Query.Command[Criteria]
