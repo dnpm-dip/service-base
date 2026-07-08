@@ -116,13 +116,23 @@ object Cache
       )
 
 
-    override def filter(f: (K,V) => Boolean): Map[K,V] =
-      entries.collect {
-        case (key,entry) if f(key,entry.value) => 
-          entries.update(key,entry.copy(lastAccess = Instant.now))
-          (key,entry.value)
+    override def filter(f: (K,V) => Boolean): Map[K,V] = {
+
+      val now = Instant.now
+
+      entries.flatMap {
+        case (key,entry) if f(key,entry.value) && !entry.expiration.isExpired(entry.lastAccess,now) =>
+          entries.update(key,entry.copy(lastAccess = now))
+          Some(key -> entry.value)
+
+        case (key,entry) if entry.expiration.isExpired(entry.lastAccess,now) =>
+          entries.remove(key)
+          None
+
+        case _ => None  
       }
       .toMap
+    }
 
 
     override def get(key: K): Option[V] = {
