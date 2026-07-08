@@ -185,7 +185,16 @@ object Cache
   def empty[K,V](
     cleanupPeriod: FiniteDuration = 60 seconds 
   ): Cache[K,V] =
-    new Impl(Executors.newSingleThreadScheduledExecutor,true,cleanupPeriod)
+    new Impl(
+      Executors.newSingleThreadScheduledExecutor { 
+        r => 
+          val thread = new Thread(r)
+          thread.setDaemon(true)
+          thread
+      },
+      true,
+      cleanupPeriod
+    )
 
 }
 
