@@ -310,8 +310,9 @@ with Logging
                   .map(_.toIor.toIorNel)
                   .reduceOption(_ combine _)
                   .getOrElse(Seq.empty.rightIor)
+                  .toEither
             
-              errsOrQuery = errsOrResults.toEither match {
+              errsOrQuery = errsOrResults match {
                 case Right(results) if (results.nonEmpty) =>
                   Query[Criteria](
                     id,
@@ -338,7 +339,8 @@ with Logging
         }
       }
 
-      case update @ Query.Update(id,optMode,optSites,optCriteria) => {
+
+      case update @ Query.Update(id,optMode,optSites,optRawCriteria) => {
 
         log.info(s"Updating Query $id by $querier: \n${Json.prettyPrint(Json.toJson(update))}") 
         
@@ -348,26 +350,18 @@ with Logging
 
             val (mode,sites) = modeAndSites(optMode.getOrElse(query.mode),optSites.complete)
 
-            val sitesChanged = sites != query.peers.map(_.site).toSet
-
-            //TODO: criteria validation
-            optCriteria.traverse(validate).map(_.complete) match {
+            optRawCriteria.traverse(validate).map(_.complete) match {
               
-              case Right(criteria) =>
+              case Right(optCriteria) =>
 
-                val criteriaChanged =
-                  (criteria,query.criteria) match {
-                    case (Some(n),Some(prev)) if n == prev => false
-                    case _ => true
-                  }
-                
-                
-                if (sitesChanged || criteriaChanged){
+                val sitesChanged = sites != query.peers.map(_.site).toSet
+
+                if (sitesChanged || optCriteria.exists(c => query.criteria.contains(c))){
                 
                   log.debug(s"Query target sites or criteria changed, re-submitting...") 
                 
                   for {
-                    resultsBySite <- executeQuery(id,sites,criteria) 
+                    resultsBySite <- executeQuery(id,sites,optCriteria) 
                   
                     errsOrResults =
                       resultsBySite
@@ -375,21 +369,20 @@ with Logging
                         .map(_.toIor.toIorNel)
                         .reduceOption(_ combine _)
                         .getOrElse(Seq.empty.rightIor)
+                        .toEither
                 
-                    errsOrQuery = errsOrResults.toEither match {
+                    errsOrQuery = errsOrResults match {
                       case Right(results) if (results.nonEmpty) =>
-                        Query[Criteria](
-                          id,
-                          LocalDateTime.now,
-                          querier,
-                          mode,
-                          ConnectionStatus.from(resultsBySite),
-                          criteria,
-                          sessionTimeout.toSeconds.toInt,
-                          Instant.now
+
+                        val updatedQuery = query.copy(
+                          mode = mode,
+                          criteria = optCriteria.orElse(query.criteria),
+                          peers = ConnectionStatus.from(resultsBySite),
+                          lastUpdate = Instant.now
                         )
-                        .tap(query => querySessions.put(id,query -> ResultSetFrom(query,results),sessionTimeout))
-                        .asRight
+
+                        querySessions.put(id,updatedQuery -> ResultSetFrom(updatedQuery,results),sessionTimeout)
+                        updatedQuery.asRight
                 
                       case Right(_) => Query.NoResults.asLeft
                 
@@ -415,7 +408,6 @@ with Logging
       }
 
       case Query.Delete(id) => 
-
         log.info(s"Deleting Query $id by $querier") 
         querySessions.remove(id) match { 
           case None => Query.InvalidId.asLeft.pure[F]
