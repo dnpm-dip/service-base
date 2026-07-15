@@ -7,6 +7,7 @@ import java.io.{
   FileWriter,
   InputStream
 }
+import java.time.LocalDateTime
 import scala.reflect.ClassTag
 import scala.util.chaining._
 import scala.util.Using
@@ -15,11 +16,15 @@ import scala.collection.concurrent.{
   TrieMap
 }
 import cats.Monad
-import cats.data.NonEmptyList
-import cats.syntax.functor._
-import cats.syntax.flatMap._
+import cats.data.{
+  EitherNel,
+  NonEmptyList
+}
 import cats.syntax.applicative._
 import cats.syntax.either._
+import cats.syntax.flatMap._
+import cats.syntax.functor._
+import cats.syntax.traverse._
 import play.api.libs.json.{
   Json,
   Reads,
@@ -32,11 +37,13 @@ import de.dnpm.dip.model.{
   Id,
   Patient,
   PatientRecord,
+  Period
 }
 import de.dnpm.dip.service.controlling.{
   Controlling,
   PatientDataCounts
 }
+import MVHService.DeletionEvent
 
 
 // Extractor for TANs according to file naming pattern below
@@ -85,6 +92,9 @@ with Logging
   private val REPORT_PREFIX = "SubmissionReport"
 
   private val SUBMISSION_PREFIX = s"MVH_${classTag.runtimeClass.getSimpleName}"
+
+  private val DELETION_PREFIX = "DeletionEvent"
+
 
   private def reportFile(id: Id[Patient], tan: Id[TransferTAN]): File =
     new File(dataDir,s"${REPORT_PREFIX}_Patient_${id.value}_TAN_${tan.value}.json")
@@ -149,7 +159,6 @@ with Logging
       .map(readAsJson[PartialSubmission])
       .map(sub => sub.metadata.transferTAN -> sub)
     )
-
 
 
   override def alreadyUsed(id: Id[TransferTAN])(
@@ -308,38 +317,63 @@ with Logging
 
   override def delete(id: Id[Patient])(
     implicit env: Env
-  ): F[Either[String,Unit]] =
+  ): F[EitherNel[String,List[Id[TransferTAN]]]] = 
     for {
       repFiles <- reportFiles(id).pure
       subFiles <- submissionFiles(id).pure
 
-      submissionDeletionErrors =
-        subFiles.foldLeft(List.empty[String]){
-          (acc,file) => 
-            if (file.delete){
-              val TAN(tan) = file
+      outcomes =
+        repFiles.zip(subFiles)
+          .foldLeft(
+            List.empty[EitherNel[String,Id[TransferTAN]]]
+          ){ 
+            case (acc,(reportFile,submissionFile)) =>
+          
+              val TAN(tan) = reportFile
+          
+              val submissionDeleted = submissionFile.delete
+              val reportDeleted     = reportFile.delete
+
               cachedPartialSubmissions -= tan
-              acc
-            }
-            else s"Failed to delete $SUBMISSION_PREFIX file $file".tap(log.error) :: acc
-        }
-
-      deletionErrors =
-        repFiles.foldLeft(submissionDeletionErrors){
-          (acc,file) =>
-            if (file.delete){
-              val TAN(tan) = file
               cachedReports -= tan 
-              acc
-            }
-            else s"Failed to delete $REPORT_PREFIX file $file".tap(log.error) :: acc
-        }
+          
+              if (!submissionDeleted) log.error(s"Failed to delete $SUBMISSION_PREFIX file $submissionFile")
+              if (!reportDeleted)     log.error(s"Failed to delete $REPORT_PREFIX file $reportFile")
+          
+              if (submissionDeleted && reportDeleted)
+                tan.asRight.toEitherNel :: acc 
+              else
+                s"Failed to delete data for TAN $tan".asLeft.toEitherNel :: acc
+          }
+      
+    } yield outcomes.sequence
 
-      result =
-        if (deletionErrors.isEmpty) ().asRight
-        else deletionErrors.mkString("; ").asLeft
 
-    } yield result
+  def save(event: DeletionEvent)(
+    implicit env: Env
+  ): F[Either[String,Unit]] =
+    Using(new FileWriter(new File(dataDir,s"${DELETION_PREFIX}_TAN_${event.tan}.json"))){
+      _.write(Json.stringify(Json.toJson(event)))
+    }
+    .fold(
+      _ => s"Failed saving DeletionEvent ${Json.toJson(event)}".asLeft,
+      _ => ().asRight
+    )
+    .pure
+
+
+  def deletionEvents(
+    period: Period[LocalDateTime],
+  )(
+    implicit env: Env
+  ): F[LazyList[DeletionEvent]] =
+    dataDir.listFiles(
+      (_,name) => (name startsWith DELETION_PREFIX) && (name endsWith ".json")
+    )
+    .to(LazyList)
+    .map(new FileInputStream(_))
+    .map(readAsJson[DeletionEvent])
+    .filter(period)
+    .pure
 
 }
-

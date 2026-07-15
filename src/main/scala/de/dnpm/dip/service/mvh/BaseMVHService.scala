@@ -6,10 +6,15 @@ import java.time.{
   LocalDateTime
 }
 import cats.Monad
-import cats.data.NonEmptyList
+import cats.data.{
+  EitherNel,
+  NonEmptyList
+}
+import cats.syntax.applicative._
 import cats.syntax.either._
 import cats.syntax.functor._
 import cats.syntax.flatMap._
+import cats.syntax.traverse._
 import de.dnpm.dip.util.Logging
 import de.dnpm.dip.model.{
   ClosedPeriod,
@@ -17,6 +22,7 @@ import de.dnpm.dip.model.{
   Id,
   NGSReport,
   PatientRecord,
+  Period,
   Site
 }
 import de.dnpm.dip.service.Distribution
@@ -98,7 +104,7 @@ with Logging
 
   override def !(cmd: Command[T])(
     implicit env: Env
-  ): F[Either[Error,Outcome]] =
+  ): F[EitherNel[Error,Outcome]] =
     cmd match {
 
       case Process(record,metadata) =>
@@ -119,7 +125,7 @@ with Logging
           processingResult <- optTanError match {
 
             // Fail-fast in case of TAN error
-            case Some(tanError) => env.pure(tanError.asLeft)
+            case Some(tanError) => env.pure(tanError.asLeft.toEitherNel)
 
             case None =>
               for {
@@ -170,7 +176,7 @@ with Logging
 
                   case Some(error) => 
                     log.warn(s"${error.msg}, refusing submission")
-                    env.pure(error.asLeft)
+                    env.pure(error.asLeft.toEitherNel)
                   }
 
                } yield result
@@ -191,10 +197,11 @@ with Logging
                     GenericError(_),
                     _ => Updated
                   )
+                  .toEitherNel
                 )
 
             case None =>
-              env.pure(GenericError(s"Invalid TAN $id").asLeft)
+              GenericError(s"Invalid TAN $id").asLeft.toEitherNel.pure
           }
 
         } yield result
@@ -202,13 +209,37 @@ with Logging
 
       case Delete(id) =>
         log.info(s"Deleting MVH data for Patient $id")
-        repo.delete(id)
-          .map(
-            _.bimap(
-              GenericError(_),
-              _ => Deleted
-            )
-          )
+        for {
+          deleteOutcomes <- repo.delete(id)
+
+          result <- deleteOutcomes match {
+            case Right(tans) =>
+              val now = LocalDateTime.now
+
+              //TODO: re-consider whether to discard potential errors from DeletionEvent storage 
+              tans.map(DeletionEvent(id,_,now))
+                .pure
+                .flatTap(_ traverse repo.save)
+                .map(_ => Deleted.asRight)
+
+/* 
+              tans.map(DeletionEvent(id,_,LocalDateTime.now))
+                .traverse(repo.save)
+                .map(
+                  _.map(_.toEitherNel).sequence
+                )
+                .map(
+                  _.bimap(
+                   _.map(GenericError(_)),
+                   _ => Deleted
+                  )
+                )
+ */
+            case Left(errs) => errs.map(GenericError(_)).asLeft.pure
+          }      
+
+        } yield result
+
     }
 
 
@@ -218,7 +249,7 @@ with Logging
       previousSubmissionReport: Option[Submission.Report]
     )(
       implicit env: Monad[F]
-    ): F[Either[Error,Saved.type]] = {
+    ): F[EitherNel[Error,Saved.type]] = {
 
       val submittedAt = LocalDateTime.now
 
@@ -274,6 +305,7 @@ with Logging
           GenericError(_),
           _ => Saved
         )
+        .toEitherNel
       )
 
     }
@@ -354,5 +386,13 @@ with Logging
     repo.patientDataCounts(criteria)
 
   }
+
+
+  override def deletionEvents(
+    period: Period[LocalDateTime],
+  )(
+    implicit env: Env
+  ): F[Seq[DeletionEvent]] =
+    repo.deletionEvents(period)
 
 }

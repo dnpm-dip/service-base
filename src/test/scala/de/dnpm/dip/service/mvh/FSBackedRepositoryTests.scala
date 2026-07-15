@@ -1,12 +1,14 @@
 package de.dnpm.dip.service.mvh
 
 
+import java.time.LocalDateTime
 import java.nio.file.Files.createTempDirectory
 import scala.concurrent.Future
 import scala.util.Random
 import cats.syntax.traverse._
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.must.Matchers._
+import de.dnpm.dip.model.Period
 import de.dnpm.dip.service.DummyPatientRecord
 import de.dnpm.dip.service.Gens._
 import de.ekut.tbi.generators.Gen
@@ -51,8 +53,9 @@ class FSBackedRepositoryTests extends AsyncFlatSpec
 
     val n = 42
 
-    val submissions =
-      List.fill(n)(metadata.next).map(Gen.of[DummyPatientRecord].next -> _)
+    val submissions = List.fill(n)(metadata.next).map(Gen.of[DummyPatientRecord].next -> _)
+
+    val start = LocalDateTime.now
 
     for { 
 
@@ -60,7 +63,7 @@ class FSBackedRepositoryTests extends AsyncFlatSpec
 
       _ = all (saveOutcomes) must matchPattern { case Right(Saved) => }
 
-      // For each Submission, a Submission and Submission.Report file must have be created, hence the factor of 2
+      // For each Submission, a Submission and Submission.Report file must have been created, hence the factor of 2
       _ = dataDir.listFiles.size mustBe 2*n
 
 
@@ -84,7 +87,11 @@ class FSBackedRepositoryTests extends AsyncFlatSpec
       _ = all (submissionsAfterDeletion) must be (empty)
       _ = all (submissionReportsAfterDeletion) must be (empty)
 
-      _ = dataDir.listFiles mustBe empty
+      _ = dataDir.listFiles((_,name) => !(name startsWith "Deletion")) mustBe empty
+
+      deletionEvents <- service.deletionEvents(Period(start,LocalDateTime.now))
+
+      _ = deletionEvents.size mustBe n
 
     } yield succeed // If this point is reached, test succeeded
 
