@@ -14,7 +14,6 @@ import cats.syntax.applicative._
 import cats.syntax.either._
 import cats.syntax.functor._
 import cats.syntax.flatMap._
-import cats.syntax.traverse._
 import de.dnpm.dip.util.Logging
 import de.dnpm.dip.model.{
   ClosedPeriod,
@@ -208,36 +207,15 @@ with Logging
 
 
       case Delete(id) =>
-        log.info(s"Deleting MVH data for Patient $id")
+        log.info(s"Deleting MVH Submissions for Patient $id")
         for {
-          deleteOutcomes <- repo.delete(id)
+          outcome <- repo.delete(id)
 
-          result <- deleteOutcomes match {
-            case Right(tans) =>
-              val now = LocalDateTime.now
-
-              //TODO: re-consider whether to discard potential errors from DeletionEvent storage 
-              tans.map(DeletionEvent(id,_,now))
-                .pure
-                .flatTap(_ traverse repo.save)
-                .map(_ => Deleted.asRight)
-
-/* 
-              tans.map(DeletionEvent(id,_,LocalDateTime.now))
-                .traverse(repo.save)
-                .map(
-                  _.map(_.toEitherNel).sequence
-                )
-                .map(
-                  _.bimap(
-                   _.map(GenericError(_)),
-                   _ => Deleted
-                  )
-                )
- */
-            case Left(errs) => errs.map(GenericError(_)).asLeft.pure
-          }      
-
+          result = outcome.bimap(
+            _.map(GenericError(_)),
+            _ => Deleted
+          )
+    
         } yield result
 
     }

@@ -314,42 +314,41 @@ with Logging
     } yield history
 
 
-  override def delete(id: Id[Patient])(
-    implicit env: Env
-  ): F[EitherNel[String,List[Id[TransferTAN]]]] = 
-    for {
-      subFiles <- submissionFiles(id).pure
-
-      outcomes = subFiles.foldLeft(
-        List.empty[EitherNel[String,Id[TransferTAN]]]
-      ){ 
-        (acc,submissionFile) =>
-      
-          val TAN(tan) = submissionFile
-      
-          if (submissionFile.delete){
-            cachedPartialSubmissions -= tan
-            tan.asRight.toEitherNel :: acc 
-          } else {
-            log.error(s"Failed to delete $SUBMISSION_PREFIX file $submissionFile")
-            s"Failed to delete data for TAN $tan".asLeft.toEitherNel :: acc
-          }
-      }
-      
-    } yield outcomes.sequence
-
-
-  def save(event: DeletionEvent)(
-    implicit env: Env
-  ): F[Either[String,Unit]] =
+  private def save(
+    event: DeletionEvent
+  ): Either[String,DeletionEvent] =
     Using(new FileWriter(new File(dataDir,s"${DELETION_PREFIX}_TAN_${event.tan}.json"))){
       _.write(Json.stringify(Json.toJson(event)))
     }
     .fold(
       _ => s"Failed saving DeletionEvent ${Json.toJson(event)}".asLeft,
-      _ => ().asRight
+      _ => event.asRight
     )
-    .pure
+
+
+  override def delete(id: Id[Patient])(
+    implicit env: Env
+  ): F[EitherNel[String,List[DeletionEvent]]] = 
+    for {
+      subFiles <- submissionFiles(id).pure
+
+      outcomes = subFiles.foldLeft(
+        List.empty[EitherNel[String,DeletionEvent]]
+      ){ 
+        (events,submissionFile) =>
+      
+          val TAN(tan) = submissionFile
+      
+          if (submissionFile.delete){
+            cachedPartialSubmissions -= tan
+            save(DeletionEvent(id,tan,LocalDateTime.now)).toEitherNel :: events
+          } else {
+            log.error(s"Failed to delete $SUBMISSION_PREFIX file $submissionFile")
+            s"Failed to delete data for TAN $tan".asLeft.toEitherNel :: events
+          }
+      }
+      
+    } yield outcomes.sequence
 
 
   def deletionEvents(

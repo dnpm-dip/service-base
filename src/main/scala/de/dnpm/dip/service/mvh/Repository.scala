@@ -85,15 +85,10 @@ trait Repository[F[_],Env,T <: PatientRecord] extends Controlling.Ops[F,Env]
     implicit env: Env
   ): F[Option[History[Submission.Report]]]
 
-
+  
   def delete(id: Id[Patient])(
     implicit env: Env
-  ): F[EitherNel[String,Seq[Id[TransferTAN]]]]
-
-
-  def save(event: DeletionEvent)(
-    implicit env: Env
-  ): F[Either[String,Unit]]
+  ): F[EitherNel[String,Seq[DeletionEvent]]]
 
 
   def deletionEvents(
