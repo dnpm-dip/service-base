@@ -350,7 +350,7 @@ with Logging
 
     val dateTimePeriod = period.copy(
       start = period.start.atTime(LocalTime.MIN),
-      end   = period.end.atTime(LocalTime.MIDNIGHT),
+      end   = period.end.atTime(LocalTime.MAX),
     )
 
     for {
