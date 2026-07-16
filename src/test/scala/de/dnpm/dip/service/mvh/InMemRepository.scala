@@ -181,7 +181,7 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
 
     val tans = reports.remove(id).map(_.keys.toSeq)
 
-    tans.toRight(s"Invalid Patient ID $id").toEitherNel.pure
+    tans.getOrElse(Nil).asRight.toEitherNel.pure
   }
 
 
