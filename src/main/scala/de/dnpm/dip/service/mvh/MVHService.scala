@@ -25,8 +25,6 @@ trait MVHService[F[_],Env,T <: PatientRecord] extends Controlling.Ops[F,Env]
     Outcome
   }
 
-  type ReportType <: Report
-
   val useCase: UseCase.Value
 
   /**
@@ -67,7 +65,7 @@ trait MVHService[F[_],Env,T <: PatientRecord] extends Controlling.Ops[F,Env]
     criteria: Report.Criteria
   )(
     implicit env: Env
-  ): F[ReportType]
+  ): F[Report]
 
 
   def deletionEvents(

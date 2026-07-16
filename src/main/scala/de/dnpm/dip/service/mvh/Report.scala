@@ -20,7 +20,21 @@ import play.api.libs.json.{
 }
 
 
-object Report
+final case class Report
+(
+  site: Coding[Site],
+  createdAt: LocalDateTime,
+  quarter: Option[Report.Quarter.Value],
+  period: ClosedPeriod[LocalDate],
+  useCase: UseCase.Value,
+  submissionTypes: Distribution[Submission.Type.Value],
+  diagnosticExtents: Distribution[Submission.DiagnosticExtent.Value],
+  consentRevocations: Option[Map[Consent.Category.Value,Distribution[Consent.Subject.Value]]],
+  deletions: Option[Int]
+)
+
+
+object Report extends  JsonEnumKeyHelpers
 {
 
   type Quarter = ClosedPeriod[LocalDate]
@@ -59,36 +73,8 @@ object Report
   final case class ForQuarter(quarter: Quarter.Value, year: Option[Year]) extends Criteria
   final case class ForPeriod(start: LocalDate, end: LocalDate) extends Criteria
 
-}
 
+  implicit val format: OFormat[Report] =
+    Json.format[Report]
 
-trait Report
-{
-  val site: Coding[Site]
-  val createdAt: LocalDateTime
-  val quarter: Option[Report.Quarter.Value]
-  val period: ClosedPeriod[LocalDate]
-  val useCase: UseCase.Value
-  val submissionTypes: Distribution[Submission.Type.Value]
-  val consentRevocations: Option[Map[Consent.Category.Value,Distribution[Consent.Subject.Value]]]
-}
-
-
-final case class BaseReport
-(
-  site: Coding[Site],
-  createdAt: LocalDateTime,
-  quarter: Option[Report.Quarter.Value],
-  period: ClosedPeriod[LocalDate],
-  useCase: UseCase.Value,
-  submissionTypes: Distribution[Submission.Type.Value],
-  consentRevocations: Option[Map[Consent.Category.Value,Distribution[Consent.Subject.Value]]]
-)
-extends Report
-
-
-object BaseReport extends JsonEnumKeyHelpers
-{
-  implicit val format: OFormat[BaseReport] =
-    Json.format[BaseReport]
 }

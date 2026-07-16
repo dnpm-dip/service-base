@@ -328,50 +328,74 @@ with Logging
   ): F[Seq[Submission[T]]] =
     repo ? filter
 
+
   override def submission(id: Id[TransferTAN])(
     implicit env: Env
   ): F[Option[Submission[T]]] =
     repo submission id
 
 
-  // Create BaseReport for the criteria and return it together with the submissions it's based on,
-  // in case the implementing subclass needs to extract additional info from the submissions
-  protected def baseReport(
+  override def report(
     criteria: Report.Criteria
   )(
     implicit env: Env
-  ): F[(BaseReport,Seq[Submission[T]])] = {
+  ): F[Report] = {
 
     log.info(s"Creating MVH Report: $criteria")
 
     val (quarter,period) = criteria match {
       case Report.ForQuarter(n,year)   => Some(n) -> Report.Quarter(n,year)
-      case Report.ForPeriod(start,end) => None -> ClosedPeriod(start,end)
+      case Report.ForPeriod(start,end) => None    -> ClosedPeriod(start,end)
     }
 
+    val dateTimePeriod = period.copy(
+      start = period.start.atTime(LocalTime.MIN),
+      end   = period.end.atTime(LocalTime.MIDNIGHT),
+    )
+
     for {
-      submissions <- repo ? Submission.Filter(
-        period = Some(
-          period.copy(
-            start = period.start.atTime(LocalTime.MIN),
-            end   = period.end.atTime(LocalTime.MIDNIGHT),
-          )
-        )
-      )
+      submissionReports <- repo ? Submission.Report.Filter(period = Some(dateTimePeriod))
 
-      submissionTypes = submissions.map(_.metadata.`type`)
+      submissionTypes = submissionReports.map(_.`type`)
 
-      report = BaseReport(
-        Site.local,
-        LocalDateTime.now,
-        quarter,
-        period,
-        useCase,
-        Distribution.of(submissionTypes),
-        None   // TODO
-      )
+      diagnosticExtents = submissionReports.flatMap(_.diagnosticExtent)
 
-    } yield report -> submissions
+      // Compute the distribution of consent revocations by category (MV, Research)
+      // by accumulating the occurrences of "true" (i.e. revoked) as a List[Consent.Subject.Value].
+      // The distinction of index vs. non-index patient/subject is kept for generality,
+      // but at present, the clinical data only pertains to the index patient
+      consentRevocations =
+        submissionReports.flatMap(_.consentRevocation)
+          .foldLeft(
+            Map.empty[Consent.Category.Value,List[Consent.Subject.Value]]
+          ){
+            (acc,revocationStatus) => revocationStatus.foldLeft(acc){
+              case (acc2,(category,true)) =>
+                acc2.updatedWith(category){
+                  _.map(Consent.Subject.IndexPatient :: _).orElse(Some(List(Consent.Subject.IndexPatient))) 
+                } 
+
+              case (acc2,(_,false)) => acc2
+            }
+          }
+          .map {
+            case (category,subjects) => category -> Distribution.of(subjects)
+          }
+
+      deletions <- repo.deletionEvents(dateTimePeriod)
+
+    } yield Report(
+      Site.local,
+      LocalDateTime.now,
+      quarter,
+      period,
+      useCase,
+      Distribution.of(submissionTypes),
+      Distribution.of(diagnosticExtents),
+      Option.when(consentRevocations.nonEmpty)(consentRevocations),
+      Option.when(deletions.nonEmpty)(deletions.size)
+    )
+
   }
 
 
