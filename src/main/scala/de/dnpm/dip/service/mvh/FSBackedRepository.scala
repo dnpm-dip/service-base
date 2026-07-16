@@ -351,7 +351,7 @@ with Logging
     } yield outcomes.sequence
 
 
-  def deletionEvents(
+  override def deletionEvents(
     period: Period[LocalDateTime],
   )(
     implicit env: Env
