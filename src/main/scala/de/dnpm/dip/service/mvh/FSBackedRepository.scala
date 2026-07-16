@@ -22,7 +22,6 @@ import cats.data.{
 }
 import cats.syntax.applicative._
 import cats.syntax.either._
-import cats.syntax.flatMap._
 import cats.syntax.functor._
 import cats.syntax.traverse._
 import play.api.libs.json.{
@@ -319,32 +318,23 @@ with Logging
     implicit env: Env
   ): F[EitherNel[String,List[Id[TransferTAN]]]] = 
     for {
-      repFiles <- reportFiles(id).pure
       subFiles <- submissionFiles(id).pure
 
-      outcomes =
-        repFiles.zip(subFiles)
-          .foldLeft(
-            List.empty[EitherNel[String,Id[TransferTAN]]]
-          ){ 
-            case (acc,(reportFile,submissionFile)) =>
-          
-              val TAN(tan) = reportFile
-          
-              val submissionDeleted = submissionFile.delete
-              val reportDeleted     = reportFile.delete
-
-              cachedPartialSubmissions -= tan
-              cachedReports -= tan 
-          
-              if (!submissionDeleted) log.error(s"Failed to delete $SUBMISSION_PREFIX file $submissionFile")
-              if (!reportDeleted)     log.error(s"Failed to delete $REPORT_PREFIX file $reportFile")
-          
-              if (submissionDeleted && reportDeleted)
-                tan.asRight.toEitherNel :: acc 
-              else
-                s"Failed to delete data for TAN $tan".asLeft.toEitherNel :: acc
+      outcomes = subFiles.foldLeft(
+        List.empty[EitherNel[String,Id[TransferTAN]]]
+      ){ 
+        (acc,submissionFile) =>
+      
+          val TAN(tan) = submissionFile
+      
+          if (submissionFile.delete){
+            cachedPartialSubmissions -= tan
+            tan.asRight.toEitherNel :: acc 
+          } else {
+            log.error(s"Failed to delete $SUBMISSION_PREFIX file $submissionFile")
+            s"Failed to delete data for TAN $tan".asLeft.toEitherNel :: acc
           }
+      }
       
     } yield outcomes.sequence
 
