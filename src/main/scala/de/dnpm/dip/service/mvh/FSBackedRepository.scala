@@ -317,7 +317,7 @@ with Logging
   private def save(
     event: DeletionEvent
   ): Either[String,DeletionEvent] =
-    Using(new FileWriter(new File(dataDir,s"${DELETION_PREFIX}_TAN_${event.tan}.json"))){
+    Using(new FileWriter(new File(dataDir,s"${DELETION_PREFIX}_TAN_${event.tan.value}.json"))){
       _.write(Json.stringify(Json.toJson(event)))
     }
     .fold(
@@ -341,42 +341,24 @@ with Logging
 
           if (submissionFile.delete){
             cachedPartialSubmissions -= tan
-            reportFile(patId,tan).delete
-            cachedReports -= tan
-            save(DeletionEvent(patId,tan,LocalDateTime.now)).toEitherNel :: events
+
+            val repFile = reportFile(patId,tan)
+
+            if (repFile.delete){
+              cachedReports -= tan
+              save(DeletionEvent(patId,tan,LocalDateTime.now)).toEitherNel :: events
+            } else {
+              log.error(s"Failed to delete $REPORT_PREFIX file $repFile")
+              s"Failed to delete SubmissionReport for TAN $tan".asLeft.toEitherNel :: events
+            }
           } else {
             log.error(s"Failed to delete $SUBMISSION_PREFIX file $submissionFile")
-            s"Failed to delete data for TAN $tan".asLeft.toEitherNel :: events
+            s"Failed to delete Submission for TAN $tan".asLeft.toEitherNel :: events
           }
       }
       
     } yield outcomes.sequence
 
-/*
-  override def delete(id: Id[Patient])(
-    implicit env: Env
-  ): F[EitherNel[String,List[DeletionEvent]]] = 
-    for {
-      subFiles <- submissionFiles(id).pure
-
-      outcomes = subFiles.foldLeft(
-        List.empty[EitherNel[String,DeletionEvent]]
-      ){ 
-        (events,submissionFile) =>
-      
-          val TAN(tan) = submissionFile
-      
-          if (submissionFile.delete){
-            cachedPartialSubmissions -= tan
-            save(DeletionEvent(id,tan,LocalDateTime.now)).toEitherNel :: events
-          } else {
-            log.error(s"Failed to delete $SUBMISSION_PREFIX file $submissionFile")
-            s"Failed to delete data for TAN $tan".asLeft.toEitherNel :: events
-          }
-      }
-      
-    } yield outcomes.sequence
-*/
 
   override def deletionEvents(
     period: Period[LocalDateTime],
