@@ -172,8 +172,8 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
       )
     }
 
-
-  // Remove all Submissions and return recorded DeletionEvents 
+/*
+  // Remove all Submissions for the Patient and return recorded DeletionEvents 
   override def delete(id: Id[Patient])(
     implicit env: Env
   ): F[EitherNel[String,Seq[DeletionEvent]]] =
@@ -185,8 +185,26 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
       .tapEach(event => deletions += event.tan -> event)
       .asRight
       .toEitherNel
+      .pure  
+*/
+
+  // Remove all SubmissionReports and Submissions for the Patient, 
+  // and return recorded DeletionEvents 
+  override def delete(id: Id[Patient])(
+    implicit env: Env
+  ): F[EitherNel[String,Seq[DeletionEvent]]] = {
+    reports -= id
+
+    submissions
+      .remove(id)
+      .map(_.keys.toSeq)
+      .getOrElse(Nil)
+      .map(DeletionEvent(id,_,LocalDateTime.now))
+      .tapEach(event => deletions += event.tan -> event)
+      .asRight
+      .toEitherNel
       .pure
-  
+  }
 
   override def deletionEvents(
     period: Period[LocalDateTime],
@@ -198,5 +216,4 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
       .toSeq
       .pure
 
-  
 }

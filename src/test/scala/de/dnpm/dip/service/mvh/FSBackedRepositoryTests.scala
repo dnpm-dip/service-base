@@ -66,9 +66,9 @@ class FSBackedRepositoryTests extends AsyncFlatSpec
       // For each Submission, a Submission and Submission.Report file must have been created, hence the factor of 2
       _ = dataDir.listFiles.size mustBe 2*n
 
-      loadedSubmissions <- service ? Submission.Filter()
+      queriedSubmissions <- service ? Submission.Filter()
 
-      _ = loadedSubmissions.size mustBe n
+      _ = queriedSubmissions.size mustBe n
 
 
       submissionsByTAN <- submissions.map(_._2.transferTAN).traverse(service.submission(_))
@@ -82,10 +82,13 @@ class FSBackedRepositoryTests extends AsyncFlatSpec
 
 
       submissionsAfterDeletion <- submissions.map(_._2.transferTAN).traverse(service submission _)
+      reportsAfterDeletion     <- submissions.map(_._2.transferTAN).traverse(service submissionReport _)
 
       _ = all (submissionsAfterDeletion) must be (empty)
+      _ = all (reportsAfterDeletion) must be (empty)
 
       _ = dataDir.listFiles((_,name) => name contains "MVH_DummyPatientRecord") mustBe empty
+      _ = dataDir.listFiles((_,name) => name contains "SubmissionReport") mustBe empty
 
 
       deletionEvents <- service.deletionEvents(Period(start,LocalDateTime.now))

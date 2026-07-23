@@ -326,6 +326,33 @@ with Logging
     )
 
 
+  override def delete(patId: Id[Patient])(
+    implicit env: Env
+  ): F[EitherNel[String,List[DeletionEvent]]] = 
+    for {
+      subFiles <- submissionFiles(patId).pure
+
+      outcomes = subFiles.foldLeft(
+        List.empty[EitherNel[String,DeletionEvent]]
+      ){ 
+        (events,submissionFile) =>
+      
+          val TAN(tan) = submissionFile
+
+          if (submissionFile.delete){
+            cachedPartialSubmissions -= tan
+            reportFile(patId,tan).delete
+            cachedReports -= tan
+            save(DeletionEvent(patId,tan,LocalDateTime.now)).toEitherNel :: events
+          } else {
+            log.error(s"Failed to delete $SUBMISSION_PREFIX file $submissionFile")
+            s"Failed to delete data for TAN $tan".asLeft.toEitherNel :: events
+          }
+      }
+      
+    } yield outcomes.sequence
+
+/*
   override def delete(id: Id[Patient])(
     implicit env: Env
   ): F[EitherNel[String,List[DeletionEvent]]] = 
@@ -349,7 +376,7 @@ with Logging
       }
       
     } yield outcomes.sequence
-
+*/
 
   override def deletionEvents(
     period: Period[LocalDateTime],

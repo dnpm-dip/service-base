@@ -139,8 +139,10 @@ class OrchestratorTests extends AsyncFlatSpec
       _ = outcome.value mustBe a [Deleted]
 
       submission <- mvhService submission initialUpload.metadata.get.transferTAN
+      submissionReport <- mvhService submissionReport initialUpload.metadata.get.transferTAN
 
       _ = submission must not be defined
+      _ = submissionReport must not be defined
     
       snapshot <- queryService ! retrievalRequest
 
