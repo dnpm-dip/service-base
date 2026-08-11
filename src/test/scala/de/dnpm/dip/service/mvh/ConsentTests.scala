@@ -31,6 +31,11 @@ class ConsentTests extends AnyFlatSpec with Matchers
 
   }
 
+  "Consent version" must "have been correctly extracted" in { 
+    consent.version must be (defined)
+  }
+
+
 /*
   "BroadConsent deidentification" must "have worked as expected" in {
 

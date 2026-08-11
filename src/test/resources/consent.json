@@ -4,7 +4,7 @@
     "meta":{
        "lastUpdated":"2025-02-11T21:50:46.037+01:00",
        "profile":[
-          "https://www.medizininformatik-initiative.de/fhir/modul-consent/StructureDefinition/mii-pr-consent-einwilligung"
+          "https://www.medizininformatik-initiative.de/fhir/modul-consent/StructureDefinition/mii-pr-consent-einwilligung|2026.0.0"
        ]
     },
     "extension":[
