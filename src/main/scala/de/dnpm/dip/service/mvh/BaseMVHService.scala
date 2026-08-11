@@ -326,9 +326,9 @@ with Logging
       case Report.ForPeriod(start,end) => None    -> ClosedPeriod(start,end)
     }
 
-    val dateTimePeriod = period.copy(
-      start = period.start.atTime(LocalTime.MIN),
-      end   = period.end.atTime(LocalTime.MAX),
+    val dateTimePeriod = Period(
+      period.start.atTime(LocalTime.MIN),
+      period.end.atTime(LocalTime.MAX),
     )
 
     for {
