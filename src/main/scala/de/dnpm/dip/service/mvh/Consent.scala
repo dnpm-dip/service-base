@@ -368,12 +368,13 @@ object BroadConsent
   /*
    * Extract MII Consent Version from List of profiles, based on structure:
    * "meta": { 
-   *   "profile": ["...|2026.0.0"]
+   *   "profile": ["https://www.medizininformatik-initiative.de/fhir/modul-consent/StructureDefinition/mii-pr-consent-einwilligung|2026.0.0"]
    * }
    * by selecting the String part after | in the first entry
    */
   private val consentVersion: List[String] => Option[String] =
-    _.headOption.flatMap(_.split("\\|").lift(1))
+    _.find(_ contains "mii-pr-consent-einwilligung|")
+     .flatMap(_.split("\\|").lift(1))
 
   implicit val readView: Reads[View] = {
     (
