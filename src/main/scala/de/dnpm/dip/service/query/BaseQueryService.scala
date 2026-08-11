@@ -5,13 +5,11 @@ import java.time.{
   Instant,
   LocalDateTime
 }
-import scala.util.{
-  Either,
-  Left,
-  Right
-}
+import java.util.UUID.randomUUID
+import scala.concurrent.duration._
 import cats.Monad
 import cats.data.EitherNel
+import cats.syntax.traverse._
 import de.dnpm.dip.util.{
   Logging,
   Completer
@@ -24,6 +22,7 @@ import de.dnpm.dip.model.{
   Site
 }
 import de.dnpm.dip.service.{
+  Cache,
   Connector,
   ConnectionStatus,
 }
@@ -37,17 +36,13 @@ import play.api.libs.json.{
   Reads
 }
 
-abstract class BaseQueryService[
-  F[+_],
-  UseCase <: UseCaseConfig,
-](
+
+abstract class BaseQueryService[F[+_],UseCase <: UseCaseConfig](
   implicit 
   fpr: Format[UseCase#PatientRecord],
   fcrit: Format[UseCase#Criteria]
 )
-extends QueryService[
-  F,Monad[F],UseCase
-]
+extends QueryService[F,Monad[F],UseCase]
 with Logging
 {
 
@@ -59,14 +54,20 @@ with Logging
   import cats.syntax.flatMap._
   import de.dnpm.dip.util.Completer.syntax._
   import BaseQueryService.FEDERATED_QUERIES_INACTIVE
+  import Query.Mode.{Local,Federated,Custom}
+  import QueryService._
+
 
   
   protected val preparedQueryDB: PreparedQueryDB[F,Monad[F],Criteria,String]
   protected val db: LocalDB[F,Monad[F],Criteria,PatientRecord]
   protected val connector: Connector[F,Monad[F]]
-  protected val cache: QueryCache[Criteria,Results,PatientRecord] 
+  protected val querySessions: Cache[Query.Id,(Query[Criteria],Results)] 
 
   protected implicit val criteriaCompleter: Completer[Criteria]
+
+  protected def validate(criteria: Criteria): EitherNel[String,Criteria]
+
 
   // Completer[Criteria] to allow expanding the criteria,
   // e.g. including sub-classes of concepts, etc
@@ -84,10 +85,7 @@ with Logging
 
     val sites = Site.local :: connector.otherSites.toList
 
-    Completer.of(
-      site =>
-        sites.find(_.code == site.code).getOrElse(site)
-    )
+    site => sites.find(_.code == site.code).getOrElse(site)
   }
 
 
@@ -118,69 +116,81 @@ with Logging
     implicit 
     env: Monad[F],
     querier: Querier
-  ): F[String EitherNel PreparedQuery[Criteria]] = {
+  ): F[Either[Query.Error,PreparedQuery[Criteria]]] = {
 
     import de.dnpm.dip.util.Operations.syntax._
     import PreparedQuery.{Create,Update,Delete}
 
     cmd match {
 
-      case Create(name,criteria) =>
+      case Create(name,rawCriteria) =>
         log.info(s"Processing new PreparedQuery by $querier")
 
-        for { 
-          id <-
-            preparedQueryDB.newId
+        validate(rawCriteria) match {
+          case Right(criteria) =>
+            for { 
+              id <- preparedQueryDB.newId
+            
+              pq = PreparedQuery(
+                id,
+                querier,
+                name,
+                criteria.complete,
+                LocalDateTime.now,
+                Instant.now
+              )
+            
+              result <- preparedQueryDB.save(pq).map(
+                _.bimap(
+                  Query.GenericError(_),
+                  _ => pq
+                )
+              )
+            
+            } yield result
 
-          pq =
-            PreparedQuery(
-              id,
-              querier,
-              name,
-              criteria.complete,
-              LocalDateTime.now,
-              Instant.now
-            )
-
-          result <-
-            preparedQueryDB.save(pq)
-              .map(_ => pq.asRight[String])
-
-        } yield result.toEitherNel
+          case Left(errors) =>
+            Query.InvalidCriteria(errors).asLeft.pure[F]
+        }
 
 
-      case Update(id,optName,optCriteria) =>
+      case Update(id,optName,optRawCriteria) =>
 
         log.info(s"Updating PreparedQuery $id by $querier")
 
-        for {
-          optPq <-
-            preparedQueryDB.get(id)
+        optRawCriteria.traverse(validate) match {
 
-          optUpdated =
-            optPq.map(
-              _.patch(
-                optName.map(name => _.copy(name = name)),
-                optCriteria.map(crit => _.copy(criteria = crit.complete)),
+          case Right(optCriteria) =>
+            for {
+              optPq <- preparedQueryDB.get(id)
+            
+              optUpdated = optPq.map(
+                _.patch(
+                  optName.map(name => _.copy(name = name)),
+                  optCriteria.map(crit => _.copy(criteria = crit.complete)),
+                )
+                .update(
+                  _.copy(lastUpdate = Instant.now)
+                )
               )
-              .update(
-                _.copy(lastUpdate = Instant.now)
-              )
-            )
+            
+              result <- optUpdated match {
+                case Some(updated) =>
+                  preparedQueryDB.save(updated).map(
+                    _.bimap(Query.GenericError(_),_ => updated)
+                  )
+            
+                case None => 
+                  Query.InvalidId.asLeft
+                    .pure
+              }
+            
+            } yield result
 
-          result <-
-            optUpdated match {
-              case Some(updated) =>
-                preparedQueryDB.save(updated)
-                  .map(_ => updated.asRight[String])
+          case Left(errors) =>
+            Query.InvalidCriteria(errors).asLeft.pure[F]
 
-              case None => 
-                s"Invalid PreparedQuery ID $id"
-                  .asLeft[PreparedQuery[Criteria]]
-                  .pure
-            }
-
-        } yield result.toEitherNel 
+        }
 
 
       case Delete(id) =>
@@ -189,10 +199,7 @@ with Logging
 
         preparedQueryDB
           .delete(id)
-          .map(
-            _.toRight(s"Invalid PreparedQuery ID $id")
-             .toEitherNel
-          )
+          .map(_.toRight(Query.InvalidId))
 
     }
 
@@ -228,8 +235,6 @@ with Logging
   }
 
 
-  import QueryService._
-
   override def !(
     cmd: DataCommand[PatientRecord]
   )(
@@ -253,7 +258,9 @@ with Logging
   }
 
 
-  import Query.Mode.{Local,Federated,Custom}
+
+
+  protected val sessionTimeout = 10 minutes
 
   override def !(
     cmd: Query.Command[Criteria]
@@ -282,136 +289,130 @@ with Logging
 
     cmd match {
 
-      case submit @ Query.Submit(optMode,optSites,crit) => {
+      case submit @ Query.Submit(optMode,optSites,optCriteria) => {
 
         log.info(s"Processing new query by $querier: \n${Json.prettyPrint(Json.toJson(submit))}") 
 
-        val id = cache.newQueryId
+        // Criteria validation
+        optCriteria.traverse(validate).map(_.complete) match {
 
-        val (mode,sites) = modeAndSites(optMode,optSites.complete)
+          case Right(criteria) =>
+            val id = Query.Id(randomUUID.toString)
 
-        //TODO: criteria validation
-        val criteria = crit.complete
+            val (mode,sites) = modeAndSites(optMode,optSites.complete)
 
-        for {
-          resultsBySite <- executeQuery(id,sites,criteria) 
+            for {
+              resultsBySite <- executeQuery(id,sites,criteria) 
+            
+              errsOrResults =
+                resultsBySite
+                  .values
+                  .map(_.toIor.toIorNel)
+                  .reduceOption(_ combine _)
+                  .getOrElse(Seq.empty.rightIor)
+                  .toEither
+            
+              errsOrQuery = errsOrResults match {
+                case Right(results) if (results.nonEmpty) =>
+                  Query[Criteria](
+                    id,
+                    LocalDateTime.now,
+                    querier,
+                    mode,
+                    ConnectionStatus.from(resultsBySite),
+                    criteria,
+                    sessionTimeout.toSeconds.toInt,
+                    Instant.now
+                  )
+                  .tap(query => querySessions.put(id,query -> ResultSetFrom(query,results), sessionTimeout))
+                  .asRight
+            
+                case Right(_) => Query.NoResults.asLeft
+                    
+                case Left(errs) => Query.ConnectionErrors(errs).asLeft
+              }
+            
+            } yield errsOrQuery
 
-          errsOrResults =
-            resultsBySite
-              .values
-              .map(_.toIor.toIorNel)
-              .reduceOption(_ combine _)
-              .getOrElse(Seq.empty.rightIor)
-
-          errsOrQuery = errsOrResults.toEither match {
-            case Right(results) if (results.nonEmpty) =>
-              Query[Criteria](
-                id,
-                LocalDateTime.now,
-                querier,
-                mode,
-                ConnectionStatus.from(resultsBySite),
-                criteria,
-                cache.timeoutSeconds,
-                Instant.now
-              )
-              .tap(query => cache += query -> ResultSetFrom(query,results))
-              .asRight
-
-            case Right(_) => Query.NoResults.asLeft
-                
-            case Left(errs) => Query.ConnectionErrors(errs).asLeft
-          }
-
-        } yield errsOrQuery
-
+          case Left(errors) =>
+            Query.InvalidCriteria(errors).asLeft.pure[F]
+        }
       }
 
-      case update @ Query.Update(id,optMode,optSites,optCriteria) => {
+
+      case update @ Query.Update(id,optMode,optSites,optRawCriteria) => {
 
         log.info(s"Updating Query $id by $querier: \n${Json.prettyPrint(Json.toJson(update))}") 
         
-        cache.getQuery(id) match {
+        querySessions.get(id).map(_._1) match {
 
-          case None => Query.InvalidId.asLeft.pure[F]
-
-          case Some(query) => {
+          case Some(query) =>
 
             val (mode,sites) = modeAndSites(optMode.getOrElse(query.mode),optSites.complete)
 
-            val sitesChanged = sites != query.peers.map(_.site).toSet
-
-            //TODO: criteria validation
+            optRawCriteria.traverse(validate).map(_.complete) match {
               
-            val criteria = optCriteria.complete
+              case Right(optCriteria) =>
 
-            val criteriaChanged =
-              (criteria,query.criteria) match {
-                case (Some(n),Some(prev)) if n == prev => false
-                case _ => true
-              }
+                val sitesChanged = sites != query.peers.map(_.site).toSet
 
+                if (sitesChanged || optCriteria.exists(c => query.criteria.contains(c))){
+                
+                  log.debug(s"Query target sites or criteria changed, re-submitting...") 
+                
+                  for {
+                    resultsBySite <- executeQuery(id,sites,optCriteria) 
+                  
+                    errsOrResults =
+                      resultsBySite
+                        .values
+                        .map(_.toIor.toIorNel)
+                        .reduceOption(_ combine _)
+                        .getOrElse(Seq.empty.rightIor)
+                        .toEither
+                
+                    errsOrQuery = errsOrResults match {
+                      case Right(results) if (results.nonEmpty) =>
 
-            if (sitesChanged || criteriaChanged){
+                        val updatedQuery = query.copy(
+                          mode = mode,
+                          criteria = optCriteria.orElse(query.criteria),
+                          peers = ConnectionStatus.from(resultsBySite),
+                          lastUpdate = Instant.now
+                        )
 
-              log.debug(s"Query target sites or criteria changed, re-submitting...") 
-
-              for {
-                resultsBySite <- executeQuery(id,sites,criteria) 
-              
-                errsOrResults =
-                  resultsBySite
-                    .values
-                    .map(_.toIor.toIorNel)
-                    .reduceOption(_ combine _)
-                    .getOrElse(Seq.empty.rightIor)
-
-                errsOrQuery = errsOrResults.toEither match {
-                  case Right(results) if (results.nonEmpty) =>
-                    Query[Criteria](
-                      id,
-                      LocalDateTime.now,
-                      querier,
-                      mode,
-                      ConnectionStatus.from(resultsBySite),
-                      criteria,
-                      cache.timeoutSeconds,
-                      Instant.now
-                    )
-                    .tap(query => cache += query -> ResultSetFrom(query,results))
-                    .asRight
-      
-                  case Right(_) => Query.NoResults.asLeft
-
-                  case Left(errs) => Query.ConnectionErrors(errs).asLeft
+                        querySessions.put(id,updatedQuery -> ResultSetFrom(updatedQuery,results),sessionTimeout)
+                        updatedQuery.asRight
+                
+                      case Right(_) => Query.NoResults.asLeft
+                
+                      case Left(errs) => Query.ConnectionErrors(errs).asLeft
+                    }
+                  
+                  } yield errsOrQuery
+                  
+                } else {
+                  log.debug(s"Query target sites or criteria unchanged, nothing to do") 
+                  query.asRight.pure[F]
                 }
-              
-              } yield errsOrQuery
-              
-            } else {
-              log.debug(s"Query target sites or criteria unchanged, nothing to do") 
-              query.asRight.pure[F]
+
+              case Left(errors) =>
+               Query.InvalidCriteria(errors).asLeft.pure[F]
+
             }
-
-          }
-        }
-      }
-
-      case Query.Delete(id) => {
-
-        log.info(s"Deleting Query $id by $querier") 
-
-        cache.getQuery(id) match {
 
           case None => Query.InvalidId.asLeft.pure[F]
 
-          case Some(query) => 
-            cache -= id
-            query.asRight.pure[F]
-
         }
 
       }
+
+      case Query.Delete(id) => 
+        log.info(s"Deleting Query $id by $querier") 
+        querySessions.remove(id) match { 
+          case None => Query.InvalidId.asLeft.pure[F]
+          case Some((query,_)) => query.asRight.pure[F]
+        }
 
     }
 
@@ -475,7 +476,7 @@ with Logging
 
     log.info(s"Getting current Queries for $querier")
 
-    cache.queries.pure
+    querySessions.filter((_,_) => true).values.map(_._1).toSeq.pure
   }
 
 
@@ -490,8 +491,7 @@ with Logging
 
     log.info(s"Getting Query $id for $querier")
 
-    cache.getQuery(id).pure
-
+    querySessions.get(id).map(_._1).pure
   }
 
   override def resultSet(
@@ -504,7 +504,7 @@ with Logging
 
     log.info(s"Getting ResultSet of Query $id for $querier")
 
-    cache.getResults(id).pure
+    querySessions.get(id).map(_._2).pure
 
   }
 
@@ -520,7 +520,8 @@ with Logging
 
     log.info(s"Getting Patient Record $patId of Query $id for $querier")
 
-    cache.getResults(id)
+    querySessions.get(id)
+      .map(_._2)
       .flatMap(_.patientRecord(patId))
       .pure
   }

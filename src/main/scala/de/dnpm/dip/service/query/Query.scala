@@ -127,6 +127,7 @@ object Query
   sealed trait Error
   final case object NoResults extends Error
   final case object InvalidId extends Error
+  final case class InvalidCriteria(errors: NonEmptyList[String]) extends Error
   final case class ConnectionErrors(messages: NonEmptyList[String]) extends Error
   final case class GenericError(message: String) extends Error
 

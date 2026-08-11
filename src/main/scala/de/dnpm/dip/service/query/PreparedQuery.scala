@@ -5,7 +5,6 @@ import java.time.{
   Instant,
   LocalDateTime
 }
-import cats.data.EitherNel
 import play.api.libs.json.{
   Json,
   Format,
@@ -81,8 +80,7 @@ object PreparedQuery
 trait PreparedQueryOps[
   F[+_],
   Env,
-  Criteria,
-  Err
+  Criteria
 ]
 {
 
@@ -92,7 +90,7 @@ trait PreparedQueryOps[
     implicit
     env: Env,
     querier: Querier
-  ): F[Err EitherNel PreparedQuery[Criteria]] 
+  ): F[Either[Query.Error,PreparedQuery[Criteria]]] 
 
 
   def ?(
