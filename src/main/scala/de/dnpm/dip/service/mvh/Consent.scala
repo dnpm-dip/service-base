@@ -373,7 +373,7 @@ object BroadConsent
    * by selecting the String part after | in the first entry
    */
   private val consentVersion: List[String] => Option[String] =
-    _.find(_ contains "mii-pr-consent-einwilligung|")
+    _.find(_ contains "mii-pr-consent-einwilligung")
      .flatMap(_.split("\\|").lift(1))
 
   implicit val readView: Reads[View] = {
