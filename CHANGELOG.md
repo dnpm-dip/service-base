@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.5.0](https://github.com/dnpm-dip/service-base/compare/v1.4.0...v1.5.0) (2026-08-11)
+
+
+### Features
+
+* Added event logging of DeletionEvents to be accessible by CDN ([#51](https://github.com/dnpm-dip/service-base/issues/51)) ([128bfc0](https://github.com/dnpm-dip/service-base/commit/128bfc076f9380772281d679c16943a44fc61360))
+* Query service restructuring ([#50](https://github.com/dnpm-dip/service-base/issues/50)) ([236d880](https://github.com/dnpm-dip/service-base/commit/236d88027f03a08636e5c2108e6ca81b2a3c4ee2))
+
+
+### Bug Fixes
+
+* Made check whether an initial submission exists more robust; Adapted validation accordingly to ensure at most 1 open EpisodeOfCare occurs ([#48](https://github.com/dnpm-dip/service-base/issues/48)) ([4885c1f](https://github.com/dnpm-dip/service-base/commit/4885c1f0235ddee4c7b74fe9b7369103e4f9ab26))
+* MII consent version extraction ([#52](https://github.com/dnpm-dip/service-base/issues/52)) ([ce12c0f](https://github.com/dnpm-dip/service-base/commit/ce12c0f19e5dd0213be840882d0dca927bf39b92))
+
 ## [1.4.0](https://github.com/dnpm-dip/service-base/compare/v1.3.1...v1.4.0) (2026-06-01)
 
 
