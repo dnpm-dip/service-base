@@ -111,6 +111,7 @@ sealed trait BroadConsent
   def status: BroadConsent.Status.Value
   def patient: Option[Reference[Patient]]
   def date: LocalDate
+  def version: Option[String]
   def policyUri: String
   def provision: BroadConsent.Provision
 
@@ -140,6 +141,8 @@ extends BroadConsent
 
   override def date: LocalDate = view.date
 
+  override def version: Option[String] = view.version
+
   override def policyUri: String = view.policyUri
 
   override def provision: BroadConsent.Provision = view.provision
@@ -167,6 +170,9 @@ extends BroadConsent
 
   override def date: LocalDate =
     view.map(_.date).getOrElse(LocalDate.now)
+
+  override def version: Option[String] =
+    view.flatMap(_.version)
 
   override def policyUri: String =
     view.map(_.policyUri).getOrElse("")
@@ -287,6 +293,7 @@ object BroadConsent
     status: BroadConsent.Status.Value,
     patient: Option[Reference[Patient]],
     date: LocalDate,
+    version: Option[String],
     policyUri: String,
     provision: Provision
   )
@@ -358,15 +365,26 @@ object BroadConsent
     ((JsPath \ "reference").read[String] orElse (JsPath \ "identifier" \ "value").read[String])
       .map(ref => Reference(Id[T](ref.replace(s"$resource/",""))))
 
+  /*
+   * Extract MII Consent Version from List of profiles, based on structure:
+   * "meta": { 
+   *   "profile": ["...|2026.0.0"]
+   * }
+   * by selecting the String part after | in the first entry
+   */
+  private val consentVersion: List[String] => Option[String] =
+    _.headOption.flatMap(_.split("\\|").lift(1))
+
   implicit val readView: Reads[View] = {
     (
       (JsPath \ "status").read[BroadConsent.Status.Value] and
       (JsPath \ "patient").readNullable(reference[Patient]("Patient")) and
       (JsPath \ "dateTime").read(tolerantDate) and
+      (JsPath \ "meta" \ "profile").readNullable[List[String]].map(_.flatMap(consentVersion)) and
       (JsPath \ "policy"\ 0 \ "uri").read[String] and
       (JsPath \ "provision").read[Provision]
     )(
-      View(_,_,_,_,_)
+      View(_,_,_,_,_,_)
     )    
   }
 
