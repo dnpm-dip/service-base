@@ -1,12 +1,16 @@
 package de.dnpm.dip.service.mvh
 
 
+import java.time.LocalDateTime
 import scala.collection.concurrent.{
   Map,
   TrieMap
 }
 import cats.Monad
-import cats.data.NonEmptyList
+import cats.data.{
+  EitherNel,
+  NonEmptyList
+}
 import cats.syntax.applicative._
 import cats.syntax.either._
 import de.dnpm.dip.model.{
@@ -14,11 +18,14 @@ import de.dnpm.dip.model.{
   Id,
   Patient,
   PatientRecord,
+  Period
 }
+
 import de.dnpm.dip.service.controlling.{
   Controlling,
   PatientDataCounts
 }
+import MVHService.DeletionEvent
 
 
 class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
@@ -31,6 +38,9 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
     TrieMap.empty
 
   private val submissions: Map[Id[Patient],Map[Id[TransferTAN],Submission[T]]] =
+    TrieMap.empty
+
+  private val deletions: Map[Id[TransferTAN],DeletionEvent] =
     TrieMap.empty
 
 
@@ -162,14 +172,48 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
       )
     }
 
-
+/*
+  // Remove all Submissions for the Patient and return recorded DeletionEvents 
   override def delete(id: Id[Patient])(
     implicit env: Env
-  ): F[Either[String,Unit]] = {
-    reports -= id
-    submissions -= id
+  ): F[EitherNel[String,Seq[DeletionEvent]]] =
+    submissions
+      .remove(id)
+      .map(_.keys.toSeq)
+      .getOrElse(Nil)
+      .map(DeletionEvent(id,_,LocalDateTime.now))
+      .tapEach(event => deletions += event.tan -> event)
+      .asRight
+      .toEitherNel
+      .pure  
+*/
 
-    ().asRight[String].pure
+  // Remove all SubmissionReports and Submissions for the Patient, 
+  // and return recorded DeletionEvents 
+  override def delete(id: Id[Patient])(
+    implicit env: Env
+  ): F[EitherNel[String,Seq[DeletionEvent]]] = {
+    reports -= id
+
+    submissions
+      .remove(id)
+      .map(_.keys.toSeq)
+      .getOrElse(Nil)
+      .map(DeletionEvent(id,_,LocalDateTime.now))
+      .tapEach(event => deletions += event.tan -> event)
+      .asRight
+      .toEitherNel
+      .pure
   }
+
+  override def deletionEvents(
+    period: Period[LocalDateTime],
+  )(
+    implicit env: Env
+  ): F[Seq[DeletionEvent]] =
+    deletions.values
+      .filter(period)
+      .toSeq
+      .pure
 
 }

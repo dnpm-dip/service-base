@@ -14,18 +14,9 @@ extends BaseMVHService[F,T](
   repository
 ){
 
-  type ReportType = BaseReport
-
 
   override def diagnosticExtent(record: T) = None
 
   override def sequenceTypes(record: T) = None
-
-  override def report(
-    criteria: Report.Criteria
-  )(
-    implicit env: Monad[F]
-  ): F[ReportType] =
-    env.map(baseReport(criteria))(_._1)
 
 }

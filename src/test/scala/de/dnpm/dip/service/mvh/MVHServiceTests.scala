@@ -3,6 +3,7 @@ package de.dnpm.dip.service.mvh
 
 import scala.concurrent.Future
 import scala.util.Random
+import cats.data.NonEmptyList
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.EitherValues._
 import org.scalatest.Inspectors._
@@ -66,7 +67,7 @@ class MVHServiceTests extends AsyncFlatSpec
     for { 
       outcomes <- nonInitialMetadata.next.traverse(service ! Process(record,_))
 
-    } yield all (outcomes) must matchPattern { case Left(_: InvalidSubmissionType) => }
+    } yield all (outcomes) must matchPattern { case Left(NonEmptyList(_: InvalidSubmissionType,Nil)) => }
 
   }
 
@@ -82,7 +83,7 @@ class MVHServiceTests extends AsyncFlatSpec
 
       outcome2 <- service ! Process(record,initialMetadata.next)
 
-    } yield outcome2 must matchPattern { case Left(_: InvalidSubmissionType) => }
+    } yield outcome2 must matchPattern { case Left(NonEmptyList(_: InvalidSubmissionType,Nil)) => }
 
   }
 
@@ -123,7 +124,7 @@ class MVHServiceTests extends AsyncFlatSpec
           .map(_.withEpisodeOfCare(newEpisode))
           .traverse(service ! Process(recordWithNewEpisode,_))
 
-    } yield all (outcomes2) must matchPattern { case Left(_: InvalidSubmissionType) => }
+    } yield all (outcomes2) must matchPattern { case Left(NonEmptyList(_: InvalidSubmissionType,Nil)) => }
 
   }
 

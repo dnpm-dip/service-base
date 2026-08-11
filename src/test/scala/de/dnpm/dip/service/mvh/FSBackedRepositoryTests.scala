@@ -1,12 +1,14 @@
 package de.dnpm.dip.service.mvh
 
 
+import java.time.LocalDateTime
 import java.nio.file.Files.createTempDirectory
 import scala.concurrent.Future
 import scala.util.Random
 import cats.syntax.traverse._
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.must.Matchers._
+import de.dnpm.dip.model.Period
 import de.dnpm.dip.service.DummyPatientRecord
 import de.dnpm.dip.service.Gens._
 import de.ekut.tbi.generators.Gen
@@ -51,8 +53,9 @@ class FSBackedRepositoryTests extends AsyncFlatSpec
 
     val n = 42
 
-    val submissions =
-      List.fill(n)(metadata.next).map(Gen.of[DummyPatientRecord].next -> _)
+    val submissions = List.fill(n)(metadata.next).map(Gen.of[DummyPatientRecord].next -> _)
+
+    val start = LocalDateTime.now
 
     for { 
 
@@ -60,13 +63,12 @@ class FSBackedRepositoryTests extends AsyncFlatSpec
 
       _ = all (saveOutcomes) must matchPattern { case Right(Saved) => }
 
-      // For each Submission, a Submission and Submission.Report file must have be created, hence the factor of 2
+      // For each Submission, a Submission and Submission.Report file must have been created, hence the factor of 2
       _ = dataDir.listFiles.size mustBe 2*n
 
+      queriedSubmissions <- service ? Submission.Filter()
 
-      loadedSubmissions <- service ? Submission.Filter()
-
-      _ = loadedSubmissions.size mustBe n
+      _ = queriedSubmissions.size mustBe n
 
 
       submissionsByTAN <- submissions.map(_._2.transferTAN).traverse(service.submission(_))
@@ -78,13 +80,20 @@ class FSBackedRepositoryTests extends AsyncFlatSpec
 
       _ = all (deletionOutcomes) must matchPattern { case Right(Deleted) => }
 
+
       submissionsAfterDeletion <- submissions.map(_._2.transferTAN).traverse(service submission _)
-      submissionReportsAfterDeletion <- submissions.map(_._2.transferTAN).traverse(service submissionReport _)
+      reportsAfterDeletion     <- submissions.map(_._2.transferTAN).traverse(service submissionReport _)
 
       _ = all (submissionsAfterDeletion) must be (empty)
-      _ = all (submissionReportsAfterDeletion) must be (empty)
+      _ = all (reportsAfterDeletion) must be (empty)
 
-      _ = dataDir.listFiles mustBe empty
+      _ = dataDir.listFiles((_,name) => name contains "MVH_DummyPatientRecord") mustBe empty
+      _ = dataDir.listFiles((_,name) => name contains "SubmissionReport") mustBe empty
+
+
+      deletionEvents <- service.deletionEvents(Period(start,LocalDateTime.now))
+
+      _ = deletionEvents.size mustBe n
 
     } yield succeed // If this point is reached, test succeeded
 
