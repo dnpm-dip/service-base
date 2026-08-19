@@ -123,24 +123,19 @@ with Logging
         }
    
     TrieMap.from( 
-      dataDir.listFiles(
-        (_,name) => name match { 
-          case PatId(_) => true
-          case _        => false
+      dataDir.listFiles((_,name) => PatId.unapply(name).isDefined)
+        .groupBy { case PatId(id) => id }
+        .view
+        .map {
+          case (_,filenames) => 
+        
+            // Snapshot.id is a Long representing a timestamp (as epoch millis).
+            // Thus, alphabetical order of the file name also corresponds to chronological order,
+            // so pick the alphabetically last (max) as latest 
+            val snp = readJson[Snapshot[T]](filenames.max)
+        
+            snp.data.id -> snp 
         }
-      )
-      .groupBy { case PatId(id) => id }
-      .view
-      .map {
-        case (_,filenames) => 
-
-          // Snapshot.id is a Long representing a timestamp (as epoch millis).
-          // Thus, alphabetical order of the file name also corresponds to chronological order,
-          // so pick the alphabetically last (max) as latest 
-          val snp = readJson[Snapshot[T]](filenames.max)
-
-          snp.data.id -> snp 
-      }
     )
   }
 
