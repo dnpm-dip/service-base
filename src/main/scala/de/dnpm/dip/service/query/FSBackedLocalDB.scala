@@ -6,6 +6,8 @@ import java.io.{
   FileWriter,
   FileInputStream
 }
+import java.nio.file.Files
+import java.nio.file.attribute.BasicFileAttributes
 import scala.reflect.ClassTag
 import scala.util.{
   Either,
@@ -127,13 +129,12 @@ with Logging
         .groupBy { case PatId(id) => id }
         .view
         .map {
-          case (_,filenames) => 
+          case (_,files) => 
         
-            // Snapshot.id is a Long representing a timestamp (as epoch millis).
-            // Thus, alphabetical order of the file name also corresponds to chronological order,
-            // so pick the alphabetically last (max) as latest 
-            val snp = readJson[Snapshot[T]](filenames.max)
-        
+            val latest = files.maxBy(file => Files.readAttributes(file.toPath,classOf[BasicFileAttributes]).creationTime)
+          
+            val snp = readJson[Snapshot[T]](latest)
+
             snp.data.id -> snp 
         }
     )
