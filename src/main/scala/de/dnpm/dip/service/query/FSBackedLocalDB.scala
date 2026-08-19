@@ -98,7 +98,7 @@ with Logging
   // Extractor of Patient ID from file name
   private object PatId
   {
-    private val regex = s"${prefix}_(.+)_Snapshot.+".r
+    private val regex = s"${prefix}_(.+)_Snapshot.+\\.json".r
 
     def unapply(filename: String): Option[Id[Patient]] =
       regex.findFirstMatchIn(filename)
@@ -123,9 +123,24 @@ with Logging
         }
    
     TrieMap.from( 
-      dataDir.listFiles((_,name) => (name startsWith prefix) && (name endsWith ".json"))
+      dataDir.listFiles(
+        (_,name) => name match { 
+          case PatId(_) => true
+          case _        => false
+        }
+      )
       .groupBy { case PatId(id) => id }
-      .map { case (id,filenames) => id -> readJson[Snapshot[T]](filenames.max) }
+      .view
+      .map {
+        case (_,filenames) => 
+
+          // Snapshot.id is a Long representing a timestamp (as epoch millis).
+          // Thus, alphabetical order of the file name also corresponds to chronological order,
+          // so pick the alphabetically last (max) as latest 
+          val snp = readJson[Snapshot[T]](filenames.max)
+
+          snp.data.id -> snp 
+      }
     )
   }
 
@@ -141,9 +156,7 @@ with Logging
     val snp = Snapshot.of(dataSet)
 
     Using(new FileWriter(fileOf(snp))){
-      _.write(
-        Json.toJson(snp) pipe Json.stringify
-      )
+      _.write(Json.toJson(snp) pipe Json.stringify)
     }
     .map(_ => cache update (dataSet.patient.id,snp))
     .fold(
