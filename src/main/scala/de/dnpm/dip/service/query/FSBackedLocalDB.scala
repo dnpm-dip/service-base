@@ -6,6 +6,8 @@ import java.io.{
   FileWriter,
   FileInputStream
 }
+import java.nio.file.Files
+import java.nio.file.attribute.BasicFileAttributes
 import scala.reflect.ClassTag
 import scala.util.{
   Either,
@@ -61,8 +63,7 @@ with Logging
   import cats.syntax.applicative._
   import cats.syntax.either._
 
-  private val prefix =
-    classTag.runtimeClass.getSimpleName
+  private val prefix = classTag.runtimeClass.getSimpleName
 
 
   private def fileStart(
@@ -96,6 +97,20 @@ with Logging
          .pipe(_.get)
     }
 
+  // Extractor of Patient ID from file name
+  private object PatId
+  {
+    private val regex = s"${prefix}_(.+)_Snapshot.+\\.json".r
+
+    def unapply(filename: String): Option[Id[Patient]] =
+      regex.findFirstMatchIn(filename)
+        .map(_ group 1)
+        .map(Id[Patient](_))
+
+    def unapply(file: File): Option[Id[Patient]] =
+      unapply(file.getName)
+  }
+
 
   private val cache: Map[Id[Patient],Snapshot[T]] = {
 
@@ -105,33 +120,24 @@ with Logging
       dataDir.mkdirs
         .tap {
           case false =>
-            log.warn(
-              s"Failed to create directory ${dataDir.getAbsolutePath}. Ensure the executing user has appropriate permissions on the directory."
-            )
+            log.warn(s"Failed to create directory ${dataDir.getAbsolutePath}. Ensure the executing user has appropriate permissions on the directory.")
           case _ => ()
         }
-    
-    dataDir.listFiles(
-      (_,name) => (name startsWith prefix) && (name endsWith ".json")
-    )
-    .to(LazyList)
-    .map(readJson[Snapshot[T]])
-    // Lazily accumulate only the latest snapshot of each patient record,
-    // instead of using groupyBy(patientId) and then picking the latest snapshot,
-    // which requires all to be loaded into memory, whereas with this 
-    // implementation, elements can be garbage-collected along the way
-    .foldLeft(TrieMap.empty[Id[Patient],Snapshot[T]]){ 
-      (acc,snp) =>
-        acc.updateWith(snp.data.patient.id){
-          case Some(s) =>
-            if (snp.timestamp > s.timestamp) Some(snp)
-            else Some(s)
+   
+    TrieMap.from( 
+      dataDir.listFiles((_,name) => PatId.unapply(name).isDefined)
+        .groupBy { case PatId(id) => id }
+        .view
+        .map {
+          case (_,files) => 
+        
+            val latest = files.maxBy(file => Files.readAttributes(file.toPath,classOf[BasicFileAttributes]).creationTime)
+          
+            val snp = readJson[Snapshot[T]](latest)
 
-          case None => Some(snp)
+            snp.data.id -> snp 
         }
-        acc
-    }
-    
+    )
   }
 
 
@@ -146,9 +152,7 @@ with Logging
     val snp = Snapshot.of(dataSet)
 
     Using(new FileWriter(fileOf(snp))){
-      _.write(
-        Json.toJson(snp) pipe Json.stringify
-      )
+      _.write(Json.toJson(snp) pipe Json.stringify)
     }
     .map(_ => cache update (dataSet.patient.id,snp))
     .fold(
