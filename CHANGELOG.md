@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/dnpm-dip/service-base/compare/v1.5.0...v1.5.1) (2026-09-14)
+
+
+### Bug Fixes
+
+* mii consent version validation ([#54](https://github.com/dnpm-dip/service-base/issues/54)) ([01ee4e2](https://github.com/dnpm-dip/service-base/commit/01ee4e24a5be91b69306ec38825f49c65153c9b8))
+
 ## [1.5.0](https://github.com/dnpm-dip/service-base/compare/v1.4.0...v1.5.0) (2026-08-11)
 
 
