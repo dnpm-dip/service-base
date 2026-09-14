@@ -429,11 +429,6 @@ trait Validators
   private lazy val admissibleConsentMissingReasons =
     (BroadConsent.ReasonMissing.values - TechnicalIssues - OrganizationalIssues)
 
-  private lazy val admissibleConsentProfileVersions =
-    Set(
-      "1.0.8",
-      "1.0.9"
-    )
 
   implicit val metadataValidator: Validator[Issue,Submission.Metadata] =
     metadata =>
@@ -457,11 +452,6 @@ trait Validators
         (metadata.researchConsents.filter(_.nonEmpty) orElse metadata.reasonResearchConsentMissing) must be (defined) otherwise (
           Error("Es muss entweder MII Forschungs-/Broad-Consent oder der Grund für dessen Fehlen vorhanden sein") at "Broad Consent"
         ),
-        ifDefined (metadata.researchConsents.map(_.flatMap(_.version))){
-          all (_) must be (in (admissibleConsentProfileVersions)) otherwise (
-            Error(s"Unzulässige Version, erwarte einen aus: {${admissibleConsentProfileVersions.mkString(",")}}") at "Broad Consent MII Version"
-          )
-        }, 
         valueIn (metadata.reasonResearchConsentMissing) must be (in (admissibleConsentMissingReasons)) otherwise (
           Error(s"Unzulässiger Wert, ab 01.06.2026 nur noch folgende gültig: {${admissibleConsentMissingReasons.mkString(", ")}}")
             at "Grund für fehlenden Broad Consent"
