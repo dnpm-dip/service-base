@@ -61,6 +61,7 @@ import Issue.{
   Error,
   Fatal,
   Path,
+  Warning
 }
 import shapeless.{
   Coproduct,
@@ -429,6 +430,41 @@ trait Validators
   private lazy val admissibleConsentMissingReasons =
     (BroadConsent.ReasonMissing.values - TechnicalIssues - OrganizationalIssues)
 
+  implicit val consentValidator: Validator[Issue,BroadConsent] = {
+
+    val consentPackageVersions =
+      Set(
+        "2025.0.0",
+        "2025.0.1",
+        "2025.0.2",
+        "2025.0.3",
+        "2026.0.0"
+        //"2026.0.1" // Occurs in BfArM schema although not released yet
+      )
+
+    val consentProfileVersions =
+      Set(
+        "1.0.8",
+        "1.0.9"
+      )
+
+    consent => consent.version must be (defined) otherwise (MissingValue("Version")) map (_.get) andThen {
+
+      case v if consentPackageVersions(v) => v.validNel
+
+      case v if consentProfileVersions(v) =>
+        Warning(s"Consent Version als Profil-Version angegeben, sollte eine der Package-Versionen {${consentPackageVersions.mkString(",")} sein}")
+          .at("Broad Consent")
+          .invalidNel
+
+      case v =>
+        Warning(s"Nicht zuordenbare Consent Version '$v', sollte eine der Package-Versionen {${consentPackageVersions.mkString(",")} (oder Profil-Versionen ${consentProfileVersions.mkString(",")}) sein}" )
+          .at("Broad Consent")
+          .invalidNel
+
+    } map (_ => consent)
+
+  }
 
   implicit val metadataValidator: Validator[Issue,Submission.Metadata] =
     metadata =>
@@ -455,7 +491,8 @@ trait Validators
         valueIn (metadata.reasonResearchConsentMissing) must be (in (admissibleConsentMissingReasons)) otherwise (
           Error(s"Unzulässiger Wert, ab 01.06.2026 nur noch folgende gültig: {${admissibleConsentMissingReasons.mkString(", ")}}")
             at "Grund für fehlenden Broad Consent"
-        )
+        ),
+        ifDefined(metadata.researchConsents.filter(_.nonEmpty))(validateEach(_))
       )
       .errorsOr(metadata) on "Metadaten"
 
