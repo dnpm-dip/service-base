@@ -453,12 +453,12 @@ trait Validators
       case v if consentPackageVersions(v) => v.validNel
 
       case v if consentProfileVersions(v) =>
-        Warning(s"Consent Version als Profil-Version angegeben, sollte eine der Package-Versionen {${consentPackageVersions.mkString(",")} sein}")
+        Warning(s"Consent Version als Profile-Version angegeben, sollte eine der Package-Versionen {${consentPackageVersions.mkString(",")}} sein")
           .at("Broad Consent")
           .invalidNel
 
       case v =>
-        Warning(s"Nicht zuordenbare Consent Version '$v', sollte eine der Package-Versionen {${consentPackageVersions.mkString(",")} (oder Profil-Versionen ${consentProfileVersions.mkString(",")}) sein}" )
+        Warning(s"Nicht zuordenbare Consent Version '$v', sollte eine der Package-Versionen {${consentPackageVersions.mkString(",")}} (oder Profile-Versionen {${consentProfileVersions.mkString(",")})} sein" )
           .at("Broad Consent")
           .invalidNel
 
