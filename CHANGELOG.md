@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.2](https://github.com/dnpm-dip/service-base/compare/v1.5.1...v1.5.2) (2026-09-22)
+
+
+### Bug Fixes
+
+* Added warning-level validation of Consent version ([#56](https://github.com/dnpm-dip/service-base/issues/56)) ([590d2ca](https://github.com/dnpm-dip/service-base/commit/590d2cab96e7f76f394c5e0ec8c09b191a1a2736))
+
 ## [1.5.1](https://github.com/dnpm-dip/service-base/compare/v1.5.0...v1.5.1) (2026-09-14)
 
 
