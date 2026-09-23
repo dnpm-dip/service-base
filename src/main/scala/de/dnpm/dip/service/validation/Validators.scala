@@ -453,7 +453,7 @@ trait Validators
       case v if consentProfileVersions(v) => v.validNel
 
       case v if consentPackageVersions(v) =>
-        Warning(s"Consent Version als Packagee-Version angegeben, sollte eine der Profil-Versionen {${consentProfileVersions.mkString(",")}} sein")
+        Warning(s"Consent Version als Package-Version angegeben, sollte eine der Profile-Versionen {${consentProfileVersions.mkString(",")}} sein")
           .at("Broad Consent")
           .invalidNel
 
