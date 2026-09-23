@@ -432,33 +432,33 @@ trait Validators
 
   implicit val consentValidator: Validator[Issue,BroadConsent] = {
 
-    val consentPackageVersions =
-      Set(
-        "2025.0.0",
-        "2025.0.1",
-        "2025.0.2",
-        "2025.0.3",
-        "2026.0.0"
-        //"2026.0.1" // Occurs in BfArM schema although not released yet
-      )
-
-    val consentProfileVersions =
+    val profileVersions =
       Set(
         "1.0.8",
         "1.0.9"
       )
 
+    val packageVersions =
+      Set(
+        "2025.0.0",
+        "2025.0.1",
+        "2025.0.2",
+        "2025.0.3",
+        "2026.0.0",
+        "2026.0.1" // Occurs in BfArM schema although not released yet
+      )
+
     consent => consent.version must be (defined) otherwise (MissingValue("Version")) map (_.get) andThen {
 
-      case v if consentPackageVersions(v) => v.validNel
+      case v if profileVersions(v) => v.validNel
 
-      case v if consentProfileVersions(v) =>
-        Warning(s"Consent Version als Profile-Version angegeben, sollte eine der Package-Versionen {${consentPackageVersions.mkString(",")}} sein")
+      case v if packageVersions(v) =>
+        Warning(s"Consent Version als Package-Version angegeben, sollte eine der Profile-Versionen {${profileVersions.mkString(",")}} sein")
           .at("Broad Consent")
           .invalidNel
 
       case v =>
-        Warning(s"Nicht zuordenbare Consent Version '$v', sollte eine der Package-Versionen {${consentPackageVersions.mkString(",")}} (oder Profile-Versionen {${consentProfileVersions.mkString(",")})} sein" )
+        Warning(s"Nicht zuordenbare Consent Version '$v', sollte eine der Profile-Versionen {${profileVersions.mkString(",")})} (oder vorübergehend eine der Package-Versionen {${packageVersions.mkString(",")}}) sein" )
           .at("Broad Consent")
           .invalidNel
 
