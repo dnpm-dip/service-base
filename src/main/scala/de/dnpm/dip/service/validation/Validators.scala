@@ -458,7 +458,7 @@ trait Validators
           .invalidNel
 
       case v =>
-        Warning(s"Nicht zuordenbare Consent Version '$v', sollte eine der Profile-Versionen {${profileVersions.mkString(",")})} (oder vorübergehend eine der Package-Versionen {${packageVersions.mkString(",")}}) sein" )
+        Warning(s"Nicht zuordenbare Consent Version '$v', sollte eine der Profile-Versionen {${profileVersions.mkString(",")}} (oder vorübergehend eine der Package-Versionen {${packageVersions.mkString(",")}}) sein" )
           .at("Broad Consent")
           .invalidNel
 
