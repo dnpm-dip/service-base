@@ -299,34 +299,33 @@ object BroadConsent
   )
   extends BroadConsent
 
-
-/*
-  // By validation, the List[BroadConsent] contains at most 1 element
-  // (The signature Metadata.researchConsents: List[BroadConsent] being only retained for backwards compatibility)
+  /**
+   * Check whether according to the input List[BroadConsent] research use is permitted:
+   * The check accomodates for the following possibilites:
+   * - The list contains multiple Consent resources at different times/dates
+   * - The list contains multiple Consent.provisions at a given time but split into different Consent resources
+   *
+   * Therefore, the check is:
+   * - Group List entries by date into Map[LocalDate,List[BroadConsent]]
+   * - Apply the actual check whether relevant provisions are permitted on the latest Map entry by date
+   */
   def permitsResearchUse(consents: List[BroadConsent]): Boolean =
-    consents.headOption.exists(permitsResearchUse)
+    consents.groupBy(_.date).maxByOption(_._1) match {
+      case Some(_ -> latestConsents) =>
+        // Go over all BC instances and relevant provisions to check whether any is permitted
+        latestConsents.foldLeft(Map.empty[String,Boolean])(
+          (acc,consent) => researchProvisions.foldLeft(acc)(
+            (acc2,code) => acc2.updatedWith(code){
+              case denied @ Some(false) => denied
+              case _ => consent.provision(code).map(_.isPermitted)
+            }
+          )
+        )
+        .values
+        .exists(_ == true)
 
-  def permitsResearchUse(consent: BroadConsent): Boolean =
-    consent.status == BroadConsent.Status.Active &&
-    researchProvisions.exists( 
-      code => consent.provision(code) match {
-        case Some(provision) => provision.isPermitted
-        case None => false
-      }
-    )
-*/
-
-  def permitsResearchUse(consents: List[BroadConsent]): Boolean =
-    consents.foldLeft(Map.empty[String,Boolean])(
-      (acc,consent) => researchProvisions.foldLeft(acc)(
-        (acc2,code) => acc2.updatedWith(code){
-          case denied @ Some(false) => denied
-          case _ => consent.provision(code).map(_.isPermitted)
-        }
-      )
-    )
-    .values
-    .exists(_ == true)
+     case None => false
+  }
 
   def permitsResearchUse(consent: BroadConsent): Boolean =
     permitsResearchUse(List(consent))
