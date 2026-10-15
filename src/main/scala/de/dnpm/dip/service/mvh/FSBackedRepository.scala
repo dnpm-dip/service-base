@@ -356,6 +356,15 @@ with Logging
       _ => event.asRight
     )
 
+  private def delete(
+    event: DeletionEvent
+  ): Either[String,DeletionEvent] =
+    Try(new File(dataDir,s"${DELETION_PREFIX}_TAN_${event.tan.value}.json"))
+      .map(file => Files.delete(file.toPath))
+      .fold(
+        _ => s"Failed removing DeletionEvent ${Json.toJson(event)}".asLeft,
+        _ => event.asRight
+      )
 
   override def deleteSubmission(tan: Id[TransferTAN])(
     implicit env: Env
@@ -372,20 +381,26 @@ with Logging
           val outcome = (Try{Files.delete(subFile.toPath)},Try{Files.delete(repFile.toPath)}) match {
 
             case (Success(_),Success(_)) =>
-              Try { save(DeletionEvent(patId,tan,LocalDateTime.now)) }
-                .collect {
-                   case outcome @ Right(_) =>
-                     Files.delete(backupSubmissionFile)
-                     Files.delete(backupReportFile)
-                     cachedPartialSubmissions -= tan
-                     cachedReports -= tan
-                     outcome
-                }
-                .fold(
-                  _ => s"Error occurred deleting Submission $tan".asLeft,
-                  identity
-                )
 
+              val eventOutcome = save(DeletionEvent(patId,tan,LocalDateTime.now))
+
+              val backupCleanup = Try {
+                Files.delete(backupSubmissionFile)
+                Files.delete(backupReportFile)
+              }
+
+              (backupCleanup,eventOutcome) match {
+                case (Success(_),Right(_)) =>
+                  cachedPartialSubmissions -= tan
+                  cachedReports -= tan
+                  eventOutcome
+
+                case (Failure(_),Right(event)) =>
+                  delete(event)
+
+                case (_,failed) => failed
+              } 
+                
             case (Failure(t1),Success(_)) =>
               log.error(s"Failed to delete Submission $tan, restoring deleted SubmissionReport",t1)
               Try(Files.move(backupReportFile,repFile.toPath))
