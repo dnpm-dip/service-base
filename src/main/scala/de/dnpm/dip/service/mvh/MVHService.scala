@@ -88,13 +88,15 @@ object MVHService
   extends Command[T]
 
   final case class ConfirmSubmitted(id: Id[TransferTAN]) extends Command[Nothing]
-  final case class Delete(id: Id[Patient]) extends Command[Nothing]
+  final case class DeleteSubmission(tan: Id[TransferTAN]) extends Command[Nothing]
+  final case class DeleteAll(id: Id[Patient]) extends Command[Nothing]
 
 
   sealed trait Outcome
   final case object Saved extends Outcome
   final case object Updated extends Outcome
-  final case object Deleted extends Outcome
+  final case object SubmissionDeleted extends Outcome
+  final case object AllDeleted extends Outcome
 
 
   sealed trait Error

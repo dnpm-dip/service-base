@@ -172,21 +172,33 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
       )
     }
 
-/*
-  // Remove all Submissions for the Patient and return recorded DeletionEvents 
-  override def delete(id: Id[Patient])(
+
+  // Remove Submision with given TAN and return recorded DeletionEvent
+  override def deleteSubmission(tan: Id[TransferTAN])(
     implicit env: Env
-  ): F[EitherNel[String,Seq[DeletionEvent]]] =
-    submissions
-      .remove(id)
-      .map(_.keys.toSeq)
-      .getOrElse(Nil)
-      .map(DeletionEvent(id,_,LocalDateTime.now))
-      .tapEach(event => deletions += event.tan -> event)
-      .asRight
-      .toEitherNel
-      .pure  
-*/
+  ): F[EitherNel[String,DeletionEvent]] = env.pure {
+    submissions.find(_._2.contains(tan)) match {
+
+      case Some(patId -> patSubmissions) =>
+
+        val outcome = for {      
+          _ <- patSubmissions.remove(tan)
+          _ <- reports.get(patId).flatMap(_.remove(tan))
+
+          event = DeletionEvent(patId,tan,LocalDateTime.now)
+       
+          _ = deletions += event.tan -> event
+
+        } yield event
+
+        outcome.toRight(s"Failed to delete Submission TAN $tan").toEitherNel
+
+      case _ =>
+        s"Submission TAN $tan doesn't exist".asLeft.toEitherNel
+
+    }
+  }
+
 
   // Remove all SubmissionReports and Submissions for the Patient, 
   // and return recorded DeletionEvents 

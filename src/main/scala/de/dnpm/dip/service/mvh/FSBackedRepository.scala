@@ -49,7 +49,7 @@ import MVHService.DeletionEvent
 object TAN
 {
 
-  private val regex = ".+_TAN_([a-fA-F0-9]+).json".r
+  private val regex = ".+_TAN_([a-fA-F0-9]+)\\.json".r
 
   def unapply(filename: String): Option[Id[TransferTAN]] =
     regex.findFirstMatchIn(filename)
@@ -57,6 +57,22 @@ object TAN
       .map(Id[TransferTAN](_))
 
   def unapply(file: File): Option[Id[TransferTAN]] =
+    unapply(file.getName)
+
+}
+
+
+object PatId
+{
+
+  private val regex = ".+_Patient_(.+)_TAN_.+\\.json".r
+
+  def unapply(filename: String): Option[Id[Patient]] =
+    regex.findFirstMatchIn(filename)
+      .map(_.group(1))
+      .map(Id[Patient](_))
+
+  def unapply(file: File): Option[Id[Patient]] =
     unapply(file.getName)
 
 }
@@ -111,12 +127,20 @@ with Logging
       (_,name) => name startsWith s"${SUBMISSION_PREFIX}_Patient_${id.value}_TAN"
     ) 
 
+  private def reportFile(tan: Id[TransferTAN]): Option[File] =
+    dataDir.listFiles(
+      (_,name) => (name startsWith REPORT_PREFIX) && (name endsWith s"TAN_${tan.value}.json")
+    )
+    .toList
+    .headOption
+
   private def submissionFile(tan: Id[TransferTAN]): Option[File] =
     dataDir.listFiles(
       (_,name) => (name startsWith SUBMISSION_PREFIX) && (name endsWith s"TAN_${tan.value}.json")
     )
     .toList
     .headOption
+
 
   private def toPrettyJson[A: Writes](a: A): String =
     Json.toJson(a) pipe Json.prettyPrint
@@ -324,6 +348,39 @@ with Logging
       _ => s"Failed saving DeletionEvent ${Json.toJson(event)}".asLeft,
       _ => event.asRight
     )
+
+
+  override def deleteSubmission(tan: Id[TransferTAN])(
+    implicit env: Env
+  ): F[EitherNel[String,DeletionEvent]] =
+    env.pure {
+      (submissionFile(tan),reportFile(tan)) match {
+      
+        case (Some(subFile),Some(repFile)) =>
+      
+          val PatId(patId) = subFile
+          if (subFile.delete){
+      
+            cachedPartialSubmissions -= tan
+             
+            if (repFile.delete){
+              cachedReports -= tan
+              save(DeletionEvent(patId,tan,LocalDateTime.now))
+            } else {
+              log.error(s"Failed to delete $REPORT_PREFIX file $repFile")
+              s"Failed to delete SubmissionReport for TAN $tan".asLeft
+            }
+          } else {
+            log.error(s"Failed to delete $SUBMISSION_PREFIX file $subFile")
+            s"Failed to delete Submission for TAN $tan".asLeft
+          }
+         
+        case _ =>
+          s"Invalid TAN $tan: Missing Submission or SubmissionReport file".asLeft 
+      
+      }
+    }
+    .map(_.toEitherNel)
 
 
   override def delete(patId: Id[Patient])(

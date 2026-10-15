@@ -14,10 +14,12 @@ import de.dnpm.dip.service.Gens._
 import de.ekut.tbi.generators.Gen
 import Submission.Type.Test
 import MVHService.{
-  Delete,
-  Deleted,
+  AllDeleted,
+  DeleteSubmission,
+  DeleteAll,
   Process,
-  Saved
+  Saved,
+  SubmissionDeleted
 }
 
 
@@ -75,10 +77,14 @@ class FSBackedRepositoryTests extends AsyncFlatSpec
 
       _ = all (submissionsByTAN) must be (defined)
 
+      deletionByTANOutcome <- service ! DeleteSubmission(submissions.head._2.transferTAN)
 
-      deletionOutcomes <- submissions.map(_._1.patient.id).traverse(service ! Delete(_))
+      _ = deletionByTANOutcome must matchPattern { case Right(SubmissionDeleted) => }
 
-      _ = all (deletionOutcomes) must matchPattern { case Right(Deleted) => }
+
+      deletionOutcomes <- submissions.map(_._1.patient.id).traverse(service ! DeleteAll(_))
+
+      _ = all (deletionOutcomes) must matchPattern { case Right(AllDeleted) => }
 
 
       submissionsAfterDeletion <- submissions.map(_._2.transferTAN).traverse(service submission _)

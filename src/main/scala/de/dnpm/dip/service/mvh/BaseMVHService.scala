@@ -205,15 +205,27 @@ with Logging
 
         } yield result
 
-
-      case Delete(id) =>
-        log.info(s"Deleting MVH Submissions for Patient $id")
+      case DeleteSubmission(tan) =>
+        log.info(s"Deleting MVH Submission TAN $tan")
         for {
-          outcome <- repo.delete(id)
+          outcome <- repo.deleteSubmission(tan)
 
           result = outcome.bimap(
             _.map(GenericError(_)),
-            _ => Deleted
+            _ => SubmissionDeleted
+          )
+    
+        } yield result
+
+
+      case DeleteAll(patientId) =>
+        log.info(s"Deleting MVH Submissions for Patient $patientId")
+        for {
+          outcome <- repo.delete(patientId)
+
+          result = outcome.bimap(
+            _.map(GenericError(_)),
+            _ => AllDeleted
           )
     
         } yield result

@@ -219,7 +219,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
         } yield finalResult
 
 
-      case Orchestrator.Delete(id,optScopes) =>
+      case Orchestrator.Delete(patientId,optScopes) =>
 
         val scopes = optScopes match { 
           case Some(scopes) if scopes.nonEmpty => scopes
@@ -231,12 +231,12 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
 
         for {
           results <- scopes.toList.traverse {
-            case MVGenomSeq => mvhService ! MVHService.Delete(id)
-            case Research   => queryService ! QueryService.Delete(id)
+            case MVGenomSeq => mvhService ! MVHService.DeleteAll(patientId)
+            case Research   => queryService ! QueryService.Delete(patientId)
           }
 
           // ... and delete from the validation service by default
-          validation <- validationService ! ValidationService.Delete(id)
+          validation <- validationService ! ValidationService.Delete(patientId)
 
           errors =
             (validation :: results).collect {
@@ -246,7 +246,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
             }
 
           outcome = 
-            if (errors.isEmpty) Deleted(id).asRight
+            if (errors.isEmpty) Deleted(patientId).asRight
             else errors.asLeft
               
         } yield outcome
