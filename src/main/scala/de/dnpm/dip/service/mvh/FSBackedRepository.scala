@@ -7,10 +7,15 @@ import java.io.{
   FileWriter,
   InputStream
 }
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.time.LocalDateTime
 import scala.reflect.ClassTag
 import scala.util.chaining._
-import scala.util.Using
+import scala.util.{
+  Try,
+  Using
+}
 import scala.collection.concurrent.{
   Map,
   TrieMap
@@ -20,6 +25,7 @@ import cats.data.{
   EitherNel,
   NonEmptyList
 }
+import cats.syntax.apply._
 import cats.syntax.applicative._
 import cats.syntax.either._
 import cats.syntax.functor._
@@ -359,6 +365,52 @@ with Logging
       
           val PatientId(patId) = subFile
 
+          val backupSubmissionFile = Files.copy(subFile.toPath,Files.createTempFile(dataDir.toPath,s"REMOVED_Submission_$tan",".json"),REPLACE_EXISTING)
+          val backupReportFile     = Files.copy(repFile.toPath,Files.createTempFile(dataDir.toPath,s"REMOVED_Report_$tan",".json"),REPLACE_EXISTING)
+          
+          val submissionDeletion = Try(subFile.toPath.tap(Files.delete)).recoverWith {
+            case t => 
+              log.error(s"Failed to delete Submission $tan",t)
+              Try(Files.move(backupSubmissionFile,subFile.toPath))
+          }
+
+          val reportDeletion = Try(repFile.toPath.tap(Files.delete)).recoverWith {
+            case t => 
+              log.error(s"Failed to delete Submission $tan",t)
+              Try(Files.move(backupReportFile,repFile.toPath))
+          }
+
+          (submissionDeletion,reportDeletion).mapN {
+            (_,_) =>
+              cachedPartialSubmissions -= tan
+              cachedReports -= tan
+              Files.delete(backupSubmissionFile)
+              Files.delete(backupReportFile)
+              save(DeletionEvent(patId,tan,LocalDateTime.now))
+          }
+          .getOrElse(s"Error(s) occurred deleting Submission $tan".asLeft)
+          .toEitherNel
+         
+        case _ =>
+          s"Error deleting Submission data TAN $tan: Missing Submission or SubmissionReport file"
+            .tap(log.error)
+            .asLeft 
+            .toEitherNel
+      
+      }
+    }
+
+/*
+  override def deleteSubmission(tan: Id[TransferTAN])(
+    implicit env: Env
+  ): F[EitherNel[String,DeletionEvent]] =
+    env.pure {
+      (submissionFile(tan),reportFile(tan)) match {
+      
+        case (Some(subFile),Some(repFile)) =>
+      
+          val PatientId(patId) = subFile
+
           if (subFile.delete){
       
             cachedPartialSubmissions -= tan
@@ -374,40 +426,6 @@ with Logging
           }
          
         case _ => s"Invalid TAN $tan: Missing Submission or SubmissionReport file".asLeft 
-      
-      }
-    }
-    .map(_.toEitherNel)
-
-/*
-  override def deleteSubmission(tan: Id[TransferTAN])(
-    implicit env: Env
-  ): F[EitherNel[String,DeletionEvent]] =
-    env.pure {
-      (submissionFile(tan),reportFile(tan)) match {
-      
-        case (Some(subFile),Some(repFile)) =>
-      
-          val PatId(patId) = subFile
-
-          if (subFile.delete){
-      
-            cachedPartialSubmissions -= tan
-             
-            if (repFile.delete){
-              cachedReports -= tan
-              save(DeletionEvent(patId,tan,LocalDateTime.now))
-            } else {
-              log.error(s"Failed to delete $REPORT_PREFIX file $repFile")
-              s"Failed to delete SubmissionReport for TAN $tan".asLeft
-            }
-          } else {
-            log.error(s"Failed to delete $SUBMISSION_PREFIX file $subFile")
-            s"Failed to delete Submission for TAN $tan".asLeft
-          }
-         
-        case _ =>
-          s"Invalid TAN $tan: Missing Submission or SubmissionReport file".asLeft 
       
       }
     }
