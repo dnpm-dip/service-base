@@ -372,18 +372,19 @@ with Logging
           val outcome = (Try{Files.delete(subFile.toPath)},Try{Files.delete(repFile.toPath)}) match {
 
             case (Success(_),Success(_)) =>
-              Try {
-                val event = save(DeletionEvent(patId,tan,LocalDateTime.now))
-                Files.delete(backupSubmissionFile)
-                Files.delete(backupReportFile)
-                cachedPartialSubmissions -= tan
-                cachedReports -= tan
-                event
-              }
-              .fold(
-                _ => s"Error occurred deleting Submission $tan".asLeft,
-                identity
-              )
+              Try { save(DeletionEvent(patId,tan,LocalDateTime.now)) }
+                .collect {
+                   case outcome @ Right(_) =>
+                     Files.delete(backupSubmissionFile)
+                     Files.delete(backupReportFile)
+                     cachedPartialSubmissions -= tan
+                     cachedReports -= tan
+                     outcome
+                }
+                .fold(
+                  _ => s"Error occurred deleting Submission $tan".asLeft,
+                  identity
+                )
 
             case (Failure(t1),Success(_)) =>
               log.error(s"Failed to delete Submission $tan",t1)
