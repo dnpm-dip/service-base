@@ -191,6 +191,8 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
 
         } yield event
 
+        if (patSubmissions.isEmpty) submissions.remove(patId)
+
         outcome.toRight(s"Failed to delete Submission TAN $tan").toEitherNel
 
       case _ =>
