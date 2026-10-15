@@ -48,7 +48,6 @@ import MVHService.DeletionEvent
 // Extractor for TANs according to file naming pattern below
 object TAN
 {
-
   private val regex = ".+_TAN_([a-fA-F0-9]+)\\.json".r
 
   def unapply(filename: String): Option[Id[TransferTAN]] =
@@ -62,9 +61,9 @@ object TAN
 }
 
 
-object PatId
+// Extractor for Patient IDs according to file naming pattern below
+object PatientId
 {
-
   private val regex = ".+_Patient_(.+)_TAN_.+\\.json".r
 
   def unapply(filename: String): Option[Id[Patient]] =
@@ -358,7 +357,39 @@ with Logging
       
         case (Some(subFile),Some(repFile)) =>
       
+          val PatientId(patId) = subFile
+
+          if (subFile.delete){
+      
+            cachedPartialSubmissions -= tan
+             
+            // For now, assume success after deletion of the Submission file
+            if (repFile.delete) cachedReports -= tan
+
+            save(DeletionEvent(patId,tan,LocalDateTime.now))
+
+          } else {
+            log.error(s"Failed to delete $SUBMISSION_PREFIX file $subFile")
+            s"Failed to delete Submission for TAN $tan".asLeft
+          }
+         
+        case _ => s"Invalid TAN $tan: Missing Submission or SubmissionReport file".asLeft 
+      
+      }
+    }
+    .map(_.toEitherNel)
+
+/*
+  override def deleteSubmission(tan: Id[TransferTAN])(
+    implicit env: Env
+  ): F[EitherNel[String,DeletionEvent]] =
+    env.pure {
+      (submissionFile(tan),reportFile(tan)) match {
+      
+        case (Some(subFile),Some(repFile)) =>
+      
           val PatId(patId) = subFile
+
           if (subFile.delete){
       
             cachedPartialSubmissions -= tan
@@ -381,7 +412,7 @@ with Logging
       }
     }
     .map(_.toEitherNel)
-
+*/
 
   override def delete(patId: Id[Patient])(
     implicit env: Env
