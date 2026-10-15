@@ -387,16 +387,16 @@ with Logging
                 )
 
             case (Failure(t1),Success(_)) =>
-              log.error(s"Failed to delete Submission $tan",t1)
-              Try(Files.move(backupSubmissionFile,subFile.toPath))
+              log.error(s"Failed to delete Submission $tan, restoring deleted SubmissionReport",t1)
+              Try(Files.move(backupReportFile,repFile.toPath))
                 .fold(
                   _ => s"Error occurred deleting Submission $tan".asLeft,
                   _ => s"Error occurred deleting Submission $tan".asLeft
                 )
 
             case (Success(_),Failure(t2)) =>
-              log.error(s"Failed to delete SubmissionReport $tan",t2)
-              Try(Files.move(backupReportFile,repFile.toPath))
+              log.error(s"Failed to delete SubmissionReport $tan, restoring deleted Submission",t2)
+              Try(Files.move(backupSubmissionFile,subFile.toPath))
                 .fold(
                   _ => s"Error occurred deleting Submission $tan".asLeft,
                   _ => s"Error occurred deleting Submission $tan".asLeft
