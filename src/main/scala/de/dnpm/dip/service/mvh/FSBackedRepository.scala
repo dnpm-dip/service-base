@@ -27,7 +27,6 @@ import cats.data.{
   EitherNel,
   NonEmptyList
 }
-//import cats.syntax.apply._
 import cats.syntax.applicative._
 import cats.syntax.either._
 import cats.syntax.functor._
@@ -356,6 +355,7 @@ with Logging
       _ => event.asRight
     )
 
+/*
   private def delete(
     event: DeletionEvent
   ): Either[String,DeletionEvent] =
@@ -365,6 +365,7 @@ with Logging
         _ => s"Failed removing DeletionEvent ${Json.toJson(event)}".asLeft,
         _ => event.asRight
       )
+*/
 
   override def deleteSubmission(tan: Id[TransferTAN])(
     implicit env: Env
@@ -382,23 +383,25 @@ with Logging
 
             case (Success(_),Success(_)) =>
 
-              val eventOutcome = save(DeletionEvent(patId,tan,LocalDateTime.now))
-
-              val backupCleanup = Try {
-                Files.delete(backupSubmissionFile)
-                Files.delete(backupReportFile)
-              }
-
-              (backupCleanup,eventOutcome) match {
-                case (Success(_),Right(_)) =>
+              save(DeletionEvent(patId,tan,LocalDateTime.now)) match {
+                case eventSaved @ Right(_) =>
                   cachedPartialSubmissions -= tan
                   cachedReports -= tan
-                  eventOutcome
+                  Try {
+                    Files.delete(backupSubmissionFile)
+                    Files.delete(backupReportFile)
+                  } match {
+                    case Success(_) => eventSaved
+                    case Failure(_) =>
+                      log.warn(s"Failed to delete tmp backup files for deleted Submission TAN $tan, consider removing by hand: $backupSubmissionFile, $backupReportFile")
+                      eventSaved
+                  }
 
-                case (Failure(_),Right(event)) =>
-                  delete(event)
-
-                case (_,failed) => failed
+                case eventFailed @ Left(error) =>
+                  log.error(s"Failed to save DeletionEvent for TAN $tan: $error")
+                  Files.move(backupSubmissionFile,subFile.toPath)
+                  Files.move(backupReportFile,repFile.toPath)
+                  eventFailed
               } 
                 
             case (Failure(t1),Success(_)) =>
@@ -441,52 +444,6 @@ with Logging
       }
     }
 
-/*
-  override def deleteSubmission(tan: Id[TransferTAN])(
-    implicit env: Env
-  ): F[EitherNel[String,DeletionEvent]] =
-    env.pure {
-      (submissionFile(tan),reportFile(tan)) match {
-      
-        case (Some(subFile),Some(repFile)) =>
-      
-          val PatientId(patId) = subFile
-
-          val backupSubmissionFile = Files.copy(subFile.toPath,Files.createTempFile(dataDir.toPath,s"REMOVED_Submission_$tan",".json"),REPLACE_EXISTING)
-          val backupReportFile     = Files.copy(repFile.toPath,Files.createTempFile(dataDir.toPath,s"REMOVED_Report_$tan",".json"),REPLACE_EXISTING)
-          
-          val submissionDeletion = Try(subFile.toPath.tap(Files.delete)).recoverWith {
-            case t => 
-              log.error(s"Failed to delete Submission $tan",t)
-              Try(Files.move(backupSubmissionFile,subFile.toPath))
-          }
-
-          val reportDeletion = Try(repFile.toPath.tap(Files.delete)).recoverWith {
-            case t => 
-              log.error(s"Failed to delete Submission $tan",t)
-              Try(Files.move(backupReportFile,repFile.toPath))
-          }
-
-          (submissionDeletion,reportDeletion).mapN {
-            (_,_) =>
-              cachedPartialSubmissions -= tan
-              cachedReports -= tan
-              Files.delete(backupSubmissionFile)
-              Files.delete(backupReportFile)
-              save(DeletionEvent(patId,tan,LocalDateTime.now))
-          }
-          .getOrElse(s"Error(s) occurred deleting Submission $tan".asLeft)
-          .toEitherNel
-         
-        case _ =>
-          s"Error deleting Submission data TAN $tan: Missing Submission or SubmissionReport file"
-            .tap(log.error)
-            .asLeft 
-            .toEitherNel
-      
-      }
-    }
-*/
 
   override def delete(patId: Id[Patient])(
     implicit env: Env
