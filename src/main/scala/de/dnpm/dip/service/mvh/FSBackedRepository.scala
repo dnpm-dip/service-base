@@ -7,10 +7,17 @@ import java.io.{
   FileWriter,
   InputStream
 }
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.time.LocalDateTime
 import scala.reflect.ClassTag
 import scala.util.chaining._
-import scala.util.Using
+import scala.util.{
+  Failure,
+  Success,
+  Try,
+  Using
+}
 import scala.collection.concurrent.{
   Map,
   TrieMap
@@ -48,8 +55,7 @@ import MVHService.DeletionEvent
 // Extractor for TANs according to file naming pattern below
 object TAN
 {
-
-  private val regex = ".+_TAN_([a-fA-F0-9]+).json".r
+  private val regex = ".+_TAN_([a-fA-F0-9]+)\\.json".r
 
   def unapply(filename: String): Option[Id[TransferTAN]] =
     regex.findFirstMatchIn(filename)
@@ -57,6 +63,22 @@ object TAN
       .map(Id[TransferTAN](_))
 
   def unapply(file: File): Option[Id[TransferTAN]] =
+    unapply(file.getName)
+
+}
+
+
+// Extractor for Patient IDs according to file naming pattern below
+object PatientId
+{
+  private val regex = ".+_Patient_(.+)_TAN_.+\\.json".r
+
+  def unapply(filename: String): Option[Id[Patient]] =
+    regex.findFirstMatchIn(filename)
+      .map(_.group(1))
+      .map(Id[Patient](_))
+
+  def unapply(file: File): Option[Id[Patient]] =
     unapply(file.getName)
 
 }
@@ -111,12 +133,20 @@ with Logging
       (_,name) => name startsWith s"${SUBMISSION_PREFIX}_Patient_${id.value}_TAN"
     ) 
 
+  private def reportFile(tan: Id[TransferTAN]): Option[File] =
+    dataDir.listFiles(
+      (_,name) => (name startsWith REPORT_PREFIX) && (name endsWith s"TAN_${tan.value}.json")
+    )
+    .toList
+    .headOption
+
   private def submissionFile(tan: Id[TransferTAN]): Option[File] =
     dataDir.listFiles(
       (_,name) => (name startsWith SUBMISSION_PREFIX) && (name endsWith s"TAN_${tan.value}.json")
     )
     .toList
     .headOption
+
 
   private def toPrettyJson[A: Writes](a: A): String =
     Json.toJson(a) pipe Json.prettyPrint
@@ -324,6 +354,104 @@ with Logging
       _ => s"Failed saving DeletionEvent ${Json.toJson(event)}".asLeft,
       _ => event.asRight
     )
+
+
+  private def deletionEvent(
+    tan: Id[TransferTAN]
+  ): Option[DeletionEvent] =
+    Option(new File(dataDir,s"${DELETION_PREFIX}_TAN_${tan.value}.json"))
+      .filter(_.exists)
+      .map(new FileInputStream(_))
+      .map(readAsJson[DeletionEvent])
+
+
+  override def deleteSubmission(tan: Id[TransferTAN])(
+    implicit env: Env
+  ): F[Either[String,DeletionEvent]] = env.pure {
+
+    (submissionFile(tan),reportFile(tan)) match {
+    
+      case (Some(subFile),Some(repFile)) =>
+    
+        val PatientId(patId) = subFile
+        val backupSubmissionFile = Files.copy(subFile.toPath,Files.createTempFile(dataDir.toPath,s"REMOVED_Submission_$tan",".json"),REPLACE_EXISTING)
+        val backupReportFile     = Files.copy(repFile.toPath,Files.createTempFile(dataDir.toPath,s"REMOVED_Report_$tan",".json"),REPLACE_EXISTING)
+
+        (Try{Files.delete(subFile.toPath)},Try{Files.delete(repFile.toPath)}) match {
+
+          case (Success(_),Success(_)) =>
+
+            save(DeletionEvent(patId,tan,LocalDateTime.now)) match {
+              case eventSaved @ Right(_) =>
+                cachedPartialSubmissions -= tan
+                cachedReports -= tan
+                Try {
+                  Files.delete(backupSubmissionFile)
+                  Files.delete(backupReportFile)
+                } match {
+                  case Success(_) => eventSaved
+                  case Failure(_) =>
+                    log.warn(s"Failed to delete tmp backup files for deleted Submission $tan, consider removing by hand: $backupSubmissionFile, $backupReportFile")
+                    eventSaved
+                }
+
+              case eventFailed @ Left(error) =>
+                log.error(s"Failed to save DeletionEvent for TAN $tan: $error")
+                Files.move(backupSubmissionFile,subFile.toPath)
+                Files.move(backupReportFile,repFile.toPath)
+                eventFailed
+            } 
+              
+          case (Failure(t1),Success(_)) =>
+            log.error(s"Failed to delete Submission $tan, restoring deleted SubmissionReport",t1)
+            Try(Files.move(backupReportFile,repFile.toPath))
+              .fold(
+                _ => s"Error occurred deleting Submission $tan".asLeft,
+                _ => s"Error occurred deleting Submission $tan".asLeft
+              )
+
+          case (Success(_),Failure(t2)) =>
+            log.error(s"Failed to delete SubmissionReport $tan, restoring deleted Submission",t2)
+            Try(Files.move(backupSubmissionFile,subFile.toPath))
+              .fold(
+                _ => s"Error occurred deleting SubmissionReport $tan".asLeft,
+                _ => s"Error occurred deleting SubmissionReport $tan".asLeft
+              )
+       
+          case (Failure(t1),Failure(t2)) =>
+            log.error(s"Failed to delete Submission $tan",t1)
+            log.error(s"Failed to delete SubmissionReport $tan",t2)
+            Try {
+              Files.move(backupSubmissionFile,subFile.toPath)
+              Files.move(backupReportFile,repFile.toPath)
+            }
+            .fold(
+              _ => s"Error occurred deleting Submission $tan".asLeft,
+              _ => s"Error occurred deleting Submission $tan".asLeft
+            )
+        } 
+       
+      case (None,Some(_)) =>
+        s"Error deleting Submission data TAN $tan: Missing Submission file"
+          .tap(log.error)
+          .asLeft 
+
+      case (Some(_),None) =>
+        s"Error deleting Submission data TAN $tan: Missing SubmissionReport file"
+          .tap(log.error)
+          .asLeft 
+
+      case (None,None) =>
+        deletionEvent(tan) match {
+          case Some(event) => event.asRight
+          case None =>
+            s"No DeletionEvent recorded for $tan even though no submission files persist"
+              .tap(msg => log.error(s"$msg, consider inspecting data folder manually for remaining tmp backup files"))
+              .asLeft
+        }
+
+    }
+  }
 
 
   override def delete(patId: Id[Patient])(
