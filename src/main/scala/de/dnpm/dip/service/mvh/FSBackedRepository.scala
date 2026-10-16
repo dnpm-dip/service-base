@@ -391,7 +391,7 @@ with Logging
                 } match {
                   case Success(_) => eventSaved
                   case Failure(_) =>
-                    log.warn(s"Failed to delete tmp backup files for deleted Submission TAN $tan, consider removing by hand: $backupSubmissionFile, $backupReportFile")
+                    log.warn(s"Failed to delete tmp backup files for deleted Submission $tan, consider removing by hand: $backupSubmissionFile, $backupReportFile")
                     eventSaved
                 }
 
@@ -414,8 +414,8 @@ with Logging
             log.error(s"Failed to delete SubmissionReport $tan, restoring deleted Submission",t2)
             Try(Files.move(backupSubmissionFile,subFile.toPath))
               .fold(
-                _ => s"Error occurred deleting Submission $tan".asLeft,
-                _ => s"Error occurred deleting Submission $tan".asLeft
+                _ => s"Error occurred deleting SubmissionReport $tan".asLeft,
+                _ => s"Error occurred deleting SubmissionReport $tan".asLeft
               )
        
           case (Failure(t1),Failure(t2)) =>
@@ -444,10 +444,9 @@ with Logging
       case (None,None) =>
         deletionEvent(tan) match {
           case Some(event) => event.asRight
-
           case None =>
             s"No DeletionEvent recorded for $tan even though no submission files persist"
-              .tap(log.error)
+              .tap(msg => log.error(s"$msg, consider inspecting data folder manually for remaining tmp backup files"))
               .asLeft
         }
 
