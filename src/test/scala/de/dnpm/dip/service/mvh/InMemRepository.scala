@@ -176,7 +176,7 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
   // Remove Submision with given TAN and return recorded DeletionEvent
   override def deleteSubmission(tan: Id[TransferTAN])(
     implicit env: Env
-  ): F[EitherNel[String,DeletionEvent]] = env.pure {
+  ): F[Either[String,DeletionEvent]] = env.pure {
     submissions.find(_._2.contains(tan)) match {
 
       case Some(patId -> patSubmissions) =>
@@ -193,10 +193,10 @@ class InMemRepository[F[_],T <: PatientRecord] extends Repository[F,Monad[F],T]
 
         if (patSubmissions.isEmpty) submissions.remove(patId)
 
-        outcome.toRight(s"Failed to delete Submission TAN $tan").toEitherNel
+        outcome.toRight(s"Failed to delete Submission TAN $tan")
 
       case _ =>
-        s"Submission TAN $tan doesn't exist".asLeft.toEitherNel
+        s"Submission TAN $tan doesn't exist".asLeft
 
     }
   }

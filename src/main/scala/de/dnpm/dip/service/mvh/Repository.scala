@@ -88,7 +88,7 @@ trait Repository[F[_],Env,T <: PatientRecord] extends Controlling.Ops[F,Env]
 
   def deleteSubmission(id: Id[TransferTAN])(
     implicit env: Env
-  ): F[EitherNel[String,DeletionEvent]]
+  ): F[Either[String,DeletionEvent]]
 
   
   def delete(id: Id[Patient])(

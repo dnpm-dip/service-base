@@ -211,11 +211,11 @@ with Logging
           outcome <- repo.deleteSubmission(tan)
 
           result = outcome.bimap(
-            _.map(GenericError(_)),
+            GenericError(_),
             _ => SubmissionDeleted
           )
     
-        } yield result
+        } yield result.toEitherNel
 
 
       case DeleteAll(patientId) =>

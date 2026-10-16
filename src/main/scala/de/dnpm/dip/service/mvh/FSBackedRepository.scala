@@ -355,94 +355,104 @@ with Logging
       _ => event.asRight
     )
 
-/*
-  private def delete(
-    event: DeletionEvent
-  ): Either[String,DeletionEvent] =
-    Try(new File(dataDir,s"${DELETION_PREFIX}_TAN_${event.tan.value}.json"))
-      .map(file => Files.delete(file.toPath))
-      .fold(
-        _ => s"Failed removing DeletionEvent ${Json.toJson(event)}".asLeft,
-        _ => event.asRight
-      )
-*/
+
+  private def deletionEvent(
+    tan: Id[TransferTAN]
+  ): Option[DeletionEvent] =
+    Option(new File(dataDir,s"${DELETION_PREFIX}_TAN_${tan.value}.json"))
+      .filter(_.exists)
+      .map(new FileInputStream(_))
+      .map(readAsJson[DeletionEvent])
+
 
   override def deleteSubmission(tan: Id[TransferTAN])(
     implicit env: Env
-  ): F[EitherNel[String,DeletionEvent]] =
-    env.pure {
-      (submissionFile(tan),reportFile(tan)) match {
-      
-        case (Some(subFile),Some(repFile)) =>
-      
-          val PatientId(patId) = subFile
-          val backupSubmissionFile = Files.copy(subFile.toPath,Files.createTempFile(dataDir.toPath,s"REMOVED_Submission_$tan",".json"),REPLACE_EXISTING)
-          val backupReportFile     = Files.copy(repFile.toPath,Files.createTempFile(dataDir.toPath,s"REMOVED_Report_$tan",".json"),REPLACE_EXISTING)
+  ): F[Either[String,DeletionEvent]] = env.pure {
 
-          val outcome = (Try{Files.delete(subFile.toPath)},Try{Files.delete(repFile.toPath)}) match {
+    (submissionFile(tan),reportFile(tan)) match {
+    
+      case (Some(subFile),Some(repFile)) =>
+    
+        val PatientId(patId) = subFile
+        val backupSubmissionFile = Files.copy(subFile.toPath,Files.createTempFile(dataDir.toPath,s"REMOVED_Submission_$tan",".json"),REPLACE_EXISTING)
+        val backupReportFile     = Files.copy(repFile.toPath,Files.createTempFile(dataDir.toPath,s"REMOVED_Report_$tan",".json"),REPLACE_EXISTING)
 
-            case (Success(_),Success(_)) =>
+        (Try{Files.delete(subFile.toPath)},Try{Files.delete(repFile.toPath)}) match {
 
-              save(DeletionEvent(patId,tan,LocalDateTime.now)) match {
-                case eventSaved @ Right(_) =>
-                  cachedPartialSubmissions -= tan
-                  cachedReports -= tan
-                  Try {
-                    Files.delete(backupSubmissionFile)
-                    Files.delete(backupReportFile)
-                  } match {
-                    case Success(_) => eventSaved
-                    case Failure(_) =>
-                      log.warn(s"Failed to delete tmp backup files for deleted Submission TAN $tan, consider removing by hand: $backupSubmissionFile, $backupReportFile")
-                      eventSaved
-                  }
+          case (Success(_),Success(_)) =>
 
-                case eventFailed @ Left(error) =>
-                  log.error(s"Failed to save DeletionEvent for TAN $tan: $error")
-                  Files.move(backupSubmissionFile,subFile.toPath)
-                  Files.move(backupReportFile,repFile.toPath)
-                  eventFailed
-              } 
-                
-            case (Failure(t1),Success(_)) =>
-              log.error(s"Failed to delete Submission $tan, restoring deleted SubmissionReport",t1)
-              Try(Files.move(backupReportFile,repFile.toPath))
-                .fold(
-                  _ => s"Error occurred deleting Submission $tan".asLeft,
-                  _ => s"Error occurred deleting Submission $tan".asLeft
-                )
+            save(DeletionEvent(patId,tan,LocalDateTime.now)) match {
+              case eventSaved @ Right(_) =>
+                cachedPartialSubmissions -= tan
+                cachedReports -= tan
+                Try {
+                  Files.delete(backupSubmissionFile)
+                  Files.delete(backupReportFile)
+                } match {
+                  case Success(_) => eventSaved
+                  case Failure(_) =>
+                    log.warn(s"Failed to delete tmp backup files for deleted Submission TAN $tan, consider removing by hand: $backupSubmissionFile, $backupReportFile")
+                    eventSaved
+                }
 
-            case (Success(_),Failure(t2)) =>
-              log.error(s"Failed to delete SubmissionReport $tan, restoring deleted Submission",t2)
-              Try(Files.move(backupSubmissionFile,subFile.toPath))
-                .fold(
-                  _ => s"Error occurred deleting Submission $tan".asLeft,
-                  _ => s"Error occurred deleting Submission $tan".asLeft
-                )
-         
-            case (Failure(t1),Failure(t2)) =>
-              log.error(s"Failed to delete Submission $tan",t1)
-              log.error(s"Failed to delete SubmissionReport $tan",t2)
-              Try {
+              case eventFailed @ Left(error) =>
+                log.error(s"Failed to save DeletionEvent for TAN $tan: $error")
                 Files.move(backupSubmissionFile,subFile.toPath)
                 Files.move(backupReportFile,repFile.toPath)
-              }
+                eventFailed
+            } 
+              
+          case (Failure(t1),Success(_)) =>
+            log.error(s"Failed to delete Submission $tan, restoring deleted SubmissionReport",t1)
+            Try(Files.move(backupReportFile,repFile.toPath))
               .fold(
                 _ => s"Error occurred deleting Submission $tan".asLeft,
                 _ => s"Error occurred deleting Submission $tan".asLeft
               )
-          } 
 
-          outcome.toEitherNel
-         
-        case _ =>
-          s"Error deleting Submission data TAN $tan: Missing Submission or SubmissionReport file"
-            .tap(log.error)
-            .asLeft 
-            .toEitherNel
-      
-      }
+          case (Success(_),Failure(t2)) =>
+            log.error(s"Failed to delete SubmissionReport $tan, restoring deleted Submission",t2)
+            Try(Files.move(backupSubmissionFile,subFile.toPath))
+              .fold(
+                _ => s"Error occurred deleting Submission $tan".asLeft,
+                _ => s"Error occurred deleting Submission $tan".asLeft
+              )
+       
+          case (Failure(t1),Failure(t2)) =>
+            log.error(s"Failed to delete Submission $tan",t1)
+            log.error(s"Failed to delete SubmissionReport $tan",t2)
+            Try {
+              Files.move(backupSubmissionFile,subFile.toPath)
+              Files.move(backupReportFile,repFile.toPath)
+            }
+            .fold(
+              _ => s"Error occurred deleting Submission $tan".asLeft,
+              _ => s"Error occurred deleting Submission $tan".asLeft
+            )
+        } 
+       
+      case (None,Some(_)) =>
+        s"Error deleting Submission data TAN $tan: Missing Submission file"
+          .tap(log.error)
+          .asLeft 
+
+      case (Some(_),None) =>
+        s"Error deleting Submission data TAN $tan: Missing SubmissionReport file"
+          .tap(log.error)
+          .asLeft 
+
+      case (None,None) =>
+        deletionEvent(tan) match {
+          case Some(event) => event.asRight
+
+          case None =>
+            s"No DeletionEvent recorded for $tan even though no submission files persist"
+              .tap(log.error)
+              .asLeft
+        }
+
     }
+  }
 
 
   override def delete(patId: Id[Patient])(
