@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.3](https://github.com/dnpm-dip/service-base/compare/v1.5.2...v1.5.3) (2026-10-16)
+
+
+### Bug Fixes
+
+* Added function to delete single submissions by TAN ([#60](https://github.com/dnpm-dip/service-base/issues/60)) ([817843d](https://github.com/dnpm-dip/service-base/commit/817843d5162979f98fa5eede5b0064aaea1d4e5b))
+
 ## [1.5.2](https://github.com/dnpm-dip/service-base/compare/v1.5.1...v1.5.2) (2026-09-28)
 
 
