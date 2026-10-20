@@ -91,8 +91,14 @@ class QueryServiceTests extends AsyncFlatSpec
       updateOutcome <- service ! update
       
       updatedQuery = updateOutcome.value
+    
+      _ = updatedQuery.criteria mustBe update.criteria
 
-    } yield updatedQuery.criteria mustBe update.criteria
+      reupdateOutcome <- service ! update.copy(criteria = None)
+
+      reupdatedQuery = reupdateOutcome.value
+
+    } yield reupdatedQuery.criteria mustBe update.criteria
 
   }
 

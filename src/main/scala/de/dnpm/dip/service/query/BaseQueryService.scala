@@ -358,20 +358,24 @@ with Logging
 
             update.criteria.traverse(validate).map(_.complete) match {
               
-              case Right(newCriteria) =>
+              case Right(optNewCriteria) =>
 
                 val sitesChanged = sites != query.peers.map(_.site).toSet
-                val criteriaChanged = newCriteria match {
-                  case Some(criteria) => !query.criteria.contains(criteria)
-                  case None           => query.criteria.isDefined
+
+                val criteriaChanged = (optNewCriteria,query.criteria) match {
+                  case (Some(newCriteria),Some(previousCriteria)) => newCriteria != previousCriteria
+                  case (Some(_),None)                             => true
+                  case (None,_)                                   => false
                 }
 
                 if (sitesChanged || criteriaChanged){
                 
                   log.debug(s"Query target sites or criteria changed, re-submitting...") 
                 
+                  val effectiveCriteria = if (criteriaChanged) optNewCriteria else query.criteria
+                
                   for {
-                    resultsBySite <- executeQuery(id,sites,newCriteria) 
+                    resultsBySite <- executeQuery(id,sites,effectiveCriteria) 
                   
                     combinedErrorsOrResults =
                       resultsBySite
@@ -382,9 +386,9 @@ with Logging
                   } yield combinedErrorsOrResults.map(
                     _.map(results => Option.when(results.nonEmpty)(
                         query.copy(
-                          mode = mode,
-                          criteria = if (criteriaChanged) newCriteria else query.criteria,
-                          peers = ConnectionStatus.from(resultsBySite),
+                          mode       = mode,
+                          criteria   = effectiveCriteria,
+                          peers      = ConnectionStatus.from(resultsBySite),
                           lastUpdate = Instant.now
                         ) -> results
                       )
