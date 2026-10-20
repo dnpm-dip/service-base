@@ -8,7 +8,10 @@ import java.time.{
 import java.util.UUID.randomUUID
 import scala.concurrent.duration._
 import cats.Monad
-import cats.data.EitherNel
+import cats.data.{
+  EitherNel,
+  Ior
+}
 import cats.syntax.traverse._
 import de.dnpm.dip.util.{
   Logging,
@@ -46,9 +49,7 @@ extends QueryService[F,Monad[F],UseCase]
 with Logging
 {
 
-  import scala.util.chaining._
   import cats.syntax.either._
-  import cats.syntax.ior._
   import cats.syntax.applicative._
   import cats.syntax.functor._
   import cats.syntax.flatMap._
@@ -56,7 +57,6 @@ with Logging
   import BaseQueryService.FEDERATED_QUERIES_INACTIVE
   import Query.Mode.{Local,Federated,Custom}
   import QueryService._
-
 
   
   protected val preparedQueryDB: PreparedQueryDB[F,Monad[F],Criteria,String]
@@ -303,17 +303,15 @@ with Logging
 
             for {
               resultsBySite <- executeQuery(id,sites,criteria) 
-            
-              errsOrResults =
+
+              combinedErrorsOrResults =
                 resultsBySite
                   .values
                   .map(_.toIor.toIorNel)
                   .reduceOption(_ combine _)
-                  .getOrElse(Seq.empty.rightIor)
-                  .toEither
             
-              errsOrQuery = errsOrResults match {
-                case Right(results) if (results.nonEmpty) =>
+            } yield combinedErrorsOrResults.map(
+              _.map(results => Option.when(results.nonEmpty)(
                   Query[Criteria](
                     id,
                     LocalDateTime.now,
@@ -323,24 +321,32 @@ with Logging
                     criteria,
                     sessionTimeout.toSeconds.toInt,
                     Instant.now
-                  )
-                  .tap(query => querySessions.put(id,query -> ResultSetFrom(query,results), sessionTimeout))
-                  .asRight
+                  ) -> results
+                )
+              )
+            ) 
+            .collect {
+              case Ior.Right(Some(query -> results)) =>
+                querySessions.put(id,query -> ResultSetFrom(query,results), sessionTimeout)
+                query.asRight
             
-                case Right(_) => Query.NoResults.asLeft
-                    
-                case Left(errs) => Query.ConnectionErrors(errs).asLeft
-              }
-            
-            } yield errsOrQuery
+              case Ior.Both(_,Some(query -> results)) =>
+                querySessions.put(id,query -> ResultSetFrom(query,results), sessionTimeout)
+                query.asRight
+               
+              case Ior.Both(errors,None) => Query.ConnectionErrors(errors).asLeft
+              
+              case Ior.Left(errors) => Query.ConnectionErrors(errors).asLeft
+            }
+            .getOrElse(Query.NoResults.asLeft)
 
-          case Left(errors) =>
-            Query.InvalidCriteria(errors).asLeft.pure[F]
+          case Left(errors) => Query.InvalidCriteria(errors).asLeft.pure[F]
         }
+
       }
 
 
-      case update @ Query.Update(id,optMode,optSites,optRawCriteria) => {
+      case update @ Query.Update(id,_,_,_) => {
 
         log.info(s"Updating Query $id by $querier: \n${Json.prettyPrint(Json.toJson(update))}") 
         
@@ -348,48 +354,56 @@ with Logging
 
           case Some(query) =>
 
-            val (mode,sites) = modeAndSites(optMode.getOrElse(query.mode),optSites.complete)
+            val (mode,sites) = modeAndSites(update.mode.getOrElse(query.mode),update.sites.complete)
 
-            optRawCriteria.traverse(validate).map(_.complete) match {
+            update.criteria.traverse(validate).map(_.complete) match {
               
-              case Right(optCriteria) =>
+              case Right(newCriteria) =>
 
                 val sitesChanged = sites != query.peers.map(_.site).toSet
+                val criteriaChanged = newCriteria match {
+                  case Some(criteria) => !query.criteria.contains(criteria)
+                  case None           => query.criteria.isDefined
+                }
 
-                if (sitesChanged || optCriteria.exists(c => query.criteria.contains(c))){
+                if (sitesChanged || criteriaChanged){
                 
                   log.debug(s"Query target sites or criteria changed, re-submitting...") 
                 
                   for {
-                    resultsBySite <- executeQuery(id,sites,optCriteria) 
+                    resultsBySite <- executeQuery(id,sites,newCriteria) 
                   
-                    errsOrResults =
+                    combinedErrorsOrResults =
                       resultsBySite
                         .values
                         .map(_.toIor.toIorNel)
                         .reduceOption(_ combine _)
-                        .getOrElse(Seq.empty.rightIor)
-                        .toEither
-                
-                    errsOrQuery = errsOrResults match {
-                      case Right(results) if (results.nonEmpty) =>
-
-                        val updatedQuery = query.copy(
+            
+                  } yield combinedErrorsOrResults.map(
+                    _.map(results => Option.when(results.nonEmpty)(
+                        query.copy(
                           mode = mode,
-                          criteria = optCriteria.orElse(query.criteria),
+                          criteria = newCriteria.orElse(query.criteria),
                           peers = ConnectionStatus.from(resultsBySite),
                           lastUpdate = Instant.now
-                        )
-
-                        querySessions.put(id,updatedQuery -> ResultSetFrom(updatedQuery,results),sessionTimeout)
-                        updatedQuery.asRight
-                
-                      case Right(_) => Query.NoResults.asLeft
-                
-                      case Left(errs) => Query.ConnectionErrors(errs).asLeft
-                    }
+                        ) -> results
+                      )
+                    )
+                  ) 
+                  .collect {
+                    case Ior.Right(Some(query -> results)) =>
+                      querySessions.put(id,query -> ResultSetFrom(query,results), sessionTimeout)
+                      query.asRight
                   
-                  } yield errsOrQuery
+                    case Ior.Both(_,Some(query -> results)) =>
+                      querySessions.put(id,query -> ResultSetFrom(query,results), sessionTimeout)
+                      query.asRight
+                     
+                    case Ior.Both(errors,None) => Query.ConnectionErrors(errors).asLeft
+                    
+                    case Ior.Left(errors) => Query.ConnectionErrors(errors).asLeft
+                  }
+                  .getOrElse(Query.NoResults.asLeft)
                   
                 } else {
                   log.debug(s"Query target sites or criteria unchanged, nothing to do") 
