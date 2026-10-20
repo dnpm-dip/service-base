@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.5.3](https://github.com/dnpm-dip/service-base/compare/v1.5.2...v1.5.3) (2026-10-20)
+
+
+### Bug Fixes
+
+* Aapted Query result handling to avoid discarding results when a single failure occurs ([8cf38d8](https://github.com/dnpm-dip/service-base/commit/8cf38d812fc9700eba1bfbaf0bde43220d9d88d3))
+* Added function to delete single submissions by TAN ([#60](https://github.com/dnpm-dip/service-base/issues/60)) ([817843d](https://github.com/dnpm-dip/service-base/commit/817843d5162979f98fa5eede5b0064aaea1d4e5b))
+* Fixed bug in Query.Update processing ([#62](https://github.com/dnpm-dip/service-base/issues/62)) ([8cf38d8](https://github.com/dnpm-dip/service-base/commit/8cf38d812fc9700eba1bfbaf0bde43220d9d88d3))
+* Remove Query-Mode 'custom' as required ([#59](https://github.com/dnpm-dip/service-base/issues/59)) ([7753c2f](https://github.com/dnpm-dip/service-base/commit/7753c2fbad0da7a622a7586aef6b365035922447))
+
 ## [1.5.2](https://github.com/dnpm-dip/service-base/compare/v1.5.1...v1.5.2) (2026-09-28)
 
 
