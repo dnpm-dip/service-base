@@ -1,20 +1,22 @@
 package de.dnpm.dip.service.query
 
-
+import java.time.LocalDate
 import cats.Monad
 import cats.syntax.either._
 import de.dnpm.dip.coding.Coding
 import de.dnpm.dip.util.Completer
-import de.dnpm.dip.model.PatientRecord
-import de.dnpm.dip.model.Site
+import de.dnpm.dip.model.{
+  PatientRecord,
+  Period,
+  Site
+}
 import de.dnpm.dip.service.{
   Cache,
   Connector,
   PeerToPeerRequest
 }
 import play.api.libs.json.{
-  JsObject,
-  JsSuccess,
+  Json,
   Format,
   OFormat,
   Reads,
@@ -22,15 +24,14 @@ import play.api.libs.json.{
 }
 
 
-final case class DummyQueryCriteria()
+final case class DummyQueryCriteria(
+  period: Option[Period[LocalDate]]
+)
 
 object DummyQueryCriteria
 {
   implicit val format: OFormat[DummyQueryCriteria] =
-    OFormat[DummyQueryCriteria](
-      _ => JsSuccess(DummyQueryCriteria()),
-      _ => JsObject.empty
-    )
+    Json.format[DummyQueryCriteria]
 }
 
 
@@ -98,15 +99,20 @@ final class FakeQueryService[F[+_],T <: PatientRecord: Format]
 extends BaseQueryService[F,FakeConfig[T]]
 {
 
+  override val preparedQueryDB = new InMemPreparedQueryDB[F,Monad,Criteria]
 
-  override val preparedQueryDB =
-    new InMemPreparedQueryDB[F,Monad,Criteria]
+  override val db = new InMemLocalDB[F,Monad,Criteria,T](
+    criteria => { 
+      record => criteria.period.filter(
+        period => record.episodesOfCare.exists(eoc => period contains eoc.period.start)
+      )
+      .map(
+        period => criteria.copy(period = Some(period))
+      )
+    }
+  )
 
-  override val db =
-    new InMemLocalDB[F,Monad,Criteria,T](criteria => (t => Some(criteria)))
-
-  override lazy val querySessions =
-    Cache.empty()
+  override lazy val querySessions = Cache.empty()
 
   override implicit val criteriaCompleter: Completer[Criteria] =
     identity[Criteria]
