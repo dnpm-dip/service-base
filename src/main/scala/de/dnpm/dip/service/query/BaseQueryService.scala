@@ -383,7 +383,7 @@ with Logging
                     _.map(results => Option.when(results.nonEmpty)(
                         query.copy(
                           mode = mode,
-                          criteria = newCriteria.orElse(query.criteria),
+                          criteria = if (criteriaChanged) newCriteria else query.criteria,
                           peers = ConnectionStatus.from(resultsBySite),
                           lastUpdate = Instant.now
                         ) -> results
