@@ -55,7 +55,7 @@ with Logging
   import cats.syntax.flatMap._
   import de.dnpm.dip.util.Completer.syntax._
   import BaseQueryService.FEDERATED_QUERIES_INACTIVE
-  import Query.Mode.{Local,Federated,Custom}
+  import Query.Mode.{Local,Federated}
   import QueryService._
 
   
@@ -275,15 +275,9 @@ with Logging
       sites: Option[Set[Coding[Site]]]
     ): (Coding[Query.Mode.Value],Set[Coding[Site]]) =
       mode match {
-        case Query.Mode(Local) => 
-          Coding(Local) -> Set(Site.local)
+        case Query.Mode(Local) => Coding(Local) -> Set(Site.local)
 
-        case Query.Mode(Custom) => 
-          //TODO: consider changing to return an error if site list is undefined on "custom" query
-          Coding(Custom) -> sites.getOrElse(connector.otherSites + Site.local)
-
-        case _ => 
-          Coding(Federated) -> (connector.otherSites + Site.local)
+        case _                 => Coding(Federated) -> (connector.otherSites + Site.local)
       }
 
 
