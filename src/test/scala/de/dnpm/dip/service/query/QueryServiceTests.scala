@@ -64,6 +64,7 @@ class QueryServiceTests extends AsyncFlatSpec
   it must "have correctly performed Query.Update" in { 
 
     for { 
+
       submitOutcome <- service ! Query.Submit(
         mode     = Coding(Query.Mode.Local),
         sites    = None,
@@ -76,7 +77,7 @@ class QueryServiceTests extends AsyncFlatSpec
 
       query = submitOutcome.value
 
-      updateOutcome <- service ! Query.Update(
+      update = Query.Update(
         id       = query.id,
         mode     = None,
         sites    = None,
@@ -86,10 +87,13 @@ class QueryServiceTests extends AsyncFlatSpec
           )
         )
       )
+
+      updateOutcome <- service ! update
       
       updatedQuery = updateOutcome.value
 
-    } yield updatedQuery.criteria must not equal (query.criteria)
+    } yield updatedQuery.criteria mustBe update.criteria
+
   }
 
 }
