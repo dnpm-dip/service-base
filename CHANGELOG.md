@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.4](https://github.com/dnpm-dip/service-base/compare/v1.5.3...v1.5.4) (2026-10-21)
+
+
+### Bug Fixes
+
+* bump dependencies ([ded1b1d](https://github.com/dnpm-dip/service-base/commit/ded1b1d5f5de3d88376e6a44b04c2d70f0de6889))
+
 ## [1.5.3](https://github.com/dnpm-dip/service-base/compare/v1.5.2...v1.5.3) (2026-10-20)
 
 
