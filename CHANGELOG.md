@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.5](https://github.com/dnpm-dip/service-base/compare/v1.5.4...v1.5.5) (2026-11-06)
+
+
+### Bug Fixes
+
+* Added support to validate sequences with position/index info ([#64](https://github.com/dnpm-dip/service-base/issues/64)) ([e459382](https://github.com/dnpm-dip/service-base/commit/e459382a4c2706e7f06ec4fa0afb0a4f5fb00970))
+* Corrected path for Broad-consent validation https://github.com/dnpm-dip/service-base/pull/64#discussion_r4491652332 ([e459382](https://github.com/dnpm-dip/service-base/commit/e459382a4c2706e7f06ec4fa0afb0a4f5fb00970))
+
 ## [1.5.4](https://github.com/dnpm-dip/service-base/compare/v1.5.3...v1.5.4) (2026-10-21)
 
 
