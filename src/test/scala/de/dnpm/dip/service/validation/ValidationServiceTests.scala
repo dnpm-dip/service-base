@@ -24,7 +24,7 @@ import ValidationService.{
 import Submission.Type.FollowUp
 
 
-class ValidationServiceTests extends AsyncFlatSpec with Matchers// with Validators
+class ValidationServiceTests extends AsyncFlatSpec with Matchers
 {
 
   implicit val rnd: Random = new Random(42)

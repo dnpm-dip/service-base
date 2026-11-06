@@ -41,6 +41,8 @@ object Issue
 
   case class Path(nodes: List[String])
   {
+
+    // Append methods
     def /(node: String): Path =
       copy(nodes = nodes :+ node)
 
@@ -54,7 +56,12 @@ object Issue
     ): Path =
       this/s"${node.name}[${t.id.value}]"
 
+    def /[T](tWithIdx: (T,Int))(
+      implicit node: Path.Node[T]
+    ): Path =
+      this/s"${node.name}[${tWithIdx._2}]"
 
+    // Prepend methods
     def /:(p: Path): Path =
       this.copy(nodes = p.nodes ++: nodes)
 
@@ -66,6 +73,10 @@ object Issue
     ): Path =
       s"${node.name}[${t.id.value}]" /: this
 
+    def /:[T](tWithIdx: (T,Int))(
+      implicit node: Path.Node[T]
+    ): Path =
+      s"${node.name}[${tWithIdx._2}]" /: this
 
     override def toString: String =
       s"/${nodes.mkString("/")}"

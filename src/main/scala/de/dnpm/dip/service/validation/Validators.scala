@@ -4,7 +4,10 @@ package de.dnpm.dip.service.validation
 import java.net.URI
 import scala.util.matching.Regex
 import scala.util.chaining._
-import cats.Applicative
+import cats.{
+  Applicative,
+  Traverse
+}
 import cats.data.ValidatedNel
 import cats.syntax.validated._
 import de.ekut.tbi.validation.{
@@ -73,7 +76,6 @@ import shapeless.{
 trait Validators
 {
 
-
   implicit class IssueBuilderValidatedNelExtensions[T](
     val validated: ValidatedNel[Issue.Builder,T]
   ){
@@ -82,9 +84,7 @@ trait Validators
 
     def at(node: String): ValidatedNel[Issue,T] =
       validated.leftMap(_.map(_ at Path.root/node))
-
   }
-
 
   implicit class IssueValidatedNelExtensions[T](
     val validated: ValidatedNel[Issue,T]
@@ -100,17 +100,32 @@ trait Validators
   }
 
 
+  implicit def indexedElementValidator[T: Path.Node](
+    implicit validator: Validator[Issue,T]
+  ): Validator[Issue,(T,Int)] = {
+    case tIdx @ (t,_) => validator(t).bimap(
+      _.map(issue => issue.copy(path = tIdx /: issue.path)),
+      _ => tIdx
+    )
+  }
+
+  def validateEachWithIndex[T, C[x] <: collection.SeqOps[x,C,C[x]]: Traverse](
+    ts: C[T]
+  )(
+    implicit
+    validator: Validator[Issue,T],
+    node: Path.Node[T]
+  ): ValidatedNel[Issue,C[T]] =
+    validateEach(ts.zipWithIndex).map(_.map(_._1))
+
+
   // CanContain implementation for Interval sub-types
   implicit def intervalCanContain[T, C[x] <: Interval[x]]: CanContain[T,C[T]] =
     new CanContain[T,C[T]]{
+      override def contains(c: C[T])(t: T): Boolean = c contains t
 
-      override def contains(c: C[T])(t: T): Boolean =
-        c contains t
-
-      override def containsOnly(c: C[T])(t: T): Boolean =
-        c contains t
+      override def containsOnly(c: C[T])(t: T): Boolean = c contains t
     }
-
 
 
   implicit val patientNode: Path.Node[Patient] =
@@ -139,6 +154,9 @@ trait Validators
 
   implicit def procedureNode[P <: Procedure]: Path.Node[P] =
     Path.Node("Prozedur")
+
+  implicit val consentNode: Path.Node[BroadConsent] =
+    Path.Node("Broad-Consent")
 
 
   def MissingValue(
@@ -356,7 +374,7 @@ trait Validators
     geneValidator: Validator[Issue.Builder,Coding[HGNC]]
   ): Validator[Issue,T] =
     RecommendationValidator[T] combineWith {
-      rec => (validateEach(rec.study) at "Studien-Referenz").map( _ => rec)
+      rec => (validateEach(rec.study) at "Studien-Referenz").map(_ => rec)
     }
 
 
@@ -477,13 +495,12 @@ trait Validators
           .find(_.purpose == Sequencing)
           .exists(_.`type` == Permit) must be (true) otherwise (Fatal("Fehlende Zustimmung zur Sequenzierung") at "MVH-Einwilligung"),
         ifDefined(metadata.modelProjectConsent.date)(
-          d => 
-            (
-              all (metadata.modelProjectConsent.provisions.map(_.date)) must not (be (before (d))) otherwise (
-                Error("Einwilligungsdatum kann nicht vor dem Vorlegen der Teilnahmeerklärung liegen") at "MVH-Einwilligung"
-              )
+          d => (
+            all (metadata.modelProjectConsent.provisions.map(_.date)) must not (be (before (d))) otherwise (
+              Error("Einwilligungsdatum kann nicht vor dem Vorlegen der Teilnahmeerklärung liegen") at "MVH-Einwilligung"
             )
-            .map(_ => d)
+          )
+          .map(_ => d)
         ),
         (metadata.researchConsents.filter(_.nonEmpty) orElse metadata.reasonResearchConsentMissing) must be (defined) otherwise (
           Error("Es muss entweder MII Forschungs-/Broad-Consent oder der Grund für dessen Fehlen vorhanden sein") at "Broad Consent"
@@ -492,7 +509,7 @@ trait Validators
           Error(s"Unzulässiger Wert, ab 01.06.2026 nur noch folgende gültig: {${admissibleConsentMissingReasons.mkString(", ")}}")
             at "Grund für fehlenden Broad Consent"
         ),
-        ifDefined(metadata.researchConsents.filter(_.nonEmpty))(validateEach(_))
+        ifDefined(metadata.researchConsents.filter(_.nonEmpty))(validateEachWithIndex(_))
       )
       .errorsOr(metadata) on "Metadaten"
 
