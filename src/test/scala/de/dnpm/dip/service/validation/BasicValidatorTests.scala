@@ -4,11 +4,14 @@ package de.dnpm.dip.service.validation
 import scala.util.chaining._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers._
+import org.scalatest.EitherValues._
 import org.scalatest.Inspectors._
 import Issue.Path
 import de.ekut.tbi.validation.dsl.validate
 import de.dnpm.dip.coding.Code
 import de.dnpm.dip.coding.hgvs.HGVS
+import de.dnpm.dip.service.mvh.BroadConsent
+import play.api.libs.json.Json
 
 
 class BasicValidatorTests extends AnyFlatSpec with Validators
@@ -27,8 +30,6 @@ class BasicValidatorTests extends AnyFlatSpec with Validators
   }
 
 
-
-/*
   private def readConsent(f: String): BroadConsent =
     Json.fromJson[BroadConsent](
       Json.parse(
@@ -42,8 +43,6 @@ class BasicValidatorTests extends AnyFlatSpec with Validators
 
     val consent = readConsent("consent.json")
 
-    implicit val patId = consent.patient.get.id
-
     val validation = validate(consent)
 
     validation.isValid mustBe true
@@ -52,15 +51,19 @@ class BasicValidatorTests extends AnyFlatSpec with Validators
 
   it must "have failed" in { 
 
-    val consent = readConsent("invalid_consent.json")
+    // Wrap in List to test index-based Issue.path info at the same time 
+    val consents = List(readConsent("invalid_consent.json"))
 
-    implicit val patId = Id[Patient]("1234")
-
-    val validation = validate(consent)
+    val validation = validateEachWithIndex(consents)
 
     validation.isValid mustBe false
+
+    forAll(validation.swap.toEither.value.toList)(
+      issue => issue.path.toString must include regex "\\[\\d\\]"
+    )
+
   }
-*/
+
 
   "HGVS protein change validation" must "have succeeded on correct codes" in { 
 

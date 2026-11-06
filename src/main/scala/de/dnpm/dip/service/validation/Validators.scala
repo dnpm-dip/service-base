@@ -103,9 +103,9 @@ trait Validators
   implicit def indexedElementValidator[T: Path.Node](
     implicit validator: Validator[Issue,T]
   ): Validator[Issue,(T,Int)] = {
-    case tIdx @ (t,_) => validator(t).bimap(
+    case tIdx @ (t,idx) => validator(t).bimap(
       _.map(issue => issue.copy(path = tIdx /: issue.path)),
-      _ => tIdx
+      validT => (validT,idx)
     )
   }
 
@@ -472,12 +472,12 @@ trait Validators
 
       case v if packageVersions(v) =>
         Warning(s"Consent Version als Package-Version angegeben, sollte eine der Profile-Versionen {${profileVersions.mkString(",")}} sein")
-          .at("Broad Consent")
+          .at("Version")
           .invalidNel
 
       case v =>
         Warning(s"Nicht zuordenbare Consent Version '$v', sollte eine der Profile-Versionen {${profileVersions.mkString(",")}} (oder vorübergehend eine der Package-Versionen {${packageVersions.mkString(",")}}) sein" )
-          .at("Broad Consent")
+          .at("Version")
           .invalidNel
 
     } map (_ => consent)
