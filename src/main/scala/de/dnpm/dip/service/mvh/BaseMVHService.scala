@@ -18,8 +18,10 @@ import de.dnpm.dip.util.Logging
 import de.dnpm.dip.model.{
   ClosedPeriod,
   EpisodeOfCare,
+  History,
   Id,
   NGSReport,
+  Patient,
   PatientRecord,
   Period,
   Site
@@ -310,7 +312,15 @@ with Logging
   override def submissionReport(id: Id[TransferTAN])(
     implicit env: Env
   ): F[Option[Submission.Report]] =
-    repo submissionReport id
+    repo.submissionReport(id)
+
+
+  override def submissionReportHistory(
+    id: Id[Patient]
+  )(
+    implicit env: Env
+  ): F[Option[History[Submission.Report]]] =
+    repo.submissionReportHistory(id)
 
 
   override def ?(filter: Submission.Filter)(
@@ -322,7 +332,7 @@ with Logging
   override def submission(id: Id[TransferTAN])(
     implicit env: Env
   ): F[Option[Submission[T]]] =
-    repo submission id
+    repo.submission(id)
 
 
   override def report(

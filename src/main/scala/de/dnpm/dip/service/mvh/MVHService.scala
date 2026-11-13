@@ -5,6 +5,7 @@ import java.time.LocalDateTime
 import cats.data.EitherNel
 import de.dnpm.dip.service.controlling.Controlling
 import de.dnpm.dip.model.{
+  History,
   Id,
   Patient,
   PatientRecord,
@@ -66,6 +67,13 @@ trait MVHService[F[_],Env,T <: PatientRecord] extends Controlling.Ops[F,Env]
   )(
     implicit env: Env
   ): F[Report]
+
+
+  def submissionReportHistory(
+    id: Id[Patient]
+  )(
+    implicit env: Env
+  ): F[Option[History[Submission.Report]]]
 
 
   def deletionEvents(
