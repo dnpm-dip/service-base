@@ -428,18 +428,25 @@ trait Validators
     ObservationValidator[O](valueValidator)
 
 
+  def CarePlanValidator(
+    implicit patient: Patient
+  ): Validator[Issue,CarePlan] =
+    carePlan => (
+      validate(carePlan.patient) at "Patient",
+      carePlan.boardType must be (defined) otherwise (MissingValue("Board-Typ",Issue.Severity.Error))
+    )
+    .errorsOr(carePlan) on carePlan
+
+
   def PatientRecordValidator[T <: PatientRecord]: Validator[Issue,T] = 
-    record =>
-      (
-        validate(record.patient),
-        record.getCarePlans.validateEach(
-          carePlan => carePlan.boardType must be (defined) otherwise (MissingValue("Board-Typ")) map (_ => carePlan)
-        ),
-        record.episodesOfCare.toList.count(_.period.endOption.isEmpty) must be (lessThanOrEqual (1)) otherwise (
-          Error("Es darf höchstens 1 offene/laufende Behandlungs-Episode vorkommen, d.h. ohne Enddatum") at "Behandlungs-Episoden"
-        )
+    record => (
+      validate(record.patient),
+      record.getCarePlans.validateEach(CarePlanValidator(record.patient)),
+      record.episodesOfCare.toList.count(_.period.endOption.isEmpty) must be (lessThanOrEqual (1)) otherwise (
+        Error("Es darf höchstens 1 offene/laufende Behandlungs-Episode vorkommen, d.h. ohne Enddatum") at "Behandlungs-Episoden"
       )
-      .errorsOr(record)
+    )
+    .errorsOr(record)
 
 
   private val hexString64 = "[a-fA-F0-9]{64}".r
@@ -485,33 +492,32 @@ trait Validators
   }
 
   implicit val metadataValidator: Validator[Issue,Submission.Metadata] =
-    metadata =>
-      (
-        metadata.transferTAN.value must matchRegex (hexString64) otherwise (
-          Error("Transfer-TAN entspricht nicht den Vorgaben: Hex-String mit 64 Zeichen") at "TAN (TVNk)"
-        ),
-        metadata.modelProjectConsent
-          .provisions
-          .find(_.purpose == Sequencing)
-          .exists(_.`type` == Permit) must be (true) otherwise (Fatal("Fehlende Zustimmung zur Sequenzierung") at "MVH-Einwilligung"),
-        ifDefined(metadata.modelProjectConsent.date)(
-          d => (
-            all (metadata.modelProjectConsent.provisions.map(_.date)) must not (be (before (d))) otherwise (
-              Error("Einwilligungsdatum kann nicht vor dem Vorlegen der Teilnahmeerklärung liegen") at "MVH-Einwilligung"
-            )
+    metadata => (
+      metadata.transferTAN.value must matchRegex (hexString64) otherwise (
+        Error("Transfer-TAN entspricht nicht den Vorgaben: Hex-String mit 64 Zeichen") at "TAN (TVNk)"
+      ),
+      metadata.modelProjectConsent
+        .provisions
+        .find(_.purpose == Sequencing)
+        .exists(_.`type` == Permit) must be (true) otherwise (Fatal("Fehlende Zustimmung zur Sequenzierung") at "MVH-Einwilligung"),
+      ifDefined(metadata.modelProjectConsent.date)(
+        d => (
+          all (metadata.modelProjectConsent.provisions.map(_.date)) must not (be (before (d))) otherwise (
+            Error("Einwilligungsdatum kann nicht vor dem Vorlegen der Teilnahmeerklärung liegen") at "MVH-Einwilligung"
           )
-          .map(_ => d)
-        ),
-        (metadata.researchConsents.filter(_.nonEmpty) orElse metadata.reasonResearchConsentMissing) must be (defined) otherwise (
-          Error("Es muss entweder MII Forschungs-/Broad-Consent oder der Grund für dessen Fehlen vorhanden sein") at "Broad Consent"
-        ),
-        valueIn (metadata.reasonResearchConsentMissing) must be (in (admissibleConsentMissingReasons)) otherwise (
-          Error(s"Unzulässiger Wert, ab 01.06.2026 nur noch folgende gültig: {${admissibleConsentMissingReasons.mkString(", ")}}")
-            at "Grund für fehlenden Broad Consent"
-        ),
-        ifDefined(metadata.researchConsents.filter(_.nonEmpty))(validateEachWithIndex(_))
-      )
-      .errorsOr(metadata) on "Metadaten"
+        )
+        .map(_ => d)
+      ),
+      (metadata.researchConsents.filter(_.nonEmpty) orElse metadata.reasonResearchConsentMissing) must be (defined) otherwise (
+        Error("Es muss entweder MII Forschungs-/Broad-Consent oder der Grund für dessen Fehlen vorhanden sein") at "Broad Consent"
+      ),
+      valueIn (metadata.reasonResearchConsentMissing) must be (in (admissibleConsentMissingReasons)) otherwise (
+        Error(s"Unzulässiger Wert, ab 01.06.2026 nur noch folgende gültig: {${admissibleConsentMissingReasons.mkString(", ")}}")
+          at "Grund für fehlenden Broad Consent"
+      ),
+      ifDefined(metadata.researchConsents.filter(_.nonEmpty))(validateEachWithIndex(_))
+    )
+    .errorsOr(metadata) on "Metadaten"
 
 
   def SequencingTypeValidator(
