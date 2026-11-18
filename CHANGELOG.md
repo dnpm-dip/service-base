@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.6](https://github.com/dnpm-dip/service-base/compare/v1.5.5...v1.5.6) (2026-11-18)
+
+
+### Bug Fixes
+
+* Added MVHService.submissionReportHistory ([#66](https://github.com/dnpm-dip/service-base/issues/66)) ([d84b9cd](https://github.com/dnpm-dip/service-base/commit/d84b9cd5ae62f96b20d17b62b37f5334a27fb05a))
+* Added validation to enforce that CarePlan.boardType be defined ([#67](https://github.com/dnpm-dip/service-base/issues/67)) ([459455f](https://github.com/dnpm-dip/service-base/commit/459455f4d49ccbd970b8d86e72b83ec8860bf076))
+
 ## [1.5.5](https://github.com/dnpm-dip/service-base/compare/v1.5.4...v1.5.5) (2026-11-06)
 
 
