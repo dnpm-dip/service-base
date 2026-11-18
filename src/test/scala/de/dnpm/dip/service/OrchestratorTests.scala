@@ -47,7 +47,6 @@ class OrchestratorTests extends AsyncFlatSpec
 
   val queryService = new FakeQueryService[Future,DummyPatientRecord](true)
 
-
   val orchestrator =
     new Orchestrator(
       validationService,
@@ -74,7 +73,7 @@ class OrchestratorTests extends AsyncFlatSpec
   val subsequentUpload =
     initialUpload.copy(
       metadata = Some(
-        genMetadata(record, Submission.Type.Addition,false).next
+        genMetadata(record,Submission.Type.Addition,false).next
       )
     )
 
@@ -127,6 +126,15 @@ class OrchestratorTests extends AsyncFlatSpec
       _ = snapshot.value must not be defined
 
     } yield succeed // If not failed before, test passed
+
+  }
+
+
+  it must "have failed as expected on duplicate submission" in { 
+
+    for {
+      outcome <- orchestrator ! Process(initialUpload)
+    } yield outcome must matchPattern { case Left(_) => }
 
   }
 
