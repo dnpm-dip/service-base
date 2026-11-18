@@ -31,7 +31,7 @@ import Orchestrator._
 class OrchestratorTests extends AsyncFlatSpec
 {
 
-  System.setProperty("dnpm.dip.site","UKX:Musterlingen")
+  System.setProperty(Site.PROP,"UKX:Musterlingen")
 
 
   implicit val rnd: Random = new Random(42)

@@ -24,7 +24,9 @@ import de.dnpm.dip.service.Gens.genDummyPatientRecordWithoutNGS
 class QueryServiceTests extends AsyncFlatSpec
 { 
 
-  implicit val rnd: Random = new Random()
+  System.setProperty(Site.PROP,"UKX:Musterlingen")
+
+  implicit val rnd: Random = new Random
 
   val service = new FakeQueryService[Future,DummyPatientRecord](federatedQueriesActive = false)
 
