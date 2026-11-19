@@ -85,24 +85,6 @@ object Orchestrator
   final case class SavedWithIssues(report: ValidationReport) extends Outcome
   final case class Deleted(id: Id[Patient]) extends Outcome
 
-/*
-  type Error = Either[ValidationService.Error,Either[MVHService.Error,QueryService.DataError]]
-
-  object Error
-  {
-    def apply(err: QueryService.DataError): Error =
-      err.asRight[MVHService.Error]
-        .asRight[ValidationService.Error]
-
-    def apply(err: MVHService.Error): Error =
-      err.asLeft[QueryService.DataError]
-        .asRight[ValidationService.Error]
-
-    def apply(err: ValidationService.Error): Error =
-      err.asLeft[Either[MVHService.Error,QueryService.DataError]]
-
-  }
-*/
 
   type Error = ValidationService.Error :+: MVHService.Error :+: QueryService.DataError :+: CNil
 
@@ -110,21 +92,31 @@ object Orchestrator
   {
     def apply[T](t: T)(implicit inj: Inject[Error,T]): Error = inj(t)
 
-    object syntax
+    object ops
     {
-      implicit class Ops[E,V](val outcome: Either[E,V]) extends AnyVal
-      { 
-        def widenError(implicit inj: Inject[Error,E]): EitherNel[Error,V] =
-           outcome.leftMap(err => NonEmptyList.one(inj(err)))       
+      import cats.Functor
+      import cats.syntax.functor._
+
+      implicit class EitherOps[F[_],E,V](val outcome: F[Either[E,V]]) extends AnyVal
+      {
+        def adaptError(
+          implicit
+          func: Functor[F],
+          inj: Inject[Error,E]
+        ): F[EitherNel[Error,V]] =
+          outcome.map(_.leftMap(err => NonEmptyList.one(inj(err))))
       }
 
-      implicit class NelOps[E,V](val outcome: EitherNel[E,V]) extends AnyVal
-      { 
-        def widenError(implicit inj: Inject[Error,E]): EitherNel[Error,V] =
-           outcome.leftMap(_.map(inj(_)))       
+      implicit class EitherNelOps[F[_],E,V](val outcome: F[EitherNel[E,V]]) extends AnyVal
+      {
+        def adaptErrors(
+          implicit
+          func: Functor[F],
+          inj: Inject[Error,E]
+        ): F[EitherNel[Error,V]] =
+          outcome.map(_.leftMap(_.map(inj(_))))
       }
     }
-
   }
 
 }
@@ -154,7 +146,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
   }
   import Completer.syntax._
   import Deidentifier.syntax._
-  import Error.syntax._
+  import Error.ops._
 
   // PatientRecord Deidentifier:
   // - Remove MV-specific element Patient.address in PatientRecords transferred into the Query module
@@ -195,15 +187,15 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
 
                 // MV submission
                 case Some(metadata) =>
-                  (mvhService ! MVHService.Process(dataUpload.record,metadata)).map(_.widenError) :: (
+                  (mvhService ! MVHService.Process(dataUpload.record,metadata)).adaptErrors :: (
 
                     // If ResearchConsent is given, save the data in the query module, except for submission type 'test'
                     if (metadata.researchConsents.map(BroadConsent.permitsResearchUse).exists(_ == true) && metadata.`type` != Test)
-                      Some((queryService ! QueryService.Save(dataUpload.record.deidentified)).map(_.widenError))
+                      Some(queryService ! QueryService.Save(dataUpload.record.deidentified)).map(_.adaptError)
                       
                     // Else for non-initial submissions, delete data from the query module (in case it has been saved on initial submission)
                     else if (nonInitial(metadata.`type`)) 
-                      Some((queryService ! QueryService.Delete(dataUpload.record.id)).map(_.widenError))
+                      Some(queryService ! QueryService.Delete(dataUpload.record.id)).map(_.adaptError)
 
                     else None  // Nothing to do
                     
@@ -211,7 +203,7 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
                   .toList
 
                 // No MV metadata ("DNPM-only"): Only save in query module
-                case None => List((queryService ! QueryService.Save(dataUpload.record.deidentified)).map(_.widenError))
+                case None => List(queryService ! QueryService.Save(dataUpload.record.deidentified)).map(_.adaptError)
               }
 
               for {
@@ -257,12 +249,12 @@ final class Orchestrator[F[+_],T <: PatientRecord: Completer]
 
         for {
           results <- scopes.toList.traverse {
-            case MVGenomSeq => (mvhService ! MVHService.DeleteAll(patientId)).map(_.widenError)
-            case Research   => (queryService ! QueryService.Delete(patientId)).map(_.widenError)
+            case MVGenomSeq => (mvhService ! MVHService.DeleteAll(patientId)).adaptErrors
+            case Research   => (queryService ! QueryService.Delete(patientId)).adaptError
           }
 
           // ... and delete from the validation service by default
-          validation <- (validationService ! ValidationService.Delete(patientId)).map(_.widenError)
+          validation <- (validationService ! ValidationService.Delete(patientId)).adaptError
 
           errors = (validation :: results).flatMap {
             case Left(errs) => errs.toList
