@@ -17,6 +17,7 @@ import de.dnpm.dip.service.mvh.{
   FakeMVHService,
   Submission
 }
+import de.dnpm.dip.service.mvh.MVHService.InvalidTAN
 import de.dnpm.dip.service.query.{
   FakeQueryService,
   PatientRecordRequest,
@@ -26,7 +27,7 @@ import de.dnpm.dip.service.controlling.FederatedControllingInfo
 import de.ekut.tbi.generators.Gen
 import Gens._
 import Orchestrator._
-
+import shapeless.{Inl,Inr}
 
 class OrchestratorTests extends AsyncFlatSpec
 {
@@ -46,7 +47,6 @@ class OrchestratorTests extends AsyncFlatSpec
   val mvhService = new FakeMVHService[Future,DummyPatientRecord]()
 
   val queryService = new FakeQueryService[Future,DummyPatientRecord](true)
-
 
   val orchestrator =
     new Orchestrator(
@@ -74,7 +74,7 @@ class OrchestratorTests extends AsyncFlatSpec
   val subsequentUpload =
     initialUpload.copy(
       metadata = Some(
-        genMetadata(record, Submission.Type.Addition,false).next
+        genMetadata(record,Submission.Type.Addition,false).next
       )
     )
 
@@ -127,6 +127,28 @@ class OrchestratorTests extends AsyncFlatSpec
       _ = snapshot.value must not be defined
 
     } yield succeed // If not failed before, test passed
+
+  }
+
+
+  it must "have failed as expected on duplicate submission" in { 
+
+    val upload = dataUpload.next
+
+    for {
+      outcome1 <- orchestrator ! Process(upload)
+
+      _ = outcome1.value mustBe Saved
+
+      outcome2 <- orchestrator ! Process(upload)
+
+      errors = outcome2.swap.value
+
+      _ = errors.collectFirst { case Inr(Inl(_: InvalidTAN)) => } mustBe defined
+
+      deleteOutcome <- orchestrator ! Delete(upload.record.id)
+
+    } yield deleteOutcome.value mustBe a [Deleted]
 
   }
 
