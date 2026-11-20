@@ -57,6 +57,8 @@ class FSBackedRepositoryTests extends AsyncFlatSpec
 
     val submissions = List.fill(n)(metadata.next).map(Gen.of[DummyPatientRecord].next -> _)
 
+    val tans = submissions.map(_._2.transferTAN)
+
     val start = LocalDateTime.now
 
     for { 
@@ -73,7 +75,7 @@ class FSBackedRepositoryTests extends AsyncFlatSpec
       _ = queriedSubmissions.size mustBe n
 
 
-      submissionsByTAN <- submissions.map(_._2.transferTAN).traverse(service.submission(_))
+      submissionsByTAN <- tans.traverse(service.submission(_))
 
       _ = all (submissionsByTAN) must be (defined)
 
@@ -87,8 +89,8 @@ class FSBackedRepositoryTests extends AsyncFlatSpec
       _ = all (deletionOutcomes) must matchPattern { case Right(AllDeleted) => }
 
 
-      submissionsAfterDeletion <- submissions.map(_._2.transferTAN).traverse(service submission _)
-      reportsAfterDeletion     <- submissions.map(_._2.transferTAN).traverse(service submissionReport _)
+      submissionsAfterDeletion <- tans.traverse(service submission _)
+      reportsAfterDeletion     <- tans.traverse(service submissionReport _)
 
       _ = all (submissionsAfterDeletion) must be (empty)
       _ = all (reportsAfterDeletion) must be (empty)
