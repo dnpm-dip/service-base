@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.7](https://github.com/dnpm-dip/service-base/compare/v1.5.6...v1.5.7) (2026-11-20)
+
+
+### Bug Fixes
+
+* Added validation that careplan dates be distinct (2 or more boards on the same day would seem unrealistic/inconsistent) ([#70](https://github.com/dnpm-dip/service-base/issues/70)) ([3c03c23](https://github.com/dnpm-dip/service-base/commit/3c03c23efe3ff52ec47d2aafacef99a6eeb78e64))
+* Fixed Orchestrator error handling to correctly report all errors ([#69](https://github.com/dnpm-dip/service-base/issues/69)) ([4030b46](https://github.com/dnpm-dip/service-base/commit/4030b46cb5b7d86dbd88ec8428c1c55904c16c90))
+
 ## [1.5.6](https://github.com/dnpm-dip/service-base/compare/v1.5.5...v1.5.6) (2026-11-18)
 
 
