@@ -441,6 +441,9 @@ trait Validators
   def PatientRecordValidator[T <: PatientRecord]: Validator[Issue,T] = 
     record => (
       validate(record.patient),
+      record.getCarePlans.map(_.issuedOn) must have (distinctElements) otherwise (
+        Error("Datums-Inkonsistenz: Angeblich haben 2 (oder mehr) Board-Beschlüsse am gleichen Tag stattgefunden.") at "Board-Beschluss-Datum"
+      ),
       record.getCarePlans.validateEach(CarePlanValidator(record.patient)),
       record.episodesOfCare.toList.count(_.period.endOption.isEmpty) must be (lessThanOrEqual (1)) otherwise (
         Error("Es darf höchstens 1 offene/laufende Behandlungs-Episode vorkommen, d.h. ohne Enddatum") at "Behandlungs-Episoden"
